@@ -1693,7 +1693,7 @@ uint8_t cam_sccb_set_bin4 (void)
     return cam_bin_ok;
 }
 
-volatile uint8_t cam_shutter = 150U;  // ★ 曝光 R0x0B（行数）：出厂 443 在行bin4 下卡死成帧；150≈5.5ms
+volatile uint8_t cam_shutter = 100U;   /* ★ 帧长只有 120 行 ⇒ 快门必须 < 120，150 会让传感器卡在等曝光 */  // ★ 曝光 R0x0B（行数）：出厂 443 在行bin4 下卡死成帧；150≈5.5ms
 volatile uint8_t cam_flip = 0U;       // 0=不翻 1=左右镜像(ColumnFlip) 2=上下(RowFlip) 3=两者(180°)
 
 //-------------------------------------------------------------------------------------------------------------------
