@@ -906,10 +906,14 @@ int main(void)
                 if (0U == fpkt_sent) { fpkt_total = (uint32_t)(12U + flen + 2U); }
 
                 rem = wifi_f4_send(fpkt + fpkt_sent, fpkt_total - fpkt_sent);
-                fpkt_sent = fpkt_total - rem;
+                fpkt_sent = fpkt_total - rem;              /* 已发字节数 */
 
-                if (0U == fpkt_sent)                       /* 整包真正发完了：结束这一帧 */
+                // ⚠️ 完成条件必须看 **rem == 0**（= 剩余为 0）✓
+                //   上一版写成了 `0U == fpkt_sent`，而发完时 fpkt_sent == fpkt_total ≠ 0
+                //   ⇒ **永远不完成** ⇒ 不发图、且心跳守卫把心跳也挡死了 ✗✗
+                if (0U == rem)                             /* 整包真正发完：结束这一帧 */
                 {
+                    fpkt_sent  = 0U;
                     fpkt_total = 0U;
                     cam_tx_row = (uint16_t)(txh - 1U);
                     cam_tx_row_done();
