@@ -575,9 +575,12 @@ static uint8_t wf_wait_idle_us (uint32_t us)
 uint32_t wifi_f4_send (const uint8_t *buf, uint32_t len)
 {
     uint16_t chunk;
+    uint32_t s0;
     wf_pkt_t p;
 
     if (!wf_ready || (NULL == buf)) return len;
+
+    s0 = len;                          /* 进来时的长度：判断"这一轮有没有发出去东西" ✓ */
 
     while (len)
     {
@@ -592,6 +595,20 @@ uint32_t wifi_f4_send (const uint8_t *buf, uint32_t len)
 
         len  -= chunk;
         buf  += chunk;
+    }
+
+    /* ★★ 自动重连（2026-10-19）：连续"发了但进度为 0" ⇒ 认为链路已断
+       （**上位机重启**后 TCP 会话就死了，而 wf_ready 还一直是 1 ⇒ 板子往死连接里发，不会重连 ✗）
+       ⇒ 清 wf_ready ⇒ 主循环的 3 秒重连逻辑会重新 init + 连 WiFi + 连 TCP ✓✓ */
+    {
+        static uint16_t wf_stall = 0U;
+        if (0U == (s0 - len)) { if (wf_stall < 60000U) { wf_stall ++; } }
+        else                  { wf_stall = 0U; }
+        if (wf_stall >= 150U)          /* 连续 150 次没有进展（≈0.1~1 秒）⇒ 判链路断 */
+        {
+            wf_stall = 0U;
+            wf_ready = 0U;
+        }
     }
     return len;
 }
