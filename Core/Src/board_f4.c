@@ -716,36 +716,21 @@ void board_cam_set_mode (uint8_t mode)
 //-------------------------------------------------------------------------------------------------------------------
 uint8_t board_cam_restart (void)
 {
-    uint32_t guard;
+    uint8_t i;
 
-    /* ★★ 硬重启（2026-10-19）：不用 HAL_DCMI_Stop() ★★
-       它内部要等标志且没有超时 ⇒ DCMI 不干净时死等 ⇒ 整机挂住（22:04 那次就是）✗✗
-       这里：关 DCMI → 清 CR → 关 DMA 流 → 复位 HAL 状态 → 重新 Start
-       Start 会等一个 VSYNC 当帧首 ⇒ 每次都从真帧首重新对齐 ✓
-       （这正是"开机时随机出现横竖线"的对治：上电时传感器还在默认模式，DCMI 带半截状态开始就错位） */
-    __HAL_DCMI_DISABLE(&hdcmi);
-    DCMI->CR = 0U;
-
-    hdma_dcmi.Instance->CR &= ~DMA_SxCR_EN;
-    guard = 0U;
-    while ((0U != (hdma_dcmi.Instance->CR & DMA_SxCR_EN)) && (guard < 100000U)) { guard ++; }
-    hdma_dcmi.Instance->NDTR = 0U;
-
-    hdcmi.State     = HAL_DCMI_STATE_RESET;   /* 让 HAL_DCMI_Init 肯重新配置 ✓ */
-    hdma_dcmi.State = HAL_DMA_STATE_READY;
-
-    HAL_Delay(2);
-
-    /* ★ `DCMI->CR = 0` 把极性/8位/硬件同步都清了 ⇒ **必须重新 Init 一次** ✓
-       （Init 只写寄存器、不等标志位，不会卡死 ✓ 并把 State 置回 READY，Start 才肯跑 ✓） */
-    if (HAL_DCMI_Init(&hdcmi) != HAL_OK)
+    /* ★ 回到官方写法（读 stm32f4xx_hal_dcmi.c 后确认）：
+       · HAL_DCMI_Stop 内部**有超时**（SystemCoreClock / HAL_TIMEOUT_DCMI_STOP），不会无限死等 ✓
+       · 它内部会 HAL_DMA_Abort 关掉 DMA 流 ⇒ 下次 HAL_DMA_Start_IT 才不会返回 BUSY ✓
+       · HAL_DCMI_Start_DMA 只开 DCMI/配 CM/开 DMA/置 CAPTURE，**不会重配极性**
+         ⇒ 所以**不能先 CR=0**（那样极性就丢了），直接用 Stop+Start 最稳 ✓ */
+    for (i = 0U; i < 3U; i++)
     {
-        cam_last_start_err = 1U;
-        return 1U;
+        (void)HAL_DCMI_Stop(&hdcmi);
+        HAL_Delay(2);
+
+        if (0U == board_cam_start()) { return 0U; }
+        HAL_Delay(5);
     }
-
-    if (0U == board_cam_start()) { return 0U; }
-
     cam_last_start_err = 1U;
     return 1U;
 }
