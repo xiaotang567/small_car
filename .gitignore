@@ -1,0 +1,23 @@
+# ── Keil 编译中间产物（保留 .hex / .axf / .uvprojx / .uvoptx）──
+MDK-ARM/small_car/*.o
+MDK-ARM/small_car/*.d
+MDK-ARM/small_car/*.crf
+MDK-ARM/small_car/*.dep
+MDK-ARM/small_car/*.lst
+MDK-ARM/small_car/*.htm
+MDK-ARM/small_car/*.lnp
+MDK-ARM/small_car/*.map
+MDK-ARM/small_car/*.iex
+MDK-ARM/small_car/*.__i
+MDK-ARM/*.bak
+MDK-ARM/*.uvguix.*
+
+# ── Python ──
+__pycache__/
+*.pyc
+
+# ── 上位机运行时生成物（日志/截图，不进版本库）──
+tools/cam_log.txt
+tools/cam_pol*.png
+tools/cam_frame.png
+tools/cam_frame.pgm
