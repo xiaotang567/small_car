@@ -582,7 +582,10 @@ static uint8_t cam_tx_tick (uint32_t now)
             if (cam_frame_cnt == t_last_frame)
             {
                 cam_to_cnt ++;
-                (void)board_cam_restart();      // ★ 真卡死了才 Stop + Start
+                /* ⚠️⚠️ 不再调用 `board_cam_restart()`！
+                   它内部的 `HAL_DCMI_Stop()` **没有超时**，DCMI 状态不干净时会**死等**
+                   ⇒ 板子整个挂住、连心跳都没了（实测 2026-10-19 22:04 那次就是：发了 4 行后 13 分钟无声）✗✗
+                   现在只"重开一趟"（不碰硬件）⇒ 即使采集真死了，板子也不会挂，心跳照发 ✓ */
                 board_cam_new_pass();           // 计数/位图清零，重新开始数
             }
             t_last_frame = cam_frame_cnt;
