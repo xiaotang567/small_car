@@ -716,16 +716,28 @@ void board_cam_set_mode (uint8_t mode)
 //-------------------------------------------------------------------------------------------------------------------
 uint8_t board_cam_restart (void)
 {
-    uint8_t i;
+    uint32_t guard;
 
-    for (i = 0U; i < 3U; i++)
-    {
-        (void)HAL_DCMI_Stop(&hdcmi);
-        HAL_Delay(2);
+    /* ★★ 硬重启（2026-10-19）：不用 HAL_DCMI_Stop() ★★
+       它内部要等标志且没有超时 ⇒ DCMI 不干净时死等 ⇒ 整机挂住（22:04 那次就是）✗✗
+       这里：关 DCMI → 清 CR → 关 DMA 流 → 复位 HAL 状态 → 重新 Start
+       Start 会等一个 VSYNC 当帧首 ⇒ 每次都从真帧首重新对齐 ✓
+       （这正是"开机时随机出现横竖线"的对治：上电时传感器还在默认模式，DCMI 带半截状态开始就错位） */
+    __HAL_DCMI_DISABLE(&hdcmi);
+    DCMI->CR = 0U;
 
-        if (0U == board_cam_start()) { return 0U; }
-        HAL_Delay(5);
-    }
+    hdma_dcmi.Instance->CR &= ~DMA_SxCR_EN;
+    guard = 0U;
+    while ((0U != (hdma_dcmi.Instance->CR & DMA_SxCR_EN)) && (guard < 100000U)) { guard ++; }
+    hdma_dcmi.Instance->NDTR = 0U;
+
+    hdcmi.State     = HAL_DCMI_STATE_RESET;
+    hdma_dcmi.State = HAL_DMA_STATE_READY;
+
+    HAL_Delay(2);
+
+    if (0U == board_cam_start()) { return 0U; }
+
     cam_last_start_err = 1U;
     return 1U;
 }

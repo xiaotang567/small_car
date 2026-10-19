@@ -336,6 +336,16 @@ static void cam_cmd_line (char *s)
         //   判读：期望看到 `6A 0A`（= "j\n"）；若是别的（比如一堆积压的旧数据/二进制），
         //         说明模块回的不是我们的命令 ⇒ 问题在 PC 发送或模块缓冲。
         // ★ 位打包开关：`z` 一键切换（1=打包 8倍省带宽 / 0=原始 188 字节）
+        // ★★ 手动硬重启摄像头（DCMI 重新同步）：`R` ★★
+        //   用法：**出现横竖线时发 R** —— 线消失 ⇒ 就是开机同步问题（开机流程已改成硬重启）；
+        //         线不动 ⇒ 不是同步问题，换方向 ✓
+        case 'R':
+            (void)board_cam_restart();
+            board_cam_new_pass();
+            sprintf(b, "ACK R: cam restarted\r\n");
+            wifi_f4_send_string(b);
+            return;
+
         case 'z':
             cam_pack = (uint8_t)(cam_pack ? 0U : 1U);
             sprintf(b, "ACK z: pack=%u\r\n", (unsigned)cam_pack);
