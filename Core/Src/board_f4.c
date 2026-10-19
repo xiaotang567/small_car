@@ -9,6 +9,8 @@
 ********************************************************************************************************************/
 
 #include "board_f4.h"
+#include <stdio.h>
+#include <string.h>
 
 // CubeMX 在 main.c 里定义的 DCMI 句柄（外设本身由 MX_DCMI_Init() 配好了）
 extern DCMI_HandleTypeDef hdcmi;
@@ -1681,6 +1683,95 @@ void cam_sccb_apply_flip (void)
 volatile uint8_t  cam_bound[120];     // 每行的亮/暗交界列（0xFF = 无）
 volatile uint8_t  cam_thresh = 0;     // 本帧 Otsu 阈值（诊断用）
 
+//-------------------------------------------------------------------------------------------------------------------
+// ★★★ 帧率画进图像（**单片机自己画**，电脑只负责收）★★★
+//   5x7 点阵字模（列优先：每字节低 7 位 = 一列的 7 个像素，bit0 在上）
+//   只放 0-9 . F P S 和空格 ⇒ 共 15 个字模 = 75 字节，完全不占地方 ✓
+//   画法：先铺白底框（二值图里最高对比），再用黑像素画字 ✓
+//-------------------------------------------------------------------------------------------------------------------
+static const uint8_t fps_font[15][5] =
+{
+    {0x3E,0x51,0x49,0x45,0x3E},   /* 0 */
+    {0x00,0x42,0x7F,0x40,0x00},   /* 1 */
+    {0x42,0x61,0x51,0x49,0x46},   /* 2 */
+    {0x21,0x41,0x45,0x4B,0x31},   /* 3 */
+    {0x18,0x14,0x12,0x7F,0x10},   /* 4 */
+    {0x27,0x45,0x45,0x45,0x39},   /* 5 */
+    {0x3C,0x4A,0x49,0x49,0x30},   /* 6 */
+    {0x01,0x71,0x09,0x05,0x03},   /* 7 */
+    {0x36,0x49,0x49,0x49,0x36},   /* 8 */
+    {0x06,0x49,0x49,0x29,0x1E},   /* 9 */
+    {0x00,0x60,0x60,0x00,0x00},   /* . */
+    {0x7F,0x09,0x09,0x09,0x01},   /* F */
+    {0x7F,0x09,0x09,0x09,0x06},   /* P */
+    {0x26,0x49,0x49,0x49,0x32},   /* S */
+    {0x00,0x00,0x00,0x00,0x00},   /* 空格 */
+};
+
+#define FPS_TXT_SCALE   1U      /* 1 = 小字（不挡视野）；想更大改成 2 */
+
+static uint8_t fps_glyph_idx (char c)
+{
+    if ((c >= '0') && (c <= '9')) { return (uint8_t)(c - '0'); }
+    if (c == '.')                 { return 10U; }
+    if (c == 'F')                 { return 11U; }
+    if (c == 'P')                 { return 12U; }
+    if (c == 'S')                 { return 13U; }
+    return 14U;
+}
+
+static void board_cam_draw_fps_text (uint16_t fps10)
+{
+    char     txt[12];
+    uint8_t  i, n;
+    uint16_t x0 = 2U, y0 = 2U, sc = FPS_TXT_SCALE;
+    uint16_t tw, th, gx, gy, cx, cy;
+
+    (void)sprintf(txt, "FPS %u.%u", (unsigned)(fps10 / 10U), (unsigned)(fps10 % 10U));
+    n  = (uint8_t)strlen(txt);
+    tw = (uint16_t)((uint16_t)n * 6U * sc);
+    th = (uint16_t)(7U * sc);
+
+    for (gy = 0U; gy < (uint16_t)(th + 2U * sc); gy++)                /* 白底框 */
+    {
+        for (gx = 0U; gx < (uint16_t)(tw + 2U * sc); gx++)
+        {
+            if (((y0 + gy) < (uint16_t)CAM_H) && ((x0 + gx) < (uint16_t)CAM_TXW))
+            {
+                disp_img[y0 + gy][x0 + gx] = 255U;
+            }
+        }
+    }
+
+    for (i = 0U; i < n; i++)                                          /* 黑字 */
+    {
+        uint8_t gi = fps_glyph_idx(txt[i]);
+        for (cx = 0U; cx < 5U; cx++)
+        {
+            uint8_t col = fps_font[gi][cx];
+            for (cy = 0U; cy < 7U; cy++)
+            {
+                if (0U != (col & (uint8_t)(1U << cy)))
+                {
+                    uint16_t sy, sx;
+                    for (sy = 0U; sy < sc; sy++)
+                    {
+                        for (sx = 0U; sx < sc; sx++)
+                        {
+                            uint16_t px = (uint16_t)(x0 + sc + ((uint16_t)i * 6U + cx) * sc + sx);
+                            uint16_t py = (uint16_t)(y0 + sc + cy * sc + sy);
+                            if ((px < (uint16_t)CAM_TXW) && (py < (uint16_t)CAM_H))
+                            {
+                                disp_img[py][px] = 0U;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
 void board_cam_analyze (void)
 {
     static uint32_t hist[256];
@@ -1727,6 +1818,27 @@ void board_cam_analyze (void)
             }
         }
         cam_bound[r] = bound;
+    }
+
+    /* ★★ 帧率画进图像（单片机自己画，电脑只收）★★
+       用本函数两次调用的间隔反推出帧率（= 实际出帧率），再画在左上角 ✓ */
+    {
+        static uint32_t t_prev = 0U;
+        static uint16_t fps10  = 0U;
+        uint32_t now2 = HAL_GetTick();
+
+        if (0U != t_prev)
+        {
+            uint32_t dt = now2 - t_prev;
+            if (dt > 0U)
+            {
+                uint32_t f10 = 10000U / dt;
+                if (f10 > 999U) { f10 = 999U; }
+                fps10 = (uint16_t)f10;
+            }
+        }
+        t_prev = now2;
+        board_cam_draw_fps_text(fps10);
     }
 }
 

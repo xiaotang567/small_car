@@ -200,20 +200,8 @@ class Viewer(object):
 
             im = im.resize((w * SCALE, h * SCALE), Image.NEAREST)
 
-            # ★★ 把帧率**画在图像上**（左上角，黄字 + 黑描边，放大 4 倍后清晰可读）★★
-            #   用 Arial Bold 22px；拿不到字体就用 Pillow 默认字体（不会崩）✓
-            if getattr(self, '_font', -1) == -1:
-                try:
-                    from PIL import ImageFont
-                    self._font = ImageFont.truetype('C:/Windows/Fonts/arialbd.ttf', 22)
-                except Exception:
-                    self._font = None
-            try:
-                _d = ImageDraw.Draw(im)
-                _d.text((8, 6), 'FPS %.1f' % self.fps, font=self._font,
-                        fill=(255, 255, 0), stroke_width=2, stroke_fill=(0, 0, 0))
-            except Exception:
-                pass
+            # ★ 帧率已由**单片机自己画进图像**（左上角 FPS xx.x）⇒ 上位机不再覆盖，**只负责接收显示** ✓
+            #   （标题栏那个 FPS 仅作参考，不改图像✓）
 
             self.tkimg = ImageTk.PhotoImage(im)
             self.lbl.configure(image=self.tkimg)
