@@ -608,6 +608,8 @@ volatile uint32_t disp_pass   = 0;               // 行号回绕次数（**仅�
 volatile uint32_t disp_lag_max = 0;              // ★ 单次收割最多补了几行（≥30 ⇒ 主循环太慢，在漏行）
 volatile uint8_t  disp_fill   = 0;               // ★★ 本帧已经填到第几行（1..CAM_H）；**VSYNC 时清 0**
 volatile uint8_t  disp_done   = 0;               // ★★ 1 = **本帧的 120 行全部来自同一帧**，可以拿去发
+volatile uint8_t  disp_vsync_flag = 0;   // ★ VSYNC 中断置位（真实帧首信号）
+volatile uint16_t disp_in_frame   = 0;   // ★ 本帧内已收行数（0..119），VSYNC 归零
 volatile uint8_t  disp_armed  = 0;               // ★★ 1 = 已经跨过帧首，允许拷贝/计数（见下面说明）
 // ★★ 120 位的"哪些 dst 行已经填过"位图（15 字节）—— **去重计数**用，见 `board_cam_harvest()` ★★
 //   🔥 2026-10-15：这是"没图了 / 图里有横线"的根因修复 —— 旧的"max(dst+1)"计数在
@@ -624,6 +626,7 @@ void board_cam_new_pass (void)
     uint8_t i;
 
     disp_fill  = 0U;
+    disp_in_frame = 0U;
     for (i = 0U; i < 15U; i++) { disp_map[i] = 0U; }
 
     disp_done  = 0U;      // 锁存的"采齐"标志（只在这里清）
@@ -771,6 +774,7 @@ volatile uint32_t cam_vsync_isr_cnt = 0;
 
 void HAL_DCMI_VsyncEventCallback (DCMI_HandleTypeDef *hdcmi_)
 {
+    disp_vsync_flag = 1U;                 // ★ 告诉收割：真实帧首到了（用来对齐一趟）
     (void)hdcmi_;
     cam_vsync_isr_cnt ++;
     cam_frame_start();
@@ -801,6 +805,20 @@ void board_cam_harvest (void)
     uint16_t w    = (uint16_t)board_cam_write_row();   // DMA 当前写到第几行（还没写完的那行）
     uint32_t nlag = 0U;
 
+    /* ★★★ 用**真实帧边界（VSYNC）**对齐一趟 ★★★
+       以前用 disp_ln 回绕（每 120 行）当帧边界，但那个相位和传感器的实际帧边界**无关**
+       ⇒ 一趟常常横跨两帧 ⇒ 画面出现一条**横向接缝**（位置随机，重启几次碰巧对齐就消失）✗
+       现在：VSYNC 一到 ⇒ 本趟结束、从 0 重新数 ⇒ **一趟 = 一帧** ✓ */
+    if (0U != disp_vsync_flag)
+    {
+        disp_vsync_flag = 0U;
+        disp_in_frame   = 0U;
+        disp_fill       = 0U;
+        (void)memset(disp_map, 0, sizeof(disp_map));
+        disp_armed      = 1U;
+        disp_pass      ++;
+    }
+
     // ⚠️ 用 while 不是 if：主循环每圈可能已经过去好几行 ⇒ 一次把落下的全补齐
     while (disp_next_row != w)
     {
@@ -813,7 +831,7 @@ void board_cam_harvest (void)
         //         ⇒ 一帧只走了一半就"数完 120 行" ⇒ **画面里同一场景出现两遍** ✓ 就是这个 bug。
         if ((0U == (disp_ln % (uint32_t)cam_dstep)) && (0U == disp_hold) && (0U != disp_armed))
         {
-            uint32_t dst = disp_ln / (uint32_t)cam_dstep;  // 0..119
+            uint32_t dst = (uint32_t)disp_in_frame;   // ★ 帧内行号（VSYNC 归零）⇒ 一趟正好一帧 ✓
             // ★★ 源行地址按**运行时的行宽**算：752 模式 = 752 字节/行；188 模式 = 188 字节/行。
             //    用"扁平指针 + 行宽乘法"而不是 `cam_image[row][col]`，因为数组的固定行距是 752，
             //    188 模式下 DMA 是**按 188 连续写**的 ⇒ 必须手动乘行宽才对得上 ✓
@@ -834,6 +852,7 @@ void board_cam_harvest (void)
             if (0U == (disp_map[(uint32_t)dst >> 3U] & (uint8_t)(1U << ((uint32_t)dst & 7U))))
             {
                 disp_map[(uint32_t)dst >> 3U] |= (uint8_t)(1U << ((uint32_t)dst & 7U));
+                if (disp_in_frame < (uint16_t)CAM_H) { disp_in_frame ++; }   // ★ 帧内行号推进
                 if (disp_fill < (uint8_t)CAM_H) { disp_fill ++; }
 
                 if (disp_fill >= (uint8_t)CAM_H)
