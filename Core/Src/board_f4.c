@@ -1699,6 +1699,7 @@ void cam_sccb_apply_flip (void)
 //     ③ 每行从左向右找第一个跳变列，要求其后连续 2 像素同向（防单点噪声 ✓）
 //        ⇒ cam_bound[行] = 交界列号（0xFF = 该行无交界）；上位机只报数据，蓝线由上位机画 ✓
 //-------------------------------------------------------------------------------------------------------------------
+volatile uint8_t  cam_testpat = 0U;      // ★ 1 = 输出标准渐变测试图（排查错位用）
 volatile uint8_t  cam_bound[120];     // 每行的亮/暗交界列（0xFF = 无）
 volatile uint8_t  cam_thresh = 0;     // 本帧 Otsu 阈值（诊断用）
 
@@ -1793,6 +1794,23 @@ static void board_cam_draw_fps_text (uint16_t fps10)
 
 void board_cam_analyze (void)
 {
+    /* ★★ 测试图模式：左右渐变（0..255）。
+       任何"行数据错位"都会在图上表现为**某列突然跳变** ✓
+       平滑无跳变 ⇒ 数据通道干净，那些线是场景/二值化造成的 ✓ */
+    if (0U != cam_testpat)
+    {
+        uint32_t rr, cc;
+        for (rr = 0U; rr < (uint32_t)CAM_H; rr++)
+        {
+            for (cc = 0U; cc < (uint32_t)CAM_TXW; cc++)
+            {
+                disp_img[rr][cc] = (uint8_t)((cc * 255U) / (uint32_t)(CAM_TXW - 1U));
+            }
+        }
+        board_cam_draw_fps_text(0U);
+        return;
+    }
+
     static uint32_t hist[256];
     uint8_t *base = &disp_img[0][0];
     uint32_t total = (uint32_t)CAM_H * (uint32_t)CAM_TXW;

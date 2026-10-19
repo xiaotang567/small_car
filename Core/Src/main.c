@@ -338,6 +338,13 @@ static void cam_cmd_line (char *s)
         //   打印最近 16 个字节的十六进制 + 当前攒行缓冲里的内容。
         //   判读：期望看到 `6A 0A`（= "j\n"）；若是别的（比如一堆积压的旧数据/二进制），
         //         说明模块回的不是我们的命令 ⇒ 问题在 PC 发送或模块缓冲。
+        // ★ 测试图：`T` 切换"左右渐变标准图"（排查错位用）
+        case 'T':
+            cam_testpat = (uint8_t)(cam_testpat ? 0U : 1U);
+            sprintf(b, "ACK T: testpat=%u\r\n", (unsigned)cam_testpat);
+            wifi_f4_send_string(b);
+            return;
+
         // ★ 位打包开关：`z` 一键切换（1=打包 8倍省带宽 / 0=原始 188 字节）
         case 'z':
             cam_pack = (uint8_t)(cam_pack ? 0U : 1U);

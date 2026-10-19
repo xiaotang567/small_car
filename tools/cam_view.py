@@ -175,8 +175,34 @@ class Viewer(object):
         if len(f.got) >= h:
             self.nframe += 1
             f.got = set()
+            snap = bytes(f.buf)
             self.bounds = None              # 新帧的边界随后由 0xFE 包更新 ✓
-            self.shot = (w, h, pol, bytes(f.buf))   # 快照：板子之后再怎么写都不影响这张
+            # ★★ 自动抓"竖向断层"：某列与左右邻居都不一致（>70% 行）⇒ 行数据错位的铁证
+            try:
+                if w == 188:
+                    hr = max(h // 2, 1)
+                    for c in range(1, w - 1):
+                        dl = 0
+                        dr = 0
+                        for r in range(h):
+                            b0 = snap[r * w + c]
+                            if b0 != snap[r * w + c - 1]:
+                                dl += 1
+                            if b0 != snap[r * w + c + 1]:
+                                dr += 1
+                        if dl > h * 0.7 and dr > h * 0.7:
+                            self._seam_n = getattr(self, '_seam_n', 0) + 1
+                            fn = 'seam_%03d.png' % self._seam_n
+                            try:
+                                Image.frombytes('L', (w, h), snap).save(fn)
+                            except Exception:
+                                fn = '(save fail)'
+                            print('  [竖向断层] 列=%d  已存 %s  (第 %d 次)'
+                                  % (c, fn, self._seam_n))
+                            break
+            except Exception:
+                pass
+            self.shot = (w, h, pol, snap)            # 快照：板子之后再怎么写都不影响这张
             self.draw()
 
     # ---------------------------------------------------------------- 显示
