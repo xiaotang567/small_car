@@ -446,12 +446,6 @@ def run():
                         if len(buf) < need2:
                             break
                         pl   = bytes(buf[12:12 + flen])
-                        # ★ 校验和（原来没校）：坏包直接丢，不让它出现在画面上 ✓
-                        ck_r = (buf[12 + flen] << 8) | buf[12 + flen + 1]
-                        if (sum(pl) & 0xFFFF) != ck_r:
-                            v.badrows += 1
-                            del buf[:need2]
-                            continue
                         polf = pol & 0x07
                         nrow = h
                         bw   = 24
