@@ -609,7 +609,7 @@ void wifi_f4_send_string (const char *s)
 
     if (NULL == s) { return; }
 
-    for (i = 0U; i < 10U; i++)
+    for (i = 0U; i < 100U; i++)
     {
         if (0U == wifi_f4_send((const uint8_t *)s, (uint32_t)strlen(s))) { return; }
         wf_delay_us(400);

@@ -338,21 +338,6 @@ static void cam_cmd_line (char *s)
         //   打印最近 16 个字节的十六进制 + 当前攒行缓冲里的内容。
         //   判读：期望看到 `6A 0A`（= "j\n"）；若是别的（比如一堆积压的旧数据/二进制），
         //         说明模块回的不是我们的命令 ⇒ 问题在 PC 发送或模块缓冲。
-        // ★ 重测"行内相位”（那条竖线的坑位）：`K`
-        //   正常开机自动测；如果测偏了（把真实竖边当坑位）用它清零重来 ✓
-        case 'K':
-            cam_phase_k = 0U;
-            sprintf(b, "ACK K: phase reset (k=0)\r\n");
-            wifi_f4_send_string(b);
-            return;
-
-        // ★ 测试图：`T` 切换"左右渐变标准图"（排查错位用）
-        case 'T':
-            cam_testpat = (uint8_t)(cam_testpat ? 0U : 1U);
-            sprintf(b, "ACK T: testpat=%u\r\n", (unsigned)cam_testpat);
-            wifi_f4_send_string(b);
-            return;
-
         // ★ 位打包开关：`z` 一键切换（1=打包 8倍省带宽 / 0=原始 188 字节）
         case 'z':
             cam_pack = (uint8_t)(cam_pack ? 0U : 1U);
@@ -614,14 +599,13 @@ static uint8_t cam_tx_tick (uint32_t now)
             //   SR/RIS = DCMI 状态/原始中断：**全 0 ⇒ 它一点动静都没有**
             //   AFD  = 哪几根 DCMI 引脚没配成 AF13（0 = 11 根全对）
             //   DEN  = DMA2_Stream1 的 EN 位（期待 1）      PF = 实测像素时钟(kHz)
-            sprintf(cb, "CAM1 f=%lu er=%lu CR=%04lX ND=%lu SR=%04lX RIS=%04lX AFD=%03lX DEN=%lu PF=%luk V2=%luk CLK=%u MHz=%lu VPH=%u\r\n",
+            sprintf(cb, "CAM1 f=%lu er=%lu CR=%04lX ND=%lu SR=%04lX RIS=%04lX AFD=%03lX DEN=%lu PF=%luk V2=%luk CLK=%u MHz=%lu\r\n",
                     (unsigned long)cam_frame_cnt, (unsigned long)cam_err_cnt,
                     (unsigned long)dbg_dcmi_cr, (unsigned long)dbg_dma_ndtr,
                     (unsigned long)dbg_dcmi_sr, (unsigned long)dbg_dcmi_ris,
                     (unsigned long)dbg_pin_bad, (unsigned long)dbg_dma_en,
                     (unsigned long)dbg_pclk_khz, (unsigned long)t_vsync_hz,
-                    (unsigned)board_clock_src, (unsigned long)(board_sysclk_hz / 1000000UL),
-                    (unsigned)cam_phase_k);
+                    (unsigned)board_clock_src, (unsigned long)(board_sysclk_hz / 1000000UL));
             wifi_f4_send_string(cb);
 
             cam_t_phase = now;
@@ -922,14 +906,10 @@ int main(void)
                 if (0U == fpkt_sent) { fpkt_total = (uint32_t)(12U + flen + 2U); }
 
                 rem = wifi_f4_send(fpkt + fpkt_sent, fpkt_total - fpkt_sent);
-                fpkt_sent = fpkt_total - rem;              /* 已发字节数 */
+                fpkt_sent = fpkt_total - rem;
 
-                // ⚠️ 完成条件必须看 **rem == 0**（= 剩余为 0）✓
-                //   上一版写成了 `0U == fpkt_sent`，而发完时 fpkt_sent == fpkt_total ≠ 0
-                //   ⇒ **永远不完成** ⇒ 不发图、且心跳守卫把心跳也挡死了 ✗✗
-                if (0U == rem)                             /* 整包真正发完：结束这一帧 */
+                if (0U == fpkt_sent)                       /* 整包真正发完了：结束这一帧 */
                 {
-                    fpkt_sent  = 0U;
                     fpkt_total = 0U;
                     cam_tx_row = (uint16_t)(txh - 1U);
                     cam_tx_row_done();
