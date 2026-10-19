@@ -731,10 +731,18 @@ uint8_t board_cam_restart (void)
     while ((0U != (hdma_dcmi.Instance->CR & DMA_SxCR_EN)) && (guard < 100000U)) { guard ++; }
     hdma_dcmi.Instance->NDTR = 0U;
 
-    hdcmi.State     = HAL_DCMI_STATE_RESET;
+    hdcmi.State     = HAL_DCMI_STATE_RESET;   /* 让 HAL_DCMI_Init 肯重新配置 ✓ */
     hdma_dcmi.State = HAL_DMA_STATE_READY;
 
     HAL_Delay(2);
+
+    /* ★ `DCMI->CR = 0` 把极性/8位/硬件同步都清了 ⇒ **必须重新 Init 一次** ✓
+       （Init 只写寄存器、不等标志位，不会卡死 ✓ 并把 State 置回 READY，Start 才肯跑 ✓） */
+    if (HAL_DCMI_Init(&hdcmi) != HAL_OK)
+    {
+        cam_last_start_err = 1U;
+        return 1U;
+    }
 
     if (0U == board_cam_start()) { return 0U; }
 
