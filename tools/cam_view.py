@@ -30,7 +30,7 @@ MAGIC = b'\xAA\x55\xA5\x5A'
 
 try:
     import tkinter as tk
-    from PIL import Image, ImageTk
+    from PIL import Image, ImageTk, ImageDraw
     HAVE_GUI = True
 except Exception as _e:
     HAVE_GUI = False
@@ -199,6 +199,22 @@ class Viewer(object):
             im = Image.frombytes('L', (w, h), buf)
 
             im = im.resize((w * SCALE, h * SCALE), Image.NEAREST)
+
+            # ★★ 把帧率**画在图像上**（左上角，黄字 + 黑描边，放大 4 倍后清晰可读）★★
+            #   用 Arial Bold 22px；拿不到字体就用 Pillow 默认字体（不会崩）✓
+            if getattr(self, '_font', -1) == -1:
+                try:
+                    from PIL import ImageFont
+                    self._font = ImageFont.truetype('C:/Windows/Fonts/arialbd.ttf', 22)
+                except Exception:
+                    self._font = None
+            try:
+                _d = ImageDraw.Draw(im)
+                _d.text((8, 6), 'FPS %.1f' % self.fps, font=self._font,
+                        fill=(255, 255, 0), stroke_width=2, stroke_fill=(0, 0, 0))
+            except Exception:
+                pass
+
             self.tkimg = ImageTk.PhotoImage(im)
             self.lbl.configure(image=self.tkimg)
             # ★ 标题带上两个"跑不掉"的量（包头 byte8 / byte9）：
