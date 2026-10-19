@@ -718,11 +718,6 @@ uint8_t board_cam_restart (void)
 {
     uint8_t i;
 
-    /* ★ 回到官方写法（读 stm32f4xx_hal_dcmi.c 后确认）：
-       · HAL_DCMI_Stop 内部**有超时**（SystemCoreClock / HAL_TIMEOUT_DCMI_STOP），不会无限死等 ✓
-       · 它内部会 HAL_DMA_Abort 关掉 DMA 流 ⇒ 下次 HAL_DMA_Start_IT 才不会返回 BUSY ✓
-       · HAL_DCMI_Start_DMA 只开 DCMI/配 CM/开 DMA/置 CAPTURE，**不会重配极性**
-         ⇒ 所以**不能先 CR=0**（那样极性就丢了），直接用 Stop+Start 最稳 ✓ */
     for (i = 0U; i < 3U; i++)
     {
         (void)HAL_DCMI_Stop(&hdcmi);
@@ -937,6 +932,16 @@ uint8_t board_cam_start (void)
         return 1;
     }
     cam_last_start_err = 0;
+
+    /* ★★★ 关键：把"收割行游标"同步到 DMA 当前位置 ★★★
+       【文档依据】《总钻风摄像头使用说明 V2.7》9.3.3：
+         "摄像头上的 51 有 eeprom…每次上电的时候加载 eeprom 的配置数据"
+       我们这块**拆了 51** ⇒ 上电是出厂默认 752×480，要等固件用 SCCB 改完才变 188×120
+       ⇒ 改完配置重启 DCMI 时，**环里还混着 752 宽的旧数据**，而收割游标还停在上一次的位置
+       ⇒ 新旧数据拼在一起 ⇒ **横竖线**（拼到哪儿取决于上电时序 ⇒ "开机随机出现"）✓✓
+       这里把游标直接对齐到"DMA 现在写的行"，旧数据一律不碰 ✓ */
+    disp_next_row = (uint16_t)board_cam_write_row();
+    disp_ln       = 0U;
 
     // ★ **每帧都要** VSYNC 中断（用来记录帧边界位置）—— 不 Stop、不重启，开销极小
     __HAL_DCMI_ENABLE_IT(&hdcmi, DCMI_IT_VSYNC);
