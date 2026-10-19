@@ -609,7 +609,8 @@ volatile uint32_t disp_lag_max = 0;              // ★ 单次收割最多补了
 volatile uint8_t  disp_fill   = 0;               // ★★ 本帧已经填到第几行（1..CAM_H）；**VSYNC 时清 0**
 volatile uint8_t  disp_done   = 0;               // ★★ 1 = **本帧的 120 行全部来自同一帧**，可以拿去发
 volatile uint8_t  disp_vsync_flag = 0;   // ★ VSYNC 中断置位（真实帧首信号）
-volatile uint16_t disp_in_frame   = 0;   // ★ 本帧内已收行数（0..119），VSYNC 归零
+volatile uint16_t disp_in_frame   = 0;
+volatile uint16_t cam_phase_k     = 0;   // ★ DMA环" 行边界"与传感器真实行边界的字节差（开机相位，运行中不变）   // ★ 本帧内已收行数（0..119），VSYNC 归零
 volatile uint8_t  disp_armed  = 0;               // ★★ 1 = 已经跨过帧首，允许拷贝/计数（见下面说明）
 // ★★ 120 位的"哪些 dst 行已经填过"位图（15 字节）—— **去重计数**用，见 `board_cam_harvest()` ★★
 //   🔥 2026-10-15：这是"没图了 / 图里有横线"的根因修复 —— 旧的"max(dst+1)"计数在
@@ -775,6 +776,8 @@ volatile uint32_t cam_vsync_isr_cnt = 0;
 void HAL_DCMI_VsyncEventCallback (DCMI_HandleTypeDef *hdcmi_)
 {
     disp_vsync_flag = 1U;                 // ★ 告诉收割：真实帧首到了（用来对齐一趟）
+    /* 注：曾试过用"已搬字节数 % 行长"算行内相位，但每帧总字节数是 188 的整数倍
+       ⇒ 恒得 0，测不出固定偏移 ✗ ⇒ 改成从图像里自动找坑位（见 board_cam_analyze）✓ */
     (void)hdcmi_;
     cam_vsync_isr_cnt ++;
     cam_frame_start();
@@ -837,10 +840,26 @@ void board_cam_harvest (void)
             //    188 模式下 DMA 是**按 188 连续写**的 ⇒ 必须手动乘行宽才对得上 ✓
             const uint8_t *src = &cam_image[0][0] + (uint32_t)disp_next_row * (uint32_t)cam_row_bytes;
             uint32_t c;
-            for (c = 0U; c < (uint32_t)CAM_TXW; c++)
+            if (1U == (uint32_t)cam_dcol)
             {
-                // ★ 横向抽点 `cam_dcol`：752 模式取 c*4（752→188）；188 模式取 c（不抽）
-                disp_img[dst][c] = src[c * (uint32_t)cam_dcol];
+                /* ★★ 行内相位补偿：DMA 环的"188 字节一行"可能比真实行边界提前/滞后 k 个字节
+                   ⇒ 每行前 k 个像素实际是上一行的尾巴 ⇒ 第 k 列会出现一条竖线 ✗
+                   这里把每行往左转 k 个像素，把真正的行首对齐过来 ✓ */
+                uint32_t k = (uint32_t)cam_phase_k;
+                for (c = 0U; c < (uint32_t)CAM_TXW; c++)
+                {
+                    uint32_t sp = c + k;
+                    if (sp >= (uint32_t)cam_row_bytes) { sp -= (uint32_t)cam_row_bytes; }
+                    disp_img[dst][c] = src[sp];
+                }
+            }
+            else
+            {
+                for (c = 0U; c < (uint32_t)CAM_TXW; c++)
+                {
+                    // ★ 横向抽点 `cam_dcol`：752 模式取 c*4（752→188）；188 模式取 c（不抽）
+                    disp_img[dst][c] = src[c * (uint32_t)cam_dcol];
+                }
             }
             // ★★★ 用"120 位的位图"记"哪些 dst 行已经填过" —— **去重计数** ★★★
             //   🔥🔥 为什么必须这样（2026-10-15 的根因）：
@@ -1855,6 +1874,32 @@ void board_cam_analyze (void)
             }
         }
         cam_bound[r] = bound;
+    }
+
+    /* ★★★ 自动找"行内错位"的坑位（= 那条竖线所在的列 φ）★★★
+       判据：某列与**左右邻居都不同**（>70% 的行）⇒ 这一列就是行边界错位处
+       ⇒ 记进 cam_phase_k，下一帧收割时把每行旋转 φ 个像素补回来 ✓
+       只在开机前几帧做（防把真实竖边当坑位），之后锁定；命令 `K` 可强制重测 ✓ */
+    if (cam_frame_cnt < 10U)
+    {
+        uint32_t r2, c2, best_c = 0U, best_d = 0U;
+        for (c2 = 1U; (c2 + 1U) < (uint32_t)CAM_TXW; c2++)
+        {
+            uint32_t dl = 0U, dr = 0U;
+            for (r2 = 0U; r2 < (uint32_t)CAM_H; r2++)
+            {
+                if (disp_img[r2][c2] != disp_img[r2][c2 - 1U]) { dl ++; }
+                if (disp_img[r2][c2] != disp_img[r2][c2 + 1U]) { dr ++; }
+            }
+            if ((dl > ((uint32_t)CAM_H * 7U / 10U)) && (dr > ((uint32_t)CAM_H * 7U / 10U)))
+            {
+                if ((dl + dr) > best_d) { best_d = dl + dr; best_c = c2; }
+            }
+        }
+        if (0U != best_d)
+        {
+            cam_phase_k = (uint16_t)best_c;
+        }
     }
 
     /* ★★ 帧率画进图像（单片机自己画，电脑只收）★★
