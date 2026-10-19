@@ -165,6 +165,9 @@ static void cam_cmd_status (void)
 // ★ ★ 位打包：1 = 二值图每行 188 像素压成 **24 字节**（1字节=8像素）⇒ 数据量÷8 ✓
 //   上位机看包头 pkt[6] 的最高位（1 = 打包）自动解包；按 `z` 可切回未打包（排障用）✓
 uint8_t cam_pack = 1U;
+// ★ 整帧包发送进度：>0 表示正在发帧，此时**不能插文本**（会把字节插进二进制包里 ⇒ 竖线）
+static uint32_t fpkt_total = 0U;
+static uint32_t fpkt_sent  = 0U;
 
 static void cam_cmd_line (char *s)
 {
@@ -894,10 +897,23 @@ int main(void)
                 fpkt[12 + flen + 1] = (uint8_t)ck;
             }
 
-            if (0U == wifi_f4_send(fpkt, (uint32_t)(12U + flen + 2U)))
+            /* ★★★ **续发**：`wifi_f4_send` 模块一忙就只发出一半，
+               若上层从头重发 ⇒ 上位机收到"半包+整包" ⇒ **数据错位 ⇒ 随机竖线** ✗✗
+               现在记住"已发多少"，下一轮只发**剩余部分** ✓✓ */
             {
-                cam_tx_row = (uint16_t)(txh - 1U);      /* 一次性把这一帧算发完 */
-                cam_tx_row_done();
+                uint32_t rem;
+
+                if (0U == fpkt_sent) { fpkt_total = (uint32_t)(12U + flen + 2U); }
+
+                rem = wifi_f4_send(fpkt + fpkt_sent, fpkt_total - fpkt_sent);
+                fpkt_sent = fpkt_total - rem;
+
+                if (0U == fpkt_sent)                       /* 整包真正发完了：结束这一帧 */
+                {
+                    fpkt_total = 0U;
+                    cam_tx_row = (uint16_t)(txh - 1U);
+                    cam_tx_row_done();
+                }
             }
         }
         else
@@ -1024,7 +1040,8 @@ int main(void)
     //   🔥 上一版这里是"只在收到摄像头帧时才发"——结果摄像头一出问题，
     //      **一个字节都发不出去**，看起来像"WiFi 挂了"，极难排查。
     //      ⇒ 输出绝不能挂在另一个可能坏掉的外设上。心跳永远发，摄像头状态放在内容里。
-    if (wifi_f4_is_ready() && ((HAL_GetTick() - t_hb) >= 500))
+    // ⚠️ 正在发整帧包时不能发文本（会插进二进制包 ⇒ 解错 ⇒ 竖线）
+    if (wifi_f4_is_ready() && (0U == fpkt_sent) && ((HAL_GetTick() - t_hb) >= 500))
     {
       char buf[320];
       t_hb = HAL_GetTick();
