@@ -200,8 +200,46 @@ class Viewer(object):
 
             im = im.resize((w * SCALE, h * SCALE), Image.NEAREST)
 
-            # ★ 帧率已由**单片机自己画进图像**（左上角 FPS xx.x）⇒ 上位机不再覆盖，**只负责接收显示** ✓
-            #   （标题栏那个 FPS 仅作参考，不改图像✓）
+            # ★ 帧率已由单片机画进图像；这里只额外叠一条**红色左边界**
+            #   算法与 MCU 的 board_cam_analyze() 一致：从 c=1 往右扫，找第一个
+            #   「与左邻不同、自身与右侧连续 2 像素相同」的列（0xFF = 该行没找到）
+            try:
+                bnd = []
+                for r in range(h):
+                    base = r * w
+                    b = 0xFF
+                    # 前 24 行跳过左上角 FPS/R 文字区：单片机是"先找边、后画字"，
+                    # 电脑拿到的是画完字的图，不躲开就会把文字边缘误判成边界
+                    c0 = 62 if r < 24 else 1
+                    for c in range(c0, w - 2):
+                        if (buf[base + c] != buf[base + c - 1] and
+                                buf[base + c] == buf[base + c + 1] and
+                                buf[base + c] == buf[base + c + 2]):
+                            b = c
+                            break
+                    bnd.append(b)
+
+                im = im.convert('RGB')
+                _d = ImageDraw.Draw(im)
+                S = SCALE
+                wd = max(2, S // 2)
+
+                for r in range(1, h):                 # 相邻行连线 ⇒ 斜边也连续
+                    b0, b1 = bnd[r - 1], bnd[r]
+                    if b0 == 0xFF or b1 == 0xFF:
+                        continue
+                    if abs(b1 - b0) > 10:             # 跳变太大不连
+                        continue
+                    lo, hi = (b0, b1) if b0 <= b1 else (b1, b0)
+                    _d.line([(lo * S, r * S + S // 2), (hi * S + S - 1, r * S + S // 2)],
+                            fill=(255, 0, 0), width=wd)
+
+                for r, b in enumerate(bnd):           # 每行的点（孤立行也能看见）
+                    if b != 0xFF:
+                        _d.rectangle([b * S, r * S, b * S + S - 1, r * S + S - 1],
+                                     fill=(255, 0, 0))
+            except Exception:
+                pass
 
             self.tkimg = ImageTk.PhotoImage(im)
             self.lbl.configure(image=self.tkimg)
