@@ -1718,7 +1718,7 @@ volatile uint8_t  cam_thresh = 0;     // 本帧 Otsu 阈值（诊断用）
 //   只放 0-9 . F P S 和空格 ⇒ 共 15 个字模 = 75 字节，完全不占地方 ✓
 //   画法：先铺白底框（二值图里最高对比），再用黑像素画字 ✓
 //-------------------------------------------------------------------------------------------------------------------
-static const uint8_t fps_font[15][5] =
+static const uint8_t fps_font[16][5] =
 {
     {0x3E,0x51,0x49,0x45,0x3E},   /* 0 */
     {0x00,0x42,0x7F,0x40,0x00},   /* 1 */
@@ -1735,6 +1735,7 @@ static const uint8_t fps_font[15][5] =
     {0x7F,0x09,0x09,0x09,0x06},   /* P */
     {0x26,0x49,0x49,0x49,0x32},   /* S */
     {0x00,0x00,0x00,0x00,0x00},   /* 空格 */
+    {0x7F,0x09,0x19,0x29,0x46},   /* R ★路线识别用 */
 };
 
 #define FPS_TXT_SCALE   1U      /* 1 = 小字（不挡视野）；想更大改成 2 */
@@ -1746,6 +1747,7 @@ static uint8_t fps_glyph_idx (char c)
     if (c == 'F')                 { return 11U; }
     if (c == 'P')                 { return 12U; }
     if (c == 'S')                 { return 13U; }
+    if (c == 'R')                 { return 15U; }
     return 14U;
 }
 
@@ -1797,6 +1799,77 @@ static void board_cam_draw_fps_text (uint16_t fps10)
                     }
                 }
             }
+        }
+    }
+}
+
+//-------------------------------------------------------------------------------------------------------------------
+// ★★★ 路线识别：用左边界在近/中/远三段行上的位置趋势判弯向 ★★★
+//   0 = 直线   1 = 左转   2 = 右转   3 = 丢线/十字
+//   原理：远段（图上部）对应“车前方远处”，边界往左偏 ⇒ 轨道向左弯 ✓
+//-------------------------------------------------------------------------------------------------------------------
+volatile uint8_t cam_route = 0;          // ★ 当前路线类型（0..3）
+
+static void board_cam_classify_route (void)
+{
+    uint32_t r2;
+    uint32_t sN = 0U, sM = 0U, sF = 0U;
+    uint8_t  cN = 0U, cM = 0U, cF = 0U;
+
+    for (r2 = 106U; r2 < 116U; r2++) { if (0xFFU != cam_bound[r2]) { sN += cam_bound[r2]; cN ++; } }
+    for (r2 =  76U; r2 <  86U; r2++) { if (0xFFU != cam_bound[r2]) { sM += cam_bound[r2]; cM ++; } }
+    for (r2 =  46U; r2 <  56U; r2++) { if (0xFFU != cam_bound[r2]) { sF += cam_bound[r2]; cF ++; } }
+
+    if ((cN < 3U) && (cM < 3U))
+    {
+        cam_route = 3U;                                     /* 连中段都没边 ⇒ 丢线/十字 */
+        return;
+    }
+    if (cF < 3U) { cam_route = 0U; return; }                 /* 远段可靠性不够 ⇒ 不敢判 */
+
+    {
+        int32_t d = (int32_t)(sF / cF) - (int32_t)(sN / cN);  /* 远 - 近 */
+        if (d < -8)      { cam_route = 1U; }                  /* 边界往左 ⇒ 左转 */
+        else if (d > 8)  { cam_route = 2U; }                  /* 往右     ⇒ 右转 */
+        else             { cam_route = 0U; }                  /* 直线 */
+    }
+}
+
+// 在左上角画 "R<code>"（紧跟在 FPS 下面一行）
+static void board_cam_draw_route_text (uint8_t code)
+{
+    char     txt[4];
+    uint8_t  i, n;
+    uint16_t x0 = 2U, y0 = 12U, sc = FPS_TXT_SCALE;
+    uint16_t gx, gy, cx, cy;
+
+    (void)sprintf(txt, "R%u", (unsigned)code);
+    n = (uint8_t)strlen(txt);
+
+    for (gy = 0U; gy < (uint16_t)(7U * sc + 2U * sc); gy++)
+        for (gx = 0U; gx < (uint16_t)((uint16_t)n * 6U * sc + 2U * sc); gx++)
+            if (((y0 + gy) < (uint16_t)CAM_H) && ((x0 + gx) < (uint16_t)CAM_TXW))
+                disp_img[y0 + gy][x0 + gx] = 255U;
+
+    for (i = 0U; i < n; i++)
+    {
+        uint8_t gi = fps_glyph_idx(txt[i]);
+        for (cx = 0U; cx < 5U; cx++)
+        {
+            uint8_t col = fps_font[gi][cx];
+            for (cy = 0U; cy < 7U; cy++)
+                if (0U != (col & (uint8_t)(1U << cy)))
+                {
+                    uint16_t sy, sx;
+                    for (sy = 0U; sy < sc; sy++)
+                        for (sx = 0U; sx < sc; sx++)
+                        {
+                            uint16_t px = (uint16_t)(x0 + 1U + ((uint16_t)i * 6U + cx) * sc + sx);
+                            uint16_t py = (uint16_t)(y0 + 1U + cy * sc + sy);
+                            if ((px < (uint16_t)CAM_TXW) && (py < (uint16_t)CAM_H))
+                                disp_img[py][px] = 0U;
+                        }
+                }
         }
     }
 }
@@ -1869,6 +1942,10 @@ void board_cam_analyze (void)
         t_prev = now2;
         board_cam_draw_fps_text(fps10);
     }
+
+    /* ★ 路线识别 + 在图上画 "R<code>"（紧跟在 FPS 下面一行） */
+    board_cam_classify_route();
+    board_cam_draw_route_text(cam_route);
 }
 
 uint8_t cam_sccb_test (void)
