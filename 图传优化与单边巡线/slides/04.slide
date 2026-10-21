@@ -1,0 +1,69 @@
+<Slide style={{ width: 1280, height: 720, background: '#FFFFFF', padding: 40, flexDirection: 'column', fontFamily: "'Microsoft YaHei', sans-serif" }}>
+  <Box style={{ flexDirection: 'row', alignItems: 'center', height: 56, background: '#1E4FA8', borderRadius: 6, paddingLeft: 24, paddingRight: 24 }}>
+    <Text style={{ fontSize: 32, fontWeight: 'bold', color: '#FFFFFF' }}>帧率优化：先算账，再动手</Text>
+    <Box style={{ flex: 1 }} />
+    <Text style={{ fontSize: 16, color: '#DCE8FA' }}></Text>
+  </Box>
+
+  <Box style={{ height: 16 }} />
+
+  <Box style={{ flex: 1, flexDirection: 'column' }}>
+    <Box style={{ flexDirection: 'row', height: 96, background: '#E8EFF8', borderRadius: 8, paddingLeft: 24, paddingRight: 24, alignItems: 'center' }}>
+      <Text style={{ fontSize: 24, color: '#0E3F8C' }}>一帧 120 行 × 包开销 1~2ms ⇒ 120 个包 = 120~240ms；位打包后字节仅 2.9KB ⇒ </Text>
+      <Text style={{ fontSize: 24, fontWeight: 'bold', color: '#D9534F' }}>包数才是最大头</Text>
+    </Box>
+
+    <Box style={{ height: 20 }} />
+
+    <Box style={{ flexDirection: 'row', gap: 16, flex: 1 }}>
+    <Box style={{ flex: 1, background: '#FFFFFF', border: '1px solid #D6DCE5', borderRadius: 8, padding: 20, flexDirection: 'column', gap: 10 }}>
+      <Box style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+        <Box style={{ width: 6, height: 24, background: '#1E4FA8', borderRadius: 3 }} />
+        <Text style={{ fontSize: 26, fontWeight: 'bold', color: '#0E3F8C' }}>① 减少包数</Text>
+      </Box>
+      <Text style={{ fontSize: 20, color: '#4A5568', lineHeight: 1.55 }}>整帧一包：120 包 → 1 包</Text>
+      <Text style={{ fontSize: 20, color: '#4A5568', lineHeight: 1.55 }}>代码 main.c：fpkt[4]=0xFF</Text>
+      <Text style={{ fontSize: 20, color: '#4A5568', lineHeight: 1.55 }}>现象：5~7fps → 20fps+</Text>
+    </Box>
+    <Box style={{ flex: 1, background: '#FFFFFF', border: '1px solid #D6DCE5', borderRadius: 8, padding: 20, flexDirection: 'column', gap: 10 }}>
+      <Box style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+        <Box style={{ width: 6, height: 24, background: '#3D7BD9', borderRadius: 3 }} />
+        <Text style={{ fontSize: 26, fontWeight: 'bold', color: '#0E3F8C' }}>② 减少字节</Text>
+      </Box>
+      <Text style={{ fontSize: 20, color: '#4A5568', lineHeight: 1.55 }}>位打包：1 像素 1 bit</Text>
+      <Text style={{ fontSize: 20, color: '#4A5568', lineHeight: 1.55 }}>188B/行 → 24B/行（÷8）</Text>
+      <Text style={{ fontSize: 20, color: '#4A5568', lineHeight: 1.55 }}>现象：同样间隔下快 5~8 倍</Text>
+    </Box>
+    <Box style={{ flex: 1, background: '#FFFFFF', border: '1px solid #D6DCE5', borderRadius: 8, padding: 20, flexDirection: 'column', gap: 10 }}>
+      <Box style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+        <Box style={{ width: 6, height: 24, background: '#3D7BD9', borderRadius: 3 }} />
+        <Text style={{ fontSize: 26, fontWeight: 'bold', color: '#0E3F8C' }}>③ 间隔参数</Text>
+      </Box>
+      <Text style={{ fontSize: 20, color: '#4A5568', lineHeight: 1.55 }}>g：每行间隔（现 0）</Text>
+      <Text style={{ fontSize: 20, color: '#4A5568', lineHeight: 1.55 }}>f：帧率上限（现 0=不限）</Text>
+      <Text style={{ fontSize: 20, color: '#4A5568', lineHeight: 1.55 }}>现象：g 6 ⇒ 一帧多 720ms</Text>
+    </Box>
+    <Box style={{ flex: 1, background: '#FFFFFF', border: '1px solid #D6DCE5', borderRadius: 8, padding: 20, flexDirection: 'column', gap: 10 }}>
+      <Box style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+        <Box style={{ width: 6, height: 24, background: '#D9534F', borderRadius: 3 }} />
+        <Text style={{ fontSize: 26, fontWeight: 'bold', color: '#0E3F8C' }}>④ 减阻塞</Text>
+      </Box>
+      <Text style={{ fontSize: 20, color: '#4A5568', lineHeight: 1.55 }}>文本重试 100 → 10 次</Text>
+      <Text style={{ fontSize: 20, color: '#4A5568', lineHeight: 1.55 }}>发帧期间不插心跳文本</Text>
+      <Text style={{ fontSize: 20, color: '#4A5568', lineHeight: 1.55 }}>现象：LG 稳定、不出现错位</Text>
+    </Box>
+    </Box>
+
+    <Box style={{ height: 16 }} />
+
+    <Box style={{ height: 60, flexDirection: 'row', alignItems: 'center', background: '#F0F5FC', border: '1px solid #D6DCE5', borderRadius: 8, paddingLeft: 20, paddingRight: 20 }}>
+      <Text style={{ fontSize: 20, color: '#4A5568' }}>诊断顺序：看 FPS → 看"坏"（涨就 g 1）→ 看 LG（>100 查阻塞）→ 看 F（≠120 查采集）→ 都正常还慢就回①②</Text>
+    </Box>
+  </Box>
+
+  <Box style={{ flexDirection: 'row', alignItems: 'center', height: 28 }}>
+    <Text style={{ fontSize: 14, color: '#8B97A8' }}>智能车主板 · F407 + 总钻风 MT9V034 · 图传与巡线</Text>
+    <Box style={{ flex: 1 }} />
+    <Text style={{ fontSize: 16, fontWeight: 'bold', color: '#1E4FA8' }}>04 / 08</Text>
+  </Box>
+</Slide>

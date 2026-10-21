@@ -1,0 +1,61 @@
+<Slide style={{ width: 1280, height: 720, background: '#FFFFFF', padding: 40, flexDirection: 'column', fontFamily: "'Microsoft YaHei', sans-serif" }}>
+  <Box style={{ flexDirection: 'row', alignItems: 'center', height: 56, background: '#1E4FA8', borderRadius: 6, paddingLeft: 24, paddingRight: 24 }}>
+    <Text style={{ fontSize: 32, fontWeight: 'bold', color: '#FFFFFF' }}>下周计划：五天把单边巡线跑起来</Text>
+    <Box style={{ flex: 1 }} />
+    <Text style={{ fontSize: 16, color: '#DCE8FA' }}></Text>
+  </Box>
+
+  <Box style={{ height: 16 }} />
+
+  <Box style={{ flex: 1, flexDirection: 'column' }}>
+    <Box style={{ flexDirection: 'column', gap: 10, flex: 1 }}>
+      <Box style={{ flexDirection: 'row', alignItems: 'center', flex: 1, gap: 18, background: '#FFFFFF', border: '1px solid #D6DCE5', borderRadius: 8, paddingLeft: 20, paddingRight: 20 }}>
+        <Box style={{ width: 64, height: 44, background: '#1E4FA8', borderRadius: 6, alignItems: 'center', justifyContent: 'center' }}>
+          <Text style={{ fontSize: 22, fontWeight: 'bold', color: '#FFFFFF' }}>D1</Text>
+        </Box>
+        <Text style={{ fontSize: 24, fontWeight: 'bold', color: '#1A2230', width: 380 }}>单边边界 + 连续画线</Text>
+        <Text style={{ fontSize: 20, color: '#3D7BD9' }}>✓ 屏幕上一条连续的线跟着赛道</Text>
+      </Box>
+      <Box style={{ flexDirection: 'row', alignItems: 'center', flex: 1, gap: 18, background: '#F0F5FC', border: '1px solid #D6DCE5', borderRadius: 8, paddingLeft: 20, paddingRight: 20 }}>
+        <Box style={{ width: 64, height: 44, background: '#1E4FA8', borderRadius: 6, alignItems: 'center', justifyContent: 'center' }}>
+          <Text style={{ fontSize: 22, fontWeight: 'bold', color: '#FFFFFF' }}>D2</Text>
+        </Box>
+        <Text style={{ fontSize: 24, fontWeight: 'bold', color: '#1A2230', width: 380 }}>中线 + 打角（Kp 从 0.3 起）</Text>
+        <Text style={{ fontSize: 20, color: '#3D7BD9' }}>✓ 静态推车，轮子朝弯道</Text>
+      </Box>
+      <Box style={{ flexDirection: 'row', alignItems: 'center', flex: 1, gap: 18, background: '#FFFFFF', border: '1px solid #D6DCE5', borderRadius: 8, paddingLeft: 20, paddingRight: 20 }}>
+        <Box style={{ width: 64, height: 44, background: '#1E4FA8', borderRadius: 6, alignItems: 'center', justifyContent: 'center' }}>
+          <Text style={{ fontSize: 22, fontWeight: 'bold', color: '#FFFFFF' }}>D3</Text>
+        </Box>
+        <Text style={{ fontSize: 24, fontWeight: 'bold', color: '#1A2230', width: 380 }}>加电机低速跑（开环）</Text>
+        <Text style={{ fontSize: 20, color: '#3D7BD9' }}>✓ 不切内道、不蛇形</Text>
+      </Box>
+      <Box style={{ flexDirection: 'row', alignItems: 'center', flex: 1, gap: 18, background: '#F0F5FC', border: '1px solid #D6DCE5', borderRadius: 8, paddingLeft: 20, paddingRight: 20 }}>
+        <Box style={{ width: 64, height: 44, background: '#1E4FA8', borderRadius: 6, alignItems: 'center', justifyContent: 'center' }}>
+          <Text style={{ fontSize: 22, fontWeight: 'bold', color: '#FFFFFF' }}>D4</Text>
+        </Box>
+        <Text style={{ fontSize: 24, fontWeight: 'bold', color: '#1A2230', width: 380 }}>十字 / 断线处理</Text>
+        <Text style={{ fontSize: 20, color: '#3D7BD9' }}>✓ 过十字线不跳</Text>
+      </Box>
+      <Box style={{ flexDirection: 'row', alignItems: 'center', flex: 1, gap: 18, background: '#FFFFFF', border: '1px solid #D6DCE5', borderRadius: 8, paddingLeft: 20, paddingRight: 20 }}>
+        <Box style={{ width: 64, height: 44, background: '#1E4FA8', borderRadius: 6, alignItems: 'center', justifyContent: 'center' }}>
+          <Text style={{ fontSize: 22, fontWeight: 'bold', color: '#FFFFFF' }}>D5</Text>
+        </Box>
+        <Text style={{ fontSize: 24, fontWeight: 'bold', color: '#1A2230', width: 380 }}>提速 + 数据记录</Text>
+        <Text style={{ fontSize: 20, color: '#3D7BD9' }}>✓ 给学长演示 + 前后对比</Text>
+      </Box>
+    </Box>
+
+    <Box style={{ height: 12 }} />
+
+    <Box style={{ height: 52, flexDirection: 'row', alignItems: 'center', background: '#E8EFF8', borderRadius: 8, paddingLeft: 20 }}>
+      <Text style={{ fontSize: 20, fontWeight: 'bold', color: '#0E3F8C' }}>待确认（趁学长在）：赛道元素处理、半赛道宽标定、舵机中值/限幅、电机开闭环</Text>
+    </Box>
+  </Box>
+
+  <Box style={{ flexDirection: 'row', alignItems: 'center', height: 28 }}>
+    <Text style={{ fontSize: 14, color: '#8B97A8' }}>智能车主板 · F407 + 总钻风 MT9V034 · 图传与巡线</Text>
+    <Box style={{ flex: 1 }} />
+    <Text style={{ fontSize: 16, fontWeight: 'bold', color: '#1E4FA8' }}>08 / 08</Text>
+  </Box>
+</Slide>

@@ -1,0 +1,62 @@
+<Slide style={{ width: 1280, height: 720, background: '#FFFFFF', padding: 40, flexDirection: 'column', fontFamily: "'Microsoft YaHei', sans-serif" }}>
+  <Box style={{ flexDirection: 'row', alignItems: 'center', height: 56, background: '#1E4FA8', borderRadius: 6, paddingLeft: 24, paddingRight: 24 }}>
+    <Text style={{ fontSize: 32, fontWeight: 'bold', color: '#FFFFFF' }}>目录</Text>
+    <Box style={{ flex: 1 }} />
+    <Text style={{ fontSize: 16, color: '#DCE8FA' }}></Text>
+  </Box>
+
+  <Box style={{ height: 16 }} />
+
+  <Box style={{ flex: 1, flexDirection: 'column' }}>
+    <Box style={{ flexDirection: 'column', gap: 2, paddingTop: 8 }}>
+      <Box style={{ flexDirection: 'row', alignItems: 'center', height: 62, gap: 20 }}>
+        <Box style={{ width: 56, height: 44, background: '#1E4FA8', borderRadius: 6, alignItems: 'center', justifyContent: 'center' }}>
+          <Text style={{ fontSize: 22, fontWeight: 'bold', color: '#FFFFFF' }}>01</Text>
+        </Box>
+        <Text style={{ fontSize: 26, fontWeight: 'bold', color: '#1A2230', width: 260 }}>链路全貌</Text>
+        <Text style={{ fontSize: 20, color: '#4A5568' }}>摄像头到上位机，每一环对应哪个函数</Text>
+      </Box>
+      <Box style={{ flexDirection: 'row', alignItems: 'center', height: 62, gap: 20 }}>
+        <Box style={{ width: 56, height: 44, background: '#1E4FA8', borderRadius: 6, alignItems: 'center', justifyContent: 'center' }}>
+          <Text style={{ fontSize: 22, fontWeight: 'bold', color: '#FFFFFF' }}>02</Text>
+        </Box>
+        <Text style={{ fontSize: 26, fontWeight: 'bold', color: '#1A2230', width: 260 }}>帧率优化</Text>
+        <Text style={{ fontSize: 20, color: '#4A5568' }}>四个手段 + 每个参数改完看到什么现象</Text>
+      </Box>
+      <Box style={{ flexDirection: 'row', alignItems: 'center', height: 62, gap: 20 }}>
+        <Box style={{ width: 56, height: 44, background: '#1E4FA8', borderRadius: 6, alignItems: 'center', justifyContent: 'center' }}>
+          <Text style={{ fontSize: 22, fontWeight: 'bold', color: '#FFFFFF' }}>03</Text>
+        </Box>
+        <Text style={{ fontSize: 26, fontWeight: 'bold', color: '#1A2230', width: 260 }}>像素点操作</Text>
+        <Text style={{ fontSize: 20, color: '#4A5568' }}>disp_img[r][c] 怎么读、怎么写、怎么画线</Text>
+      </Box>
+      <Box style={{ flexDirection: 'row', alignItems: 'center', height: 62, gap: 20 }}>
+        <Box style={{ width: 56, height: 44, background: '#1E4FA8', borderRadius: 6, alignItems: 'center', justifyContent: 'center' }}>
+          <Text style={{ fontSize: 22, fontWeight: 'bold', color: '#FFFFFF' }}>04</Text>
+        </Box>
+        <Text style={{ fontSize: 26, fontWeight: 'bold', color: '#1A2230', width: 260 }}>参数→现象总表</Text>
+        <Text style={{ fontSize: 20, color: '#4A5568' }}>验收时最常被问的对照表</Text>
+      </Box>
+      <Box style={{ flexDirection: 'row', alignItems: 'center', height: 62, gap: 20 }}>
+        <Box style={{ width: 56, height: 44, background: '#1E4FA8', borderRadius: 6, alignItems: 'center', justifyContent: 'center' }}>
+          <Text style={{ fontSize: 22, fontWeight: 'bold', color: '#FFFFFF' }}>05</Text>
+        </Box>
+        <Text style={{ fontSize: 26, fontWeight: 'bold', color: '#1A2230', width: 260 }}>单边巡线</Text>
+        <Text style={{ fontSize: 20, color: '#4A5568' }}>为什么先单边、边界提取、画连续的线</Text>
+      </Box>
+      <Box style={{ flexDirection: 'row', alignItems: 'center', height: 62, gap: 20 }}>
+        <Box style={{ width: 56, height: 44, background: '#1E4FA8', borderRadius: 6, alignItems: 'center', justifyContent: 'center' }}>
+          <Text style={{ fontSize: 22, fontWeight: 'bold', color: '#FFFFFF' }}>06</Text>
+        </Box>
+        <Text style={{ fontSize: 26, fontWeight: 'bold', color: '#1A2230', width: 260 }}>下周计划</Text>
+        <Text style={{ fontSize: 20, color: '#4A5568' }}>五天节奏与验收标准</Text>
+      </Box>
+    </Box>
+  </Box>
+
+  <Box style={{ flexDirection: 'row', alignItems: 'center', height: 28 }}>
+    <Text style={{ fontSize: 14, color: '#8B97A8' }}>智能车主板 · F407 + 总钻风 MT9V034 · 图传与巡线</Text>
+    <Box style={{ flex: 1 }} />
+    <Text style={{ fontSize: 16, fontWeight: 'bold', color: '#1E4FA8' }}>02 / 08</Text>
+  </Box>
+</Slide>

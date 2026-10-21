@@ -1,0 +1,25 @@
+<Slide style={{ width: 1280, height: 720, background: '#FFFFFF', padding: 0, flexDirection: 'column', fontFamily: "'Microsoft YaHei', sans-serif" }}>
+  <Box style={{ height: 220, background: '#1E4FA8', paddingLeft: 80, paddingTop: 56, flexDirection: 'column' }}>
+    <Text style={{ fontSize: 60, fontWeight: 'bold', color: '#FFFFFF' }}>图传优化 与 单边巡线</Text>
+    <Text style={{ fontSize: 22, color: '#DCE8FA', marginTop: 12 }}>Image Pipeline Optimization &amp; Single-Edge Line Following</Text>
+  </Box>
+
+  <Box style={{ flex: 1, paddingLeft: 80, paddingRight: 80, paddingTop: 48, flexDirection: 'column', gap: 18 }}>
+    <Box style={{ flexDirection: 'row', gap: 16 }}>
+      <Box style={{ width: 6, height: 120, background: '#3D7BD9', borderRadius: 3 }} />
+      <Box style={{ flexDirection: 'column', gap: 8 }}>
+        <Text style={{ fontSize: 26, color: '#1A2230' }}>平台：STM32F407VGT6 + 总钻风 MT9V034（无 51 版）</Text>
+        <Text style={{ fontSize: 26, color: '#1A2230' }}>链路：DCMI → DMA 环形缓冲 → MCU 二值化 → WiFi → 上位机</Text>
+        <Text style={{ fontSize: 26, color: '#1A2230' }}>目标：帧率可调可控、像素级操作、下周开始单边巡线</Text>
+      </Box>
+    </Box>
+
+    <Box style={{ flex: 1 }} />
+
+    <Box style={{ flexDirection: 'row', alignItems: 'center', height: 72, background: '#E8EFF8', borderRadius: 8, paddingLeft: 28, paddingRight: 28 }}>
+      <Text style={{ fontSize: 22, color: '#0E3F8C' }}>汇报人：__________</Text>
+      <Box style={{ flex: 1 }} />
+      <Text style={{ fontSize: 22, color: '#0E3F8C' }}>2026-10-19</Text>
+    </Box>
+  </Box>
+</Slide>

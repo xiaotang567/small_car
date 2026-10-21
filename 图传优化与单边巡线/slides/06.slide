@@ -1,0 +1,68 @@
+<Slide style={{ width: 1280, height: 720, background: '#FFFFFF', padding: 40, flexDirection: 'column', fontFamily: "'Microsoft YaHei', sans-serif" }}>
+  <Box style={{ flexDirection: 'row', alignItems: 'center', height: 56, background: '#1E4FA8', borderRadius: 6, paddingLeft: 24, paddingRight: 24 }}>
+    <Text style={{ fontSize: 32, fontWeight: 'bold', color: '#FFFFFF' }}>参数 → 现象：总表（验收最常问）</Text>
+    <Box style={{ flex: 1 }} />
+    <Text style={{ fontSize: 16, color: '#DCE8FA' }}></Text>
+  </Box>
+
+  <Box style={{ height: 16 }} />
+
+  <Box style={{ flex: 1, flexDirection: 'column' }}>
+    <Box style={{ flexDirection: 'column', border: '1px solid #D6DCE5', borderRadius: 8 }}>
+        <Box style={{ flexDirection: 'row', height: 48, background: '#1E4FA8', alignItems: 'center', paddingLeft: 16, paddingRight: 16 }}>
+          <Text style={{ fontSize: 20, fontWeight: 'bold', color: '#FFFFFF', width: 250 }}>参数</Text>
+          <Text style={{ fontSize: 20, fontWeight: 'bold', color: '#FFFFFF', width: 340 }}>代码位置</Text>
+          <Text style={{ fontSize: 20, fontWeight: 'bold', color: '#FFFFFF', width: 230 }}>增大</Text>
+          <Text style={{ fontSize: 20, fontWeight: 'bold', color: '#FFFFFF' }}>减小</Text>
+        </Box>
+        <Box style={{ flexDirection: 'row', height: 56, alignItems: 'center', paddingLeft: 16, paddingRight: 16, background: '#FFFFFF' }}>
+          <Text style={{ fontSize: 19, fontWeight: 'bold', color: '#1A2230', width: 250 }}>g 行间隔</Text>
+          <Text style={{ fontSize: 17, color: '#3D7BD9', width: 340, fontFamily: 'Consolas, monospace' }}>main.c:85 / 命令 g</Text>
+          <Text style={{ fontSize: 18, color: '#4A5568', width: 230 }}>更慢更稳</Text>
+          <Text style={{ fontSize: 18, color: '#D9534F' }}>更快；0=不等；太小"坏"涨</Text>
+        </Box>
+        <Box style={{ flexDirection: 'row', height: 56, alignItems: 'center', paddingLeft: 16, paddingRight: 16, background: '#F0F5FC' }}>
+          <Text style={{ fontSize: 19, fontWeight: 'bold', color: '#1A2230', width: 250 }}>f 帧率</Text>
+          <Text style={{ fontSize: 17, color: '#3D7BD9', width: 340, fontFamily: 'Consolas, monospace' }}>main.c:84 / 命令 f</Text>
+          <Text style={{ fontSize: 18, color: '#4A5568', width: 230 }}>更慢</Text>
+          <Text style={{ fontSize: 18, color: '#D9534F' }}>更快（0=不限）</Text>
+        </Box>
+        <Box style={{ flexDirection: 'row', height: 56, alignItems: 'center', paddingLeft: 16, paddingRight: 16, background: '#FFFFFF' }}>
+          <Text style={{ fontSize: 19, fontWeight: 'bold', color: '#1A2230', width: 250 }}>cam_pack</Text>
+          <Text style={{ fontSize: 17, color: '#3D7BD9', width: 340, fontFamily: 'Consolas, monospace' }}>main.c:167 / 命令 z</Text>
+          <Text style={{ fontSize: 18, color: '#4A5568', width: 230 }}>—</Text>
+          <Text style={{ fontSize: 18, color: '#D9534F' }}>退回 188B/行</Text>
+        </Box>
+        <Box style={{ flexDirection: 'row', height: 56, alignItems: 'center', paddingLeft: 16, paddingRight: 16, background: '#F0F5FC' }}>
+          <Text style={{ fontSize: 19, fontWeight: 'bold', color: '#1A2230', width: 250 }}>e 曝光（R0x0B）</Text>
+          <Text style={{ fontSize: 17, color: '#3D7BD9', width: 340, fontFamily: 'Consolas, monospace' }}>cam_shutter=150 / 命令 e</Text>
+          <Text style={{ fontSize: 18, color: '#4A5568', width: 230 }}>更亮、模糊↑</Text>
+          <Text style={{ fontSize: 18, color: '#D9534F' }}>更暗；太小/太大都不出帧</Text>
+        </Box>
+        <Box style={{ flexDirection: 'row', height: 56, alignItems: 'center', paddingLeft: 16, paddingRight: 16, background: '#FFFFFF' }}>
+          <Text style={{ fontSize: 19, fontWeight: 'bold', color: '#1A2230', width: 250 }}>R0x0D bin（0x030A）</Text>
+          <Text style={{ fontSize: 17, color: '#3D7BD9', width: 340, fontFamily: 'Consolas, monospace' }}>cam_sccb_set_bin4</Text>
+          <Text style={{ fontSize: 18, color: '#4A5568', width: 230 }}>分辨率↓ 数据↓</Text>
+          <Text style={{ fontSize: 18, color: '#D9534F' }}>分辨率↑ 数据↑</Text>
+        </Box>
+        <Box style={{ flexDirection: 'row', height: 56, alignItems: 'center', paddingLeft: 16, paddingRight: 16, background: '#F0F5FC' }}>
+          <Text style={{ fontSize: 19, fontWeight: 'bold', color: '#1A2230', width: 250 }}>Kp 打角</Text>
+          <Text style={{ fontSize: 17, color: '#3D7BD9', width: 340, fontFamily: 'Consolas, monospace' }}>巡线代码</Text>
+          <Text style={{ fontSize: 18, color: '#4A5568', width: 230 }}>震荡</Text>
+          <Text style={{ fontSize: 18, color: '#D9534F' }}>转不过来</Text>
+        </Box>
+    </Box>
+
+    <Box style={{ height: 16 }} />
+
+    <Box style={{ height: 56, flexDirection: 'row', alignItems: 'center', background: '#E8EFF8', borderRadius: 8, paddingLeft: 20 }}>
+      <Text style={{ fontSize: 20, color: '#0E3F8C' }}>口径统一：颜色/线宽/阈值都别在演示时现调 —— 先按表讲"改了会怎样"，再动手验证</Text>
+    </Box>
+  </Box>
+
+  <Box style={{ flexDirection: 'row', alignItems: 'center', height: 28 }}>
+    <Text style={{ fontSize: 14, color: '#8B97A8' }}>智能车主板 · F407 + 总钻风 MT9V034 · 图传与巡线</Text>
+    <Box style={{ flex: 1 }} />
+    <Text style={{ fontSize: 16, fontWeight: 'bold', color: '#1E4FA8' }}>06 / 08</Text>
+  </Box>
+</Slide>

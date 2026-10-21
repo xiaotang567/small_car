@@ -1,0 +1,78 @@
+<Slide style={{ width: 1280, height: 720, background: '#FFFFFF', padding: 40, flexDirection: 'column', fontFamily: "'Microsoft YaHei', sans-serif" }}>
+  <Box style={{ flexDirection: 'row', alignItems: 'center', height: 56, background: '#1E4FA8', borderRadius: 6, paddingLeft: 24, paddingRight: 24 }}>
+    <Text style={{ fontSize: 32, fontWeight: 'bold', color: '#FFFFFF' }}>链路全貌：一帧图像怎么走完全程</Text>
+    <Box style={{ flex: 1 }} />
+    <Text style={{ fontSize: 16, color: '#DCE8FA' }}></Text>
+  </Box>
+
+  <Box style={{ height: 16 }} />
+
+  <Box style={{ flex: 1, flexDirection: 'column' }}>
+    <Box style={{ flexDirection: 'row', alignItems: 'center', gap: 8, height: 220 }}>
+      <Box style={{ flex: 1, background: '#F0F5FC', border: '1px solid #D6DCE5', borderRadius: 8, padding: 14, flexDirection: 'column', gap: 6, alignItems: 'center' }}>
+        <Text style={{ fontSize: 24, fontWeight: 'bold', color: '#0E3F8C' }}>传感器</Text>
+        <Text style={{ fontSize: 18, color: '#4A5568' }}>188×120 二值</Text>
+        <Text style={{ fontSize: 14, color: '#3D7BD9' }}>board_cam_analyze</Text>
+      </Box>
+      <Text style={{ fontSize: 26, color: "#1E4FA8", fontWeight: 'bold' }}>›</Text>
+      <Box style={{ flex: 1, background: '#F0F5FC', border: '1px solid #D6DCE5', borderRadius: 8, padding: 14, flexDirection: 'column', gap: 6, alignItems: 'center' }}>
+        <Text style={{ fontSize: 24, fontWeight: 'bold', color: '#0E3F8C' }}>DCMI</Text>
+        <Text style={{ fontSize: 18, color: '#4A5568' }}>硬件同步采集</Text>
+        <Text style={{ fontSize: 14, color: '#3D7BD9' }}>MX_DCMI_Init</Text>
+      </Box>
+      <Text style={{ fontSize: 26, color: "#1E4FA8", fontWeight: 'bold' }}>›</Text>
+      <Box style={{ flex: 1, background: '#F0F5FC', border: '1px solid #D6DCE5', borderRadius: 8, padding: 14, flexDirection: 'column', gap: 6, alignItems: 'center' }}>
+        <Text style={{ fontSize: 24, fontWeight: 'bold', color: '#0E3F8C' }}>DMA 环形</Text>
+        <Text style={{ fontSize: 18, color: '#4A5568' }}>480 行 = 4 帧</Text>
+        <Text style={{ fontSize: 14, color: '#3D7BD9' }}>hdma_dcmi.Init</Text>
+      </Box>
+      <Text style={{ fontSize: 26, color: "#1E4FA8", fontWeight: 'bold' }}>›</Text>
+      <Box style={{ flex: 1, background: '#F0F5FC', border: '1px solid #D6DCE5', borderRadius: 8, padding: 14, flexDirection: 'column', gap: 6, alignItems: 'center' }}>
+        <Text style={{ fontSize: 24, fontWeight: 'bold', color: '#0E3F8C' }}>收割</Text>
+        <Text style={{ fontSize: 18, color: '#4A5568' }}>填满 120 行</Text>
+        <Text style={{ fontSize: 14, color: '#3D7BD9' }}>board_cam_harvest</Text>
+      </Box>
+      <Text style={{ fontSize: 26, color: "#1E4FA8", fontWeight: 'bold' }}>›</Text>
+      <Box style={{ flex: 1, background: '#F0F5FC', border: '1px solid #D6DCE5', borderRadius: 8, padding: 14, flexDirection: 'column', gap: 6, alignItems: 'center' }}>
+        <Text style={{ fontSize: 24, fontWeight: 'bold', color: '#0E3F8C' }}>打包发送</Text>
+        <Text style={{ fontSize: 18, color: '#4A5568' }}>24B/行 或 整帧</Text>
+        <Text style={{ fontSize: 14, color: '#3D7BD9' }}>main.c cam_pack</Text>
+      </Box>
+      <Text style={{ fontSize: 26, color: "#1E4FA8", fontWeight: 'bold' }}>›</Text>
+      <Box style={{ flex: 1, background: '#F0F5FC', border: '1px solid #D6DCE5', borderRadius: 8, padding: 14, flexDirection: 'column', gap: 6, alignItems: 'center' }}>
+        <Text style={{ fontSize: 24, fontWeight: 'bold', color: '#0E3F8C' }}>上位机</Text>
+        <Text style={{ fontSize: 18, color: '#4A5568' }}>解包显示</Text>
+        <Text style={{ fontSize: 14, color: '#3D7BD9' }}>cam_view.py</Text>
+      </Box>
+    </Box>
+
+    <Box style={{ height: 20 }} />
+
+    <Box style={{ flexDirection: 'row', gap: 20, flex: 1 }}>
+    <Box style={{ flex: 1, background: '#F7F9FC', border: '1px solid #D6DCE5', borderRadius: 8, padding: 20, flexDirection: 'column', gap: 10 }}>
+      <Box style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+        <Box style={{ width: 6, height: 24, background: '#1E4FA8', borderRadius: 3 }} />
+        <Text style={{ fontSize: 26, fontWeight: 'bold', color: '#0E3F8C' }}>关键点一：像素唯一战场</Text>
+      </Box>
+      <Text style={{ fontSize: 20, color: '#4A5568', lineHeight: 1.55 }}>所有像素操作都在 disp_img[120][188] 上</Text>
+      <Text style={{ fontSize: 20, color: '#4A5568', lineHeight: 1.55 }}>0 = 黑，255 = 白（board_cam_analyze 二值化）</Text>
+      <Text style={{ fontSize: 20, color: '#4A5568', lineHeight: 1.55 }}>改完立刻能从屏幕看到，便于现场讲解</Text>
+    </Box>
+    <Box style={{ flex: 1, background: '#F7F9FC', border: '1px solid #D6DCE5', borderRadius: 8, padding: 20, flexDirection: 'column', gap: 10 }}>
+      <Box style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+        <Box style={{ width: 6, height: 24, background: '#3D7BD9', borderRadius: 3 }} />
+        <Text style={{ fontSize: 26, fontWeight: 'bold', color: '#0E3F8C' }}>关键点二：三个"行数"别混</Text>
+      </Box>
+      <Text style={{ fontSize: 20, color: '#4A5568', lineHeight: 1.55 }}>cam_row_bytes = 188（一行字节数）</Text>
+      <Text style={{ fontSize: 20, color: '#4A5568', lineHeight: 1.55 }}>cam_span = 120（一帧行数）</Text>
+      <Text style={{ fontSize: 20, color: '#4A5568', lineHeight: 1.55 }}>cam_ring_rows = 480（环形能装几行）</Text>
+    </Box>
+    </Box>
+  </Box>
+
+  <Box style={{ flexDirection: 'row', alignItems: 'center', height: 28 }}>
+    <Text style={{ fontSize: 14, color: '#8B97A8' }}>智能车主板 · F407 + 总钻风 MT9V034 · 图传与巡线</Text>
+    <Box style={{ flex: 1 }} />
+    <Text style={{ fontSize: 16, fontWeight: 'bold', color: '#1E4FA8' }}>03 / 08</Text>
+  </Box>
+</Slide>

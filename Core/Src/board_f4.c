@@ -601,7 +601,7 @@ volatile uint16_t cam_off = 0;          // （历史遗留，不再使用；保�
 //     ⇒ `disp_ln = 0`、`disp_next_row = 当时的写入行` ⇒ 之后主循环逐行收割就对齐 ✓
 //   ⚠️ 主循环必须至少每 4.2ms 跑一圈（否则行会在被收割前被覆盖 ⇒ 漏行）。
 //-------------------------------------------------------------------------------------------------------------------
-uint8_t           disp_img[CAM_H][CAM_TXW];      // ★ 全画面 188×120（22560B，顶替原来的 cam_snap）
+__attribute__((section(".ccmram"))) uint8_t disp_img[CAM_H][CAM_TXW];  /* ★ 放 CCM：只被 CPU 读写，省 22KB 主 SRAM */      // ★ 全画面 188×120（22560B，顶替原来的 cam_snap）
 volatile uint32_t disp_frame  = 0;               // 全画面的帧数（VSYNC 一次 +1）
 volatile uint8_t  disp_hold   = 0;               // 1 = 冻结收割（发图期间，保证整帧来自同一次）
 volatile uint32_t disp_pass   = 0;               // 行号回绕次数（**仅诊断用**，别拿它判"凑齐"）
