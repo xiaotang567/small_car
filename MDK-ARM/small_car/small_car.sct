@@ -18,5 +18,7 @@ LR_IROM1 0x08000000 0x00100000  {    ; load region size_region
 
   RW_IRAM3 0x10000000 0x00010000  {  ; CCM 64KB，只有 CPU 能访问
    .ANY ( .ccmram )
+   * ( STACK )        ; ★ 栈也放 CCM：不受 DMA 抢总线
+   * ( HEAP )
   }
 }
