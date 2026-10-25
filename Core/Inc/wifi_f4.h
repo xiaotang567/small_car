@@ -63,7 +63,7 @@
 #define WIFI_SSID           "iQOO Neo9S Pro+"
 #define WIFI_PASSWORD       "12345678"
 
-#define WIFI_PC_IP          "192.168.53.77"     // 电脑的 IPv4（热点网段会变！用 ipconfig 查）
+#define WIFI_PC_IP          "192.168.165.77"     // 电脑的 IPv4（热点网段会变！用 ipconfig 查）
                                                 // 2026-10-19 更新：189.77 → 53.77（SSID 没变，只换了网段 ✓）
 #define WIFI_PC_PORT        "8086"              // 上位机监听端口
 #define WIFI_LOCAL_PORT     "6666"              // 模块自己的本地端口
