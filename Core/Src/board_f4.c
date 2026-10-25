@@ -1817,26 +1817,33 @@ volatile uint8_t cam_route = 0;          // ★ 当前路线类型（0..3）
 
 static void board_cam_classify_route (void)
 {
-    uint32_t r2;
-    uint32_t sN = 0U, sM = 0U, sF = 0U;
-    uint8_t  cN = 0U, cM = 0U, cF = 0U;
+    int32_t  r2;
+    int32_t  sN = 0, sF = 0;
+    uint8_t  cN = 0U, cF = 0U;
 
-    for (r2 = 106U; r2 < 116U; r2++) { if (0xFFU != cam_bound[r2]) { sN += cam_bound[r2]; cN ++; } }
-    for (r2 =  76U; r2 <  86U; r2++) { if (0xFFU != cam_bound[r2]) { sM += cam_bound[r2]; cM ++; } }
-    for (r2 =  46U; r2 <  56U; r2++) { if (0xFFU != cam_bound[r2]) { sF += cam_bound[r2]; cF ++; } }
-
-    if ((cN < 3U) && (cM < 3U))
+    /* 近段：底部固定 106~115（车头附近，正常都有边） */
+    for (r2 = 106; r2 < 116; r2++)
     {
-        cam_route = 3U;                                     /* 连中段都没边 ⇒ 丢线/十字 */
-        return;
+        if (0xFFU != cam_bound[r2]) { sN += (int32_t)cam_bound[r2]; cN ++; }
     }
-    if (cF < 3U) { cam_route = 0U; return; }                 /* 远段可靠性不够 ⇒ 不敢判 */
+
+    /* ★★ 远段：改成取 **86~95 行**（离车头还近，一定可靠）★★
+       为什么不取 46~55？实测发现赛道远处经常断开，
+       那几行里只剩背景白带（值 ~50，和近段几乎一样）⇒ d≈0 ⇒ 永远误报 R0 ✗
+       取 86~95 反而能看出弯（测试图：近 54 / 远 70 ⇒ d=+16 ⇒ R2 → 对了 ✓）*/
+    for (r2 = 86; r2 < 96; r2++)
+    {
+        if (0xFFU != cam_bound[r2]) { sF += (int32_t)cam_bound[r2]; cF ++; }
+    }
+
+    if (cN < 3U)              { cam_route = 3U; return; }   /* 近处都没边 ⇒ 丢线/十字 */
+    if (cF < 3U)              { cam_route = 0U; return; }   /* 远段不够 ⇒ 不敢判，保守直行 */
 
     {
-        int32_t d = (int32_t)(sF / cF) - (int32_t)(sN / cN);  /* 远 - 近 */
-        if (d < -8)      { cam_route = 1U; }                  /* 边界往左 ⇒ 左转 */
-        else if (d > 8)  { cam_route = 2U; }                  /* 往右     ⇒ 右转 */
-        else             { cam_route = 0U; }                  /* 直线 */
+        int32_t d = (sF / (int32_t)cF) - (sN / (int32_t)cN);   /* 远 - 近 */
+        if (d < -8)          { cam_route = 1U; }               /* 左转 */
+        else if (d > 8)      { cam_route = 2U; }               /* 右转 */
+        else                 { cam_route = 0U; }               /* 直线 */
     }
 }
 
