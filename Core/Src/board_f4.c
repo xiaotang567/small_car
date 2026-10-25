@@ -1820,7 +1820,12 @@ volatile uint8_t cam_ahead = 0U;   /* 未来走哪 0/1/2/3 */
 volatile uint8_t cam_route = 0;          // ★ 当前路线类型（0..3）
 
 /* ★ 消失点所在行（地平线）—— 透视基准用，现场可微调 */
-#define LF_HORIZON_ROW   56
+/* ★ 直道基准（一个标定值就够）：
+   在**确实是直道**的地方，左边界每向上 20 行，右移多少像素？
+   （透视使然：直道上边界也会往中心收敛，这个值就是"收敛速度"）
+   标定方法：车放直道，把这个值调到屏幕显示 R0 为止
+   当前值 12：由用户一张直道截图反算（近 23 → 中 37，18 行差 14 ⇒ 折算 20 行≈12）*/
+#define LF_STRAIGHT_DX_PER20   12
 
 /* ★★★ 带透视补偿的弯向判定 ★★★
    ⚠️ 以前直接用"远段 x − 近段 x"，但**直道上这个差值也不为 0**（所有平行线都向消失点收敛）⇒ 直道也会被判成弯道 ✗
@@ -1840,12 +1845,8 @@ static uint8_t lf_route_of (int32_t r_near, int32_t r_far)
     x1 = sN / (int32_t)cN;
     x2 = sF / (int32_t)cF;
 
-    /* 直道基准：x(r) = x1 + (CENTER - x1) * (r_near - r) / (r_near - LF_HORIZON_ROW) */
-    {
-        int32_t den = r_near - LF_HORIZON_ROW;
-        if (den < 8) { den = 8; }
-        x_exp = x1 + (((int32_t)(CAM_TXW / 2) - x1) * (r_near - r_far)) / den;
-    }
+    /* 直道基准（线性）：每上 20 行，左边界右移 LF_STRAIGHT_DX_PER20 个像素 */
+    x_exp = x1 + ((int32_t)LF_STRAIGHT_DX_PER20 * (r_near - r_far)) / 20;
 
     dev = x2 - x_exp;                    /* 往左偏 ⇒ 负 ⇒ 左转 ✓ */
 
