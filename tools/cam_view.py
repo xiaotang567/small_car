@@ -204,20 +204,24 @@ class Viewer(object):
             #   算法与 MCU 的 board_cam_analyze() 一致：从 c=1 往右扫，找第一个
             #   「与左邻不同、自身与右侧连续 2 像素相同」的列（0xFF = 该行没找到）
             try:
-                bnd = []
-                for r in range(h):
+                # ★ 与 MCU 一致：从最底行往上"跟线"，每行只在上行边界 ±12 内找
+                #   （不能每行独立从最左边扫 —— 背景里一块白就会把边界拽走）
+                bnd = [0xFF] * h
+                prev = -1
+                for r in range(h - 1, -1, -1):
                     base = r * w
                     b = 0xFF
-                    # 前 24 行跳过左上角 FPS/R 文字区：单片机是"先找边、后画字"，
-                    # 电脑拿到的是画完字的图，不躲开就会把文字边缘误判成边界
-                    c0 = 62 if r < 24 else 1
-                    for c in range(c0, w - 2):
-                        if (buf[base + c] != buf[base + c - 1] and
-                                buf[base + c] == buf[base + c + 1] and
-                                buf[base + c] == buf[base + c + 2]):
+                    if prev < 0:
+                        hi, lo = w // 2, 2
+                    else:
+                        hi, lo = min(prev + 20, w - 3), max(prev - 20, 2)
+                    for c in range(hi, lo - 1, -1):
+                        if buf[base + c] == 255 and buf[base + c - 1] == 0:
                             b = c
                             break
-                    bnd.append(b)
+                    bnd[r] = b
+                    if b != 0xFF:
+                        prev = b
 
                 im = im.convert('RGB')
                 _d = ImageDraw.Draw(im)

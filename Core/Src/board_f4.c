@@ -1909,22 +1909,52 @@ void board_cam_analyze (void)
     }
     cam_thresh = T;
 
-    for (r = 0U; r < (uint32_t)CAM_H; r++)   // ② 二值化 + ③ 每行交界列
+    /* ② 先整帧二值化（与行序无关，单独一遍） */
+    for (r = 0U; r < (uint32_t)CAM_H; r++)
     {
         uint8_t *row = &disp_img[r][0];
-        uint8_t  bound = 0xFFU;
-
         for (c = 0U; c < (uint32_t)CAM_TXW; c++) { row[c] = (row[c] >= T) ? 255U : 0U; }
+    }
 
-        for (c = 1U; (c + 2U) < (uint32_t)CAM_TXW; c++)
+    /* ③ 从下往上"跟线"找左边界 ★★★
+       ⚠️ 不能每行独立"从最左边扫"：背景里只要有一块白（墙/纸/反光），
+          就会把那个白块边缘当成赛道边界（实测：赛道在右下、左上有一块白条 ⇒ 误判 R2 ✗）
+       ✅ 正确做法：从最底行（离车最近、最可靠）开始，之后每行只在上一行边界 ±12 内找，
+             这样会**一直跟住同一条边**，不会被背景里的白块骗走 ✓ */
+    {
+        int32_t prev = -1;                        /* 上一行边界列，-1 = 还没有 */
+        uint8_t lost = 0U;                        /* 连续丢行计数，超过 8 就重新捕获 */
+        int32_t rr;
+
+        for (rr = (int32_t)CAM_H - 1; rr >= 0; rr--)
         {
-            if ((row[c] != row[c - 1U]) && (row[c] == row[c + 1U]) && (row[c] == row[c + 2U]))
+            uint8_t *row = &disp_img[rr][0];
+            int32_t  c_hi, c_lo, cc;
+            uint8_t  b = 0xFFU;
+
+            if (prev < 0)
             {
-                bound = (uint8_t)c;
-                break;
+                c_hi = (int32_t)CAM_TXW / 2;      /* 首行：从画面中间往左扫 */
+                c_lo = 2;
             }
+            else
+            {
+                c_hi = prev + 20;                 /* 之后：只在上行边界±20 内找 */
+                c_lo = prev - 20;
+                if (c_hi > (int32_t)CAM_TXW - 3) { c_hi = (int32_t)CAM_TXW - 3; }
+                if (c_lo < 2)                    { c_lo = 2; }
+            }
+
+            for (cc = c_hi; cc >= c_lo; cc--)     /* 找"白→黑" = 白色赛道的左边缘 */
+            {
+                if ((row[cc] == 255U) && (row[cc - 1] == 0U)) { b = (uint8_t)cc; break; }
+            }
+
+            cam_bound[rr] = b;
+            if (0xFFU != b) { prev = (int32_t)b; lost = 0U; }
+            else if (lost < 8U) { lost ++; }
+            else { prev = -1; lost = 0U; }        /* 掉线太久 ⇒ 下一行重新从中间找（重新捕获远处赛道）*/
         }
-        cam_bound[r] = bound;
     }
 
     /* ★★ 帧率画进图像（单片机自己画，电脑只收）★★
