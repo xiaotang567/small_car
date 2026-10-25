@@ -414,6 +414,22 @@ static uint8_t wf_get_mac (void)
     return 0;
 }
 
+/* ★★★ 自动推导电脑 IP：模块 IP 的前三段 + 末段 77 ★★★
+   手机热点每次开都会换网段（已踩 5 次），但电脑末段恒为 .77
+   ⇒ 用模块自己的 IP 推导，以后换网段不用改代码重烧 ✓
+   兜底：解析失败就用宏 WIFI_PC_IP ✓ */
+static char wf_pc_ip[16] = WIFI_PC_IP;
+
+static void wf_derive_pc_ip (void)
+{
+    unsigned a = 0U, b = 0U, c = 0U;
+
+    if (3 == sscanf(wifi_f4_ip_text, "%u.%u.%u.", &a, &b, &c))
+    {
+        (void)sprintf(wf_pc_ip, "%u.%u.%u.%u", a, b, c, (unsigned)WF_PC_LAST_OCTET);
+    }
+}
+
 static uint8_t wf_get_ip (void)
 {
     wf_pkt_t p;
@@ -494,6 +510,7 @@ uint8_t wifi_f4_init (void)
     // ---- 连热点 ----
     if (wf_wifi_connect(WIFI_SSID, WIFI_PASSWORD)) { wf_last_err = 2; return 2; }
     if (wf_get_ip())                               { wf_last_err = 2; return 2; }
+    wf_derive_pc_ip();                             /* ★ 自动推导电脑 IP ✓ */
     wifi_f4_progress = 2;
 
     // ---- 连电脑的 TCP 服务端 ----
@@ -504,7 +521,7 @@ uint8_t wifi_f4_init (void)
     //    ⇒ 所以这里**即使握手失败，也把 wf_ready 置 1 让数据能发出去**
     //      （真没连上时模块会把数据丢掉，**无害**）。状态码照旧返回，LED/日志不受影响。
     if (wf_socket_connect(WIFI_USE_TCP ? "TCP" : "UDP",
-                          WIFI_PC_IP, WIFI_PC_PORT, WIFI_LOCAL_PORT))
+                          wf_pc_ip, WIFI_PC_PORT, WIFI_LOCAL_PORT))
     {
         wf_last_err      = 3;
         wifi_f4_progress = 3;
@@ -529,7 +546,7 @@ uint8_t wifi_f4_retry (void)
     if (wf_ready) return 0;
 
     if (wf_socket_connect(WIFI_USE_TCP ? "TCP" : "UDP",
-                          WIFI_PC_IP, WIFI_PC_PORT, WIFI_LOCAL_PORT) == 0)
+                          wf_pc_ip, WIFI_PC_PORT, WIFI_LOCAL_PORT) == 0)
     {
         wifi_f4_progress = 3;
         wf_last_err      = 0;
