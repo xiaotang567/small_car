@@ -1819,22 +1819,47 @@ volatile uint8_t cam_now   = 0U;   /* 目前走哪 0/1/2/3 */
 volatile uint8_t cam_ahead = 0U;   /* 未来走哪 0/1/2/3 */
 volatile uint8_t cam_route = 0;          // ★ 当前路线类型（0..3）
 
-static uint8_t lf_route_of (int32_t r1lo, int32_t r1hi, int32_t r2lo, int32_t r2hi)
+/* ★ 消失点所在行（地平线）—— 透视基准用，现场可微调 */
+#define LF_HORIZON_ROW   56
+
+/* ★★★ 带透视补偿的弯向判定 ★★★
+   ⚠️ 以前直接用"远段 x − 近段 x"，但**直道上这个差值也不为 0**（所有平行线都向消失点收敛）⇒ 直道也会被判成弯道 ✗
+   ✅ 正确：先算"如果是直道，远段应在哪"（近段指向消失点的直线），
+           实际值减去这个预期值，才是纯粹的弯曲量 ✓ */
+static uint8_t lf_route_of (int32_t r_near, int32_t r_far)
 {
-    int32_t r, s1 = 0, s2 = 0;
-    uint8_t c1 = 0U, c2 = 0U;
+    int32_t r, sN = 0, sF = 0;
+    uint8_t cN = 0U, cF = 0U;
+    int32_t x1, x2, x_exp, dev;
 
-    for (r = r1lo; r < r1hi; r++) { if (0xFFU != cam_bound[r]) { s1 += (int32_t)cam_bound[r]; c1 ++; } }
-    for (r = r2lo; r < r2hi; r++) { if (0xFFU != cam_bound[r]) { s2 += (int32_t)cam_bound[r]; c2 ++; } }
+    for (r = r_near - 5; r <= r_near + 4; r++) { if (0xFFU != cam_bound[r]) { sN += (int32_t)cam_bound[r]; cN ++; } }
+    for (r = r_far  - 5; r <= r_far  + 4; r++) { if (0xFFU != cam_bound[r]) { sF += (int32_t)cam_bound[r]; cF ++; } }
 
-    if ((c1 < 3U) || (c2 < 3U)) { return 3U; }
+    if ((cN < 3U) || (cF < 3U)) { return 3U; }
 
+    x1 = sN / (int32_t)cN;
+    x2 = sF / (int32_t)cF;
+
+    /* 直道基准：x(r) = x1 + (CENTER - x1) * (r_near - r) / (r_near - LF_HORIZON_ROW) */
     {
-        int32_t d = (s2 / (int32_t)c2) - (s1 / (int32_t)c1);
-        if (d < -8) { return 1U; }
-        if (d >  8) { return 2U; }
-        return 0U;
+        int32_t den = r_near - LF_HORIZON_ROW;
+        if (den < 8) { den = 8; }
+        x_exp = x1 + (((int32_t)(CAM_TXW / 2) - x1) * (r_near - r_far)) / den;
     }
+
+    dev = x2 - x_exp;                    /* 往左偏 ⇒ 负 ⇒ 左转 ✓ */
+
+    if (dev < -6) { return 1U; }
+    if (dev >  6) { return 2U; }
+    return 0U;
+}
+
+/* ★★★ v3：「目前」看近→中，「未来」看中→远（都带透视补偿）★★★ */
+void board_cam_classify_route (void)
+{
+    cam_now   = lf_route_of(110,  92);
+    cam_ahead = lf_route_of( 92,  67);
+    cam_route = cam_ahead;
 }
 
 /* ★★★ v2：「目前走哪」+「未来走哪」 ★★★
@@ -1842,12 +1867,6 @@ static uint8_t lf_route_of (int32_t r1lo, int32_t r1hi, int32_t r2lo, int32_t r2
    目前 = 中−近：未来 = 远−中
    → 两者**共用中带** ⇒ 目前的“远”恰好是未来的“近”
      ⇒ 车往前开时，拐弯从「未来」自然滑进「目前」，**不存在切换时机** ✓ */
-void board_cam_classify_route (void)
-{
-    cam_now   = lf_route_of(106, 116,  88,  98);
-    cam_ahead = lf_route_of( 88,  98,  62,  72);
-    cam_route = cam_ahead;
-}
 
 // 在左上角画 "R<code>"（紧跟在 FPS 下面一行）
 static void board_cam_draw_route_text (void)
