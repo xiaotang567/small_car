@@ -1908,6 +1908,72 @@ static void board_cam_draw_route_text (void)
     }
 }
 
+/* ★★★ 寻线算法开关：1 = 八邻域爬线（新）  0 = 逐行±20跟线（旧，保留备用）★★★ */
+#define LF_USE_8NEIGHBOR    0
+
+#if LF_USE_8NEIGHBOR
+/* ★★★ 八邻域爬线：从底部种子出发，沿着「白色赛道的左边缘」一路向上爬 ★★★
+   相比逐行±20 跟线的优势：
+     · 不受"每行只能横移 20"限制 ⇒ 急弯 / 环岛也能跟
+     · 天然沿「连通的同一条边」走 ⇒ 不会被背景白块骗走 */
+static void lf_trace_left_8 (void)
+{
+    /* ★ 只允许"向上 / 同行横移"，**绝不向下** ⇒ 行号单调不增 ⇒ 天然不会死循环 ✓
+       （之前允许向下 ⇒ 在同一段边上下来回跳，3000 步只走了 2 行 ✗）*/
+    static const int8_t dr8[5] = { -1, -1, -1,  0,  0 };
+    static const int8_t dc8[5] = { -1,  0,  1, -1,  1 };
+    int32_t  r, c, k;
+    int32_t  r0 = -1, c0 = -1;
+    uint16_t guard = 0U;
+
+    for (r = 0; r < CAM_H; r++) { cam_bound[r] = 0xFF; }
+
+    /* ① 种子：底部 20 行里找"最宽的白段"（= 赛道，不是背景白条）*/
+    for (r = CAM_H - 1; (r >= CAM_H - 20) && (r0 < 0); r--)
+    {
+        int32_t l = -1, bestl = -1, bestr = -1, c2;
+        for (c2 = 2; c2 < (int32_t)CAM_TXW - 2; c2++)
+        {
+            if (disp_img[r][c2] == 255U) { if (l < 0) { l = c2; } }
+            else if (l >= 0)
+            {
+                if ((bestl < 0) || ((c2 - 1 - l) > (bestr - bestl))) { bestl = l; bestr = c2 - 1; }
+                l = -1;
+            }
+        }
+        if (l >= 0) { if ((bestl < 0) || (((int32_t)CAM_TXW - 3 - l) > (bestr - bestl))) { bestl = l; bestr = (int32_t)CAM_TXW - 3; } }
+        if ((bestl >= 0) && ((bestr - bestl) >= 20)) { r0 = r; c0 = bestl; }
+    }
+    if (r0 < 0) { return; }
+
+    /* ② 八邻域（向上三个 + 同行两个）爬线 */
+    r = r0; c = c0;
+    cam_bound[r] = (uint8_t)c;
+
+    while (guard < 1200U)
+    {
+        int32_t nr = -1, nc = -1;
+        guard ++;
+
+        for (k = 0; k < 5; k++)
+        {
+            int32_t tr = r + dr8[k];
+            int32_t tc = c + dc8[k];
+            if ((tr < 0) || (tc < 1) || (tc >= (int32_t)CAM_TXW - 1)) { continue; }
+            if ((disp_img[tr][tc] == 255U) && (disp_img[tr][tc - 1] == 0U))
+            {
+                if ((tr == r) && (cam_bound[tr] != 0xFF)) { continue; }   /* 同行只记第一次 */
+                nr = tr; nc = tc; break;
+            }
+        }
+        if (nr < 0) { break; }
+        r = nr; c = nc;
+        if (cam_bound[r] == 0xFF) { cam_bound[r] = (uint8_t)c; }
+        if (r == 0) { break; }
+    }
+}
+#endif
+
 void board_cam_analyze (void)
 {
     static uint32_t hist[256];
@@ -1945,7 +2011,10 @@ void board_cam_analyze (void)
         for (c = 0U; c < (uint32_t)CAM_TXW; c++) { row[c] = (row[c] >= T) ? 255U : 0U; }
     }
 
-    /* ③ 从下往上"跟线"找左边界 ★★★
+    #if LF_USE_8NEIGHBOR
+    lf_trace_left_8();
+#else
+/* ③ 从下往上"跟线"找左边界 ★★★
        ⚠️ 不能每行独立"从最左边扫"：背景里只要有一块白（墙/纸/反光），
           就会把那个白块边缘当成赛道边界（实测：赛道在右下、左上有一块白条 ⇒ 误判 R2 ✗）
        ✅ 正确做法：从最底行（离车最近、最可靠）开始，之后每行只在上一行边界 ±12 内找，
@@ -1985,6 +2054,9 @@ void board_cam_analyze (void)
             else { prev = -1; lost = 0U; }        /* 掉线太久 ⇒ 下一行重新从中间找（重新捕获远处赛道）*/
         }
     }
+
+
+#endif
 
     /* ★★ 帧率画进图像（单片机自己画，电脑只收）★★
        用本函数两次调用的间隔反推出帧率（= 实际出帧率），再画在左上角 ✓ */
