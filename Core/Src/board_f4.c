@@ -1815,6 +1815,11 @@ static void board_cam_draw_fps_text (uint16_t fps10)
 //   0 = 直线   1 = 左转   2 = 右转   3 = 丢线/十字
 //   原理：远段（图上部）对应“车前方远处”，边界往左偏 ⇒ 轨道向左弯 ✓
 //-------------------------------------------------------------------------------------------------------------------
+volatile float   lf_dbg_a = 0.0f;   /* 行110 左边界 */
+volatile float   lf_dbg_b = 0.0f;   /* 行 92 左边界 */
+volatile float   lf_dbg_c = 0.0f;   /* 行 67 左边界 */
+volatile float   lf_dbg_dev = 0.0f; /* 最近偏航量 */
+volatile uint16_t cam_fps10 = 0U;   /* FPS x10 */
 volatile uint8_t cam_now   = 0U;   /* 目前走哪 0/1/2/3 */
 volatile uint8_t cam_ahead = 0U;   /* 未来走哪 0/1/2/3 */
 volatile uint8_t cam_route = 0;          // ★ 当前路线类型（0..3）
@@ -1849,6 +1854,9 @@ static uint8_t lf_route_of (int32_t r_near, int32_t r_far)
     x_exp = x1 + ((int32_t)LF_STRAIGHT_DX_PER20 * (r_near - r_far)) / 20;
 
     dev = x2 - x_exp;                    /* 往左偏 ⇒ 负 ⇒ 左转 ✓ */
+    lf_dbg_dev = (float)dev;
+    if (110 == r_near) { lf_dbg_a = (float)x1; lf_dbg_b = (float)x2; }
+    else               { lf_dbg_b = (float)x1; lf_dbg_c = (float)x2; }
 
     if (dev < -6) { return 1U; }
     if (dev >  6) { return 2U; }
@@ -2073,6 +2081,7 @@ void board_cam_analyze (void)
                 uint32_t f10 = 10000U / dt;
                 if (f10 > 999U) { f10 = 999U; }
                 fps10 = (uint16_t)f10;
+                cam_fps10 = fps10;
             }
         }
         t_prev = now2;

@@ -21,7 +21,8 @@
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
-#include <stdio.h>            /* sprintf */
+#include <stdio.h>
+#include <string.h>            /* sprintf */
 #include "wifi_f4.h"          /* 逐飞 WiFi6B21-SPI 模块驱动（F407/HAL 移植版） */
 #include "board_f4.h"         /* 板级：时钟树 168MHz + 总钻风摄像头(DCMI) */
 /* USER CODE END Includes */
@@ -634,6 +635,32 @@ static uint8_t cam_tx_tick (uint32_t now)
     return 0U;
 }
 
+/* ★★★ 上位机模式：1 = VOFA+ JustFloat（发波形，不发图像）  0 = 自定义上位机（发图像）★★★
+   VOFA+ 设置：协议 JustFloat，通道数 8
+   ch0=行110边界 ch1=行92边界 ch2=行67边界 ch3=偏航dev
+   ch4=cam_now  ch5=cam_ahead  ch6=FPS  ch7=阈值T */
+#define SEND_MODE_VOFA      1
+
+static void vofa_send_frame (void)
+{
+    uint8_t buf[36];
+    float   f[8];
+
+    f[0] = lf_dbg_a;
+    f[1] = lf_dbg_b;
+    f[2] = lf_dbg_c;
+    f[3] = lf_dbg_dev;
+    f[4] = (float)cam_now;
+    f[5] = (float)cam_ahead;
+    f[6] = (float)cam_fps10 / 10.0f;
+    f[7] = (float)cam_thresh;
+
+    memcpy(buf, f, 32U);
+    buf[32] = 0x00U; buf[33] = 0x00U; buf[34] = 0x80U; buf[35] = 0x7FU;   /* +inf 帧尾 */
+
+    (void)wifi_f4_send(buf, 36U);
+}
+
 // 主循环发完一行后调用：推进行号；发满 ⇒ 解冻 + 回相 0（开始计时下一次）
 static void cam_tx_row_done (void)
 {
@@ -897,7 +924,8 @@ int main(void)
                 fpkt[12 + flen + 1] = (uint8_t)ck;
             }
 
-            if (0U == wifi_f4_send(fpkt, (uint32_t)(12U + flen + 2U)))
+            if (SEND_MODE_VOFA) { vofa_send_frame(); }
+            else if (0U == wifi_f4_send(fpkt, (uint32_t)(12U + flen + 2U)))
             {
                 cam_tx_row = (uint16_t)(txh - 1U);      /* 一次性把这一帧算发完 */
                 cam_tx_row_done();
@@ -967,7 +995,8 @@ int main(void)
         //   🔑 为什么必须这样：`wifi_f4_send` 原来会**死等最多 1 秒**（模块一忙就卡住主循环）
         //      ⇒ 现象就是"第一条命令有反应，之后全没反应"（主循环被按住，命令排不进来）、
         //      同时逐行收割崩掉（`LG` 飙到 117）。现在改成"忙就立刻返回"，由这里重试 ✓
-        if (0U == wifi_f4_send(pkt, (uint32_t)(10U + nbytes + 2U)))
+        if (SEND_MODE_VOFA) { /* 不发逐行包 */ }
+        else if (0U == wifi_f4_send(pkt, (uint32_t)(10U + nbytes + 2U)))
         {
             cam_tx_row_done();      // 发出去了才推进行号（满 txh 行它会自动解冻 + 回相 0）
         }
