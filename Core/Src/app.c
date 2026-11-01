@@ -394,7 +394,17 @@ void app_loop (void)
                 fpkt[12 + flen + 1] = (uint8_t)ck;
             }
 
-            if (SEND_MODE_VOFA) { vofa_send_frame(); }
+            if (SEND_MODE_VOFA)
+            {
+                /* ★ 逐飞助手：整帧一次发完，然后**必须**推进行号
+                   ⇒ cam_tx_row_done() 里 `cam_tx_row >= txh` ⇒ 解冻 disp_hold + 回相 0 ✓
+                   🔥 少了这两句的后果（实测 2026-11-01）：disp_hold 永远是 1
+                      ⇒ board_cam_harvest() 每轮都被跳过 ⇒ disp_img 冻住
+                      ⇒ 助手 FPS 正常涨到 26，但**画面定格在第一帧** ✗✗ */
+                vofa_send_frame();
+                cam_tx_row = (uint16_t)(txh - 1U);
+                cam_tx_row_done();
+            }
             else if (0U == wifi_f4_send(fpkt, (uint32_t)(12U + flen + 2U)))
             {
                 cam_tx_row = (uint16_t)(txh - 1U);      /* 一次性把这一帧算发完 */
