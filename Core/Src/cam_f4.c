@@ -12,6 +12,11 @@
 #include <stdio.h>
 #include <string.h>
 
+/* 寻线参数 */
+#define LF_SEED_ROW        112                 /* 种子行：车头附近，不被遮挡 */
+#define LF_USE_8NEIGHBOR    1
+
+
 extern DCMI_HandleTypeDef hdcmi;
 
 static DMA_HandleTypeDef hdma_dcmi;
@@ -1612,7 +1617,9 @@ void cam_sccb_apply_flip (void)
 //     ③ 每行从左向右找第一个跳变列，要求其后连续 2 像素同向（防单点噪声 ✓）
 //        ⇒ cam_bound[行] = 交界列号（0xFF = 该行无交界）；上位机只报数据，蓝线由上位机画 ✓
 //-------------------------------------------------------------------------------------------------------------------
-volatile uint8_t  cam_bound[120];     // 每行的亮/暗交界列（0xFF = 无）
+volatile uint8_t  cam_bound[120];
+volatile uint8_t  cam_bound_r[120];
+volatile uint8_t  cam_center[120];     // 每行的亮/暗交界列（0xFF = 无）
 volatile uint8_t  cam_thresh = 0;     // 本帧 Otsu 阈值（诊断用）
 
 //-------------------------------------------------------------------------------------------------------------------
@@ -1728,7 +1735,7 @@ volatile uint8_t cam_route = 0;          // ★ 当前路线类型（0..3）
    （透视使然：直道上边界也会往中心收敛，这个值就是"收敛速度"）
    标定方法：车放直道，把这个值调到屏幕显示 R0 为止
    当前值 12：由用户一张直道截图反算（近 23 → 中 37，18 行差 14 ⇒ 折算 20 行≈12）*/
-#define LF_STRAIGHT_DX_PER20   12
+#define LF_STRAIGHT_DX_PER20   0                 /* 中线在直道上垂直 ⇒ 无需透视补偿 ✓ */
 
 /* ★★★ 带透视补偿的弯向判定 ★★★
    ⚠️ 以前直接用"远段 x − 近段 x"，但**直道上这个差值也不为 0**（所有平行线都向消失点收敛）⇒ 直道也会被判成弯道 ✗
@@ -1740,8 +1747,8 @@ static uint8_t lf_route_of (int32_t r_near, int32_t r_far)
     uint8_t cN = 0U, cF = 0U;
     int32_t x1, x2, x_exp, dev;
 
-    for (r = r_near - 5; r <= r_near + 4; r++) { if (0xFFU != cam_bound[r]) { sN += (int32_t)cam_bound[r]; cN ++; } }
-    for (r = r_far  - 5; r <= r_far  + 4; r++) { if (0xFFU != cam_bound[r]) { sF += (int32_t)cam_bound[r]; cF ++; } }
+    for (r = r_near - 5; r <= r_near + 4; r++) { if (0xFFU != cam_center[r]) { sN += (int32_t)cam_center[r]; cN ++; } }
+    for (r = r_far  - 5; r <= r_far  + 4; r++) { if (0xFFU != cam_center[r]) { sF += (int32_t)cam_center[r]; cF ++; } }
 
     if ((cN < 3U) || (cF < 3U)) { return 3U; }
 
@@ -1814,9 +1821,59 @@ static void board_cam_draw_route_text (void)
     }
 }
 
+/* ★★★ 右边界跟踪（与左边界完全镜像）★★★
+   白在左 ⇒ 左手法则：每步优先左转(d-1) → 直行(d) → 右转(d+1) */
+static void lf_trace_right_8 (void)
+{
+    static const int8_t dr8[8] = { -1, -1,  0,  1,  1,  1,  0, -1 };
+    static const int8_t dc8[8] = {  0, -1, -1, -1,  0,  1,  1,  1 };   /* 左右对调 */
+    int32_t  r, c, k, d, r0 = -1, c0 = -1;
+    uint16_t guard = 0U;
+
+    for (r = 0; r < CAM_H; r++) { cam_bound_r[r] = 0xFF; }
+
+    /* 种子：第 112 行最宽白段的**右端** */
+    {
+        int32_t l = -1, q = -1, bl = -1, br = -1, c2;
+        r = LF_SEED_ROW;
+        for (c2 = 2; c2 < (int32_t)CAM_TXW - 2; c2++)
+        {
+            if (disp_img[r][c2] == 255U) { if (l < 0) { l = c2; } q = c2; }
+            else if (l >= 0)
+            {
+                if ((bl < 0) || ((q - l) > (br - bl))) { bl = l; br = q; }
+                l = -1; q = -1;
+            }
+        }
+        if (l >= 0 && ((bl < 0) || ((q - l) > (br - bl)))) { bl = l; br = q; }
+        if ((bl < 0) || ((br - bl) < 30)) { return; }
+        r0 = LF_SEED_ROW; c0 = br;
+    }
+
+    r = r0; c = c0; d = 0;
+    cam_bound_r[r] = (uint8_t)c;
+
+    while ((r > 0) && (guard < 1500U))
+    {
+        int32_t nr = -1, nc = -1, nd = d;
+        guard ++;
+        for (k = -1; k <= 1; k++)                 /* 左转 → 直行 → 右转 */
+        {
+            int32_t t  = (d + k + 8) % 8;
+            int32_t tr = r + dr8[t];
+            int32_t tc = c + dc8[t];
+            if ((tr < 0) || (tr >= (int32_t)CAM_H) || (tc < 1) || (tc >= (int32_t)CAM_TXW - 1)) { continue; }
+            if ((disp_img[tr][tc] == 255U) && (disp_img[tr][tc + 1] == 0U)) { nr = tr; nc = tc; nd = t; break; }
+        }
+        if (nr < 0) { break; }
+        r = nr; c = nc; d = nd;
+        if (cam_bound_r[r] == 0xFF) { cam_bound_r[r] = (uint8_t)c; }
+    }
+
+    for (r = r0 + 1; r < (int32_t)CAM_H; r++) { cam_bound_r[r] = cam_bound_r[r0]; }
+}
+
 /* ★★★ 寻线算法开关：1 = 八邻域爬线（新）  0 = 逐行±20跟线（旧，保留备用）★★★ */
-#define LF_SEED_ROW        112                 /* 种子行：车头附近，不被遮挡 */
-#define LF_USE_8NEIGHBOR    1
 
 #if LF_USE_8NEIGHBOR
 /* ★★★ 八邻域爬线：从底部种子出发，沿着「白色赛道的左边缘」一路向上爬 ★★★
@@ -1919,7 +1976,20 @@ void board_cam_analyze (void)
     }
 
     #if LF_USE_8NEIGHBOR
-    lf_trace_left_8();
+    lf_trace_left_8();                        /* 左边界 */
+    lf_trace_right_8();                       /* 右边界 */
+    /* 中线 = (左 + 右) / 2；任一边没找到就置 0xFF */
+    for (r = 0U; r < (uint32_t)CAM_H; r++)
+    {
+        if ((cam_bound[r] != 0xFFU) && (cam_bound_r[r] != 0xFFU) && (cam_bound_r[r] > cam_bound[r]))
+        {
+            cam_center[r] = (uint8_t)(((uint16_t)cam_bound[r] + (uint16_t)cam_bound_r[r]) / 2U);
+        }
+        else
+        {
+            cam_center[r] = 0xFFU;
+        }
+    }
 #else
 /* ③ 从下往上"跟线"找左边界 ★★★
        ⚠️ 不能每行独立"从最左边扫"：背景里只要有一块白（墙/纸/反光），

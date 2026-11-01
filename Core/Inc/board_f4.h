@@ -148,7 +148,9 @@ extern volatile uint8_t  cam_sccb_addr;             // 探测成功时用的是�
 //   成功 ⇒ 一帧正好 22560 字节 = DMA 缓冲大小 ⇒ 配合 `board_cam_set_mode(1)` 走"缓冲即整帧"
 uint8_t  cam_sccb_set_bin4 (void);
 void     board_cam_analyze (void);           // ★ Otsu 二值化 + 每行亮/暗交界列（采齐后调）
-extern volatile uint8_t  cam_bound[120];
+extern volatile uint8_t  cam_bound[120];      /* 左边界 */
+extern volatile uint8_t  cam_bound_r[120];    /* 右边界 */
+extern volatile uint8_t  cam_center[120];     /* 中线 = (左+右)/2 */
 extern volatile uint8_t  cam_now;
 extern volatile uint8_t  cam_ahead;
 extern volatile uint16_t cam_fps10;
