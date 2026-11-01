@@ -140,9 +140,32 @@ static uint8_t cam_tx_tick (uint32_t now)
 
 static void vofa_send_frame (void)
 {
+    static uint8_t img[2820];        /* 188 x 120 / 8 */
     uint8_t buf[36];
+    char    hdr[48];
     float   f[8];
+    int32_t i, r, c;
 
+    /* ---- ① 图像：FireWater 前导帧 + 1bit 位数据 ---- */
+    for (i = 0; i < 2820; i++) { img[i] = 0U; }
+    for (r = 0; r < CAM_H; r++)
+    {
+        for (c = 0; c < CAM_TXW; c++)
+        {
+            if (disp_img[r][c] != 0U)
+            {
+                int32_t bit = r * CAM_TXW + c;
+                img[bit >> 3] |= (uint8_t)(1U << (7 - (bit & 7)));
+            }
+        }
+    }
+
+    (void)sprintf(hdr, "image:0,%u,%u,%u,1\n",
+                  (unsigned)2820, (unsigned)CAM_TXW, (unsigned)CAM_H);
+    (void)wifi_f4_send((uint8_t *)hdr, (uint32_t)strlen(hdr));
+    (void)wifi_f4_send(img, 2820U);
+
+    /* ---- ② 波形：8 个 float ---- */
     f[0] = lf_dbg_a;
     f[1] = lf_dbg_b;
     f[2] = lf_dbg_c;
@@ -153,12 +176,10 @@ static void vofa_send_frame (void)
     f[7] = (float)cam_thresh;
 
     memcpy(buf, f, 32U);
-    buf[32] = 0x00U; buf[33] = 0x00U; buf[34] = 0x80U; buf[35] = 0x7FU;   /* +inf 帧尾 */
-
+    buf[32] = 0x00U; buf[33] = 0x00U; buf[34] = 0x80U; buf[35] = 0x7FU;
     (void)wifi_f4_send(buf, 36U);
 }
 
-// 主循环发完一行后调用：推进行号；发满 ⇒ 解冻 + 回相 0（开始计时下一次）
 static void cam_tx_row_done (void)
 {
     uint16_t txh = (uint16_t)((uint16_t)CAM_H / (uint16_t)cam_cmd_dy);
