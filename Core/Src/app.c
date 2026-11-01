@@ -155,13 +155,14 @@ static void vofa_send_frame (void)
             if (disp_img[r][c] != 0U)
             {
                 int32_t bit = r * CAM_TXW + c;
-                img[bit >> 3] |= (uint8_t)(1U << (7 - (bit & 7)));
+                img[bit >> 3] |= (uint8_t)(1U << (bit & 7));      /* LSB 优先 */
             }
         }
     }
 
-    (void)sprintf(hdr, "image:0,%u,%u,%u,1\n",
-                  (unsigned)2820, (unsigned)CAM_TXW, (unsigned)CAM_H);
+    /* VOFA 图像：IMG_SIZE=像素数 22560，格式 2 = MonoLSB，位打包 LSB 优先 */
+    (void)sprintf(hdr, "image:0,%u,%u,%u,2\n",
+                  (unsigned)(CAM_TXW * CAM_H), (unsigned)CAM_TXW, (unsigned)CAM_H);
     (void)wifi_f4_send((uint8_t *)hdr, (uint32_t)strlen(hdr));
     (void)wifi_f4_send(img, 2820U);
 
