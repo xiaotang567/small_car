@@ -13,6 +13,16 @@
 #include "wifi_f4.h"
 #include <stdio.h>
 #include <string.h>
+
+
+/* ★★★ 图像模式下的文本闸门 ★★★
+   逐飞助手/上位机是按"固定字节数"切帧的（协议里没有长度字段、没有校验和）。
+   只要往同一条 TCP 流里插进去几十字节 ASCII，后面所有帧就整体错位 ⇒ 画面撕裂 → 丢同步。
+   ⇒ SEND_MODE_VOFA=1（发图像）时，**所有文本输出一律丢弃**；只有发自定义协议时才放行。 */
+static void dbg_txt (const char *s)
+{
+    if ((0U == SEND_MODE_VOFA) && (NULL != s)) { wifi_f4_send_string(s); }
+}
 volatile uint32_t cam_rx_bytes = 0U;
 static uint32_t t_last_frame = 0U;    // ★ 上次自检时的帧计数（判"有没有新帧"）      // ★ 最近一次量到的 PB7(VSYNC) 边沿率(Hz)
 volatile uint8_t  cam_rx_dump[32]  = {0};
@@ -104,7 +114,7 @@ static uint8_t cam_tx_tick (uint32_t now)
                     (unsigned long)dbg_pin_bad, (unsigned long)dbg_dma_en,
                     (unsigned long)dbg_pclk_khz, (unsigned long)t_vsync_hz,
                     (unsigned)board_clock_src, (unsigned long)(board_sysclk_hz / 1000000UL));
-            wifi_f4_send_string(cb);
+            dbg_txt(cb);
 
             cam_t_phase = now;
         }
@@ -136,7 +146,6 @@ static uint8_t cam_tx_tick (uint32_t now)
    VOFA+ 设置：协议 JustFloat，通道数 8
    ch0=行110边界 ch1=行92边界 ch2=行67边界 ch3=偏航dev
    ch4=cam_now  ch5=cam_ahead  ch6=FPS  ch7=阈值T */
-#define SEND_MODE_VOFA      1
 
 /* 把 buf 全部发出去（wifi_f4_send 发不完会把剩余长度返回，必须重试，
    否则一帧少一截 ⇒ 助手永远拼不出完整帧） */
@@ -146,14 +155,14 @@ static void zf_send_all (const uint8_t *buf, uint32_t len)
     uint16_t guard = 0U;
     uint16_t stall = 0U;
 
-    while ((0U < len) && (guard < 400U))
+    while ((0U < len) && (guard < 60U))
     {
         guard ++;
         rem = wifi_f4_send(buf, len);
         if (0U == rem)                     { return; }          /* 发完了 */
         if (rem >= len)                                         /* 一点没动 */
         {
-            if (++stall > 40U)             { return; }          /* 链路卡死 ⇒ 弃帧 */
+            if (++stall > 12U)             { return; }          /* 链路卡死 ⇒ 弃帧 */
         }
         else
         {
@@ -513,7 +522,7 @@ void app_loop (void)
 
                 sprintf(cb, "CAM FOUND! result=%u ADDR=%02X ID=%04X\r\n",
                         (unsigned)cam_if_ok, (unsigned)cam_sccb_addr, (unsigned)cam_if_id);
-                wifi_f4_send_string(cb);
+                dbg_txt(cb);
 
                 // ★★ 紧接着**自动配置**（依然零命令）：配成 188×120（列 bin4 + 行 bin4），
                 //    这样一帧正好 = 22560 字节 = DMA 缓冲大小 ⇒ 缓冲天然就是一整帧 ✓
@@ -525,7 +534,7 @@ void app_loop (void)
                 t_pclk = board_cam_pclk_khz();
                 sprintf(cb, "CAM CFG: bin4 R0D=%04X SHUT=%04X ok=%u PCLK=%lukHz -> switch 188x120\r\n",
                         (unsigned)cam_r0d, (unsigned)cam_r0e, (unsigned)cam_bin_ok, (unsigned long)t_pclk);
-                wifi_f4_send_string(cb);
+                dbg_txt(cb);
             }
 
             board_cam_set_mode(1U);      // ★ 切到 188 宽模式（cam_row_bytes=188 / span=120 / dcol=1）
@@ -566,7 +575,7 @@ void app_loop (void)
                 (unsigned)cam_r0d,
                 (unsigned)board_cam_write_row(), (unsigned)cam_last_start_err,
                 (unsigned long)t_pclk, (unsigned long)dcmi_ris);
-        wifi_f4_send_string(buf);
+        dbg_txt(buf);
       }
 
       if (cam_dbg_level >= 2U)
@@ -591,7 +600,7 @@ void app_loop (void)
               (unsigned long)dbg_dcmi_sr, (unsigned long)dbg_dcmi_ris,
               (unsigned long)dbg_pin_bad, (unsigned long)dbg_dma_en, (unsigned long)dbg_dma_err,
               (unsigned long)dbg_pclk_khz);
-      wifi_f4_send_string(buf);
+      dbg_txt(buf);
 
       // ---------- 第 2 行：★ 引脚"悬浮/断线"检测（决定性）----------
       //   每组三个数 = **无拉 / 上拉 / 下拉** 时的"高电平占比(%)"，单位 %
@@ -610,7 +619,7 @@ void app_loop (void)
               (unsigned long)dbg_flt[3][0], (unsigned long)dbg_flt[3][1], (unsigned long)dbg_flt[3][2],
               (unsigned)cam_min, (unsigned)cam_max, (unsigned long)cam_avg,
               (unsigned long)(board_sysclk_hz / 1000000UL));
-      wifi_f4_send_string(buf);
+      dbg_txt(buf);
 
       // ---------- 第 3 行：★「行亮度剖面」—— 一眼看出哪些行是黑的 ----------
       //   把"要发出去的那 60 行"每行的平均亮度压成 **1 个十六进制位**（0=最黑 F=最亮），
@@ -633,7 +642,7 @@ void app_loop (void)
         prof[CAM_H / 2U] = 0;
 
         sprintf(buf, "CAM3 R0=%s\r\n", prof);
-        wifi_f4_send_string(buf);
+        dbg_txt(buf);
       }
 
       // ---------- 第 3.5 行：★ 全画面"收割"健康度 ----------
@@ -644,7 +653,7 @@ void app_loop (void)
       //        ⇒ 500ms 心跳里 PS 应增加约 7。不涨 ⇒ 收割没在跑；涨太慢 ⇒ 漏行
       sprintf(buf, "CAM4 LG=%lu PS=%lu\r\n",
               (unsigned long)disp_lag_max, (unsigned long)disp_pass);
-      wifi_f4_send_string(buf);
+      dbg_txt(buf);
 
       // ---------- 第 4 行：★ 实测「**一帧多少字节**」—— 唯一确定分辨率档位 ★ ----------
       //   🔑 为什么要拆成**两行极短的行**：**长文本心跳会被图像数据冲散**
@@ -671,9 +680,9 @@ void app_loop (void)
         else if ((bpf >  18000U) && (bpf <  27000U)) { md = 3U; }   //  22560 ±20%
 
         sprintf(buf, "BPF %lu\r\n", (unsigned long)bpf);
-        wifi_f4_send_string(buf);
+        dbg_txt(buf);
         sprintf(buf, "MD %lu\r\n", (unsigned long)md);
-        wifi_f4_send_string(buf);
+        dbg_txt(buf);
       }
 
       // ---------- 第 5 行：★ 活引脚电平（**单独一行、很短**，不容易被截断成碎片）----------
@@ -689,7 +698,7 @@ void app_loop (void)
                                 ((GPIOC->IDR & GPIO_PIN_6) ? 1U : 0U));     // D0    PC6
 
         sprintf(buf, "PIN %X\r\n", (unsigned)pin);
-        wifi_f4_send_string(buf);
+        dbg_txt(buf);
       }
 
       // ---------- 第 6 行：★ 活引脚"占空比"（**实时！**，很短，容易被看到）----------
@@ -707,7 +716,7 @@ void app_loop (void)
                 (unsigned long)(live_hi[1] * 100UL / n),
                 (unsigned long)(live_hi[2] * 100UL / n),
                 (unsigned long)(live_hi[3] * 100UL / n));
-        wifi_f4_send_string(buf);
+        dbg_txt(buf);
 
         live_hi[0] = 0; live_hi[1] = 0; live_hi[2] = 0; live_hi[3] = 0;
         live_n = 0;

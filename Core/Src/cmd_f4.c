@@ -15,6 +15,12 @@
 #include <stdio.h>
 #include <string.h>
 
+/* ★ 图像模式下不能往流里塞 ACK 文本（会把图像帧冲散） ⇒ 统一从这里走 */
+static void cmd_txt (const char *s)
+{
+    if ((0U == SEND_MODE_VOFA) && (NULL != s)) { wifi_f4_send_string(s); }
+}
+
 //=========================================== ★★ 实时命令通道（上位机 → 板子）★★ ===========================================
 //   为什么要它：图像链路已经通了，但"发多快 / 发多大 / 摄像头怎么配"全靠**重编固件**，
 //   试一个参数就要烧一次，效率极低。这里给上位机开一条**纯文本命令**通道：
@@ -37,7 +43,7 @@
 //   ⚠️ 回的短文本行会被上位机打印出来（它把"魔数之前的连续 ASCII"当文本）✓
 //=========================================== 实时命令通道 ===========================================
 
-uint16_t cam_cmd_fps    = 0U;      // ★★ 默认 **不限**（提速：原来 1帧/秒 → 0=不限）✓
+uint16_t cam_cmd_fps    = 20U;      // ★★ 默认 **不限**（提速：原来 1帧/秒 → 0=不限）✓
 uint16_t cam_cmd_gap_ms = 0U;      // ★★ 默认 **0 = 不等**（开机即最快）；若坏行增多用 `g 1`/`g 2` 回退 ✓
 uint8_t  cam_cmd_dx     = 1U;      // 横向抽点（1 = 188 列）
 uint8_t  cam_cmd_dy     = 1U;      // 纵向抽点（1 = 120 行）
@@ -108,7 +114,7 @@ static void cam_cmd_status (void)
             (unsigned)cam_dbg_level,
             (unsigned)cam_cfg_state, (unsigned long)(cam_cfg_ver & 0xFFFFFFUL),
             (unsigned)cam_cfg_line_state());
-    wifi_f4_send_string(b);
+    cmd_txt(b);
 }
 
 // ★ ★ 位打包：1 = 二值图每行 188 像素压成 **24 字节**（1字节=8像素）⇒ 数据量÷8 ✓
@@ -138,11 +144,11 @@ static void cam_cmd_line (char *s)
         //    那时 DMA 缓冲天然就是一整帧（120 行 × 188 字节），抽点会直接算错取址 ✗
         //    ⇒ 在 188 模式下**忽略**这两个命令，并明确回执（免得"发了没反应"让人困惑）✓
         case 'x':
-            if (1U == cam_mode) { wifi_f4_send_string("ACK x: ignored (MD=1 needs dx=1)\r\n"); return; }
+            if (1U == cam_mode) { cmd_txt("ACK x: ignored (MD=1 needs dx=1)\r\n"); return; }
             cam_cmd_dx = cam_cmd_clamp(cam_cmd_num(s + 1), 1U, 8U);
             break;
         case 'y':
-            if (1U == cam_mode) { wifi_f4_send_string("ACK y: ignored (MD=1 needs dy=1)\r\n"); return; }
+            if (1U == cam_mode) { cmd_txt("ACK y: ignored (MD=1 needs dy=1)\r\n"); return; }
             cam_cmd_dy = cam_cmd_clamp(cam_cmd_num(s + 1), 1U, 8U);
             break;
 
@@ -156,7 +162,7 @@ static void cam_cmd_line (char *s)
             v = cam_cmd_num(s + 1);
             cam_cfg_uart_open((uint8_t)((v > 4U) ? 0U : v));
             cam_cfg_state = 0U;
-            wifi_f4_send_string("ACK b: uart5 opened\r\n");
+            cmd_txt("ACK b: uart5 opened\r\n");
             return;
 
         case 'v':
@@ -164,7 +170,7 @@ static void cam_cmd_line (char *s)
             sprintf(b, "ACK v: got %lu bytes RV=%06lX LINE=%u\r\n",
                     (unsigned long)v, (unsigned long)(cam_cfg_ver & 0xFFFFFFUL),
                     (unsigned)cam_cfg_line_state());
-            wifi_f4_send_string(b);
+            cmd_txt(b);
             return;
 
         // ★★ 配置串口"探活"：一次分清"线没接 / 波特率不对 / 其实回话了" ★★
@@ -188,7 +194,7 @@ static void cam_cmd_line (char *s)
             sprintf(b, "ACK k: fps=%lu cfg_reply=%lu bytes, mode=SMALL(188x120) CST=%u\r\n",
                     (unsigned long)((v == 0U) ? 50U : v), (unsigned long)v2,
                     (unsigned)cam_cfg_state);
-            wifi_f4_send_string(b);
+            cmd_txt(b);
             return;
 
         // ★ 采集模式：`m 0` = 752 全分辨率（抽行）；`m 1` = 188×120（缓冲即整帧）
@@ -197,7 +203,7 @@ static void cam_cmd_line (char *s)
             board_cam_set_mode((uint8_t)((v != 0U) ? 1U : 0U));
             sprintf(b, "ACK m: mode=%u rowbytes=%u span=%u\r\n",
                     (unsigned)cam_mode, (unsigned)cam_row_bytes, (unsigned)cam_span);
-            wifi_f4_send_string(b);
+            cmd_txt(b);
             return;
 
         // ★★★ SCCB（I2C）探活 ★★★ —— **这才是这颗摄像头的正路**（它没有 51 配置芯片，
@@ -216,14 +222,14 @@ static void cam_cmd_line (char *s)
 
             // ★★ 进度标记：先回一条，再逐步回 —— 这样"卡在哪一步"一眼可见 ★★
             //   （如果连 `ACK j0` 都没有 ⇒ **命令根本没到板子**，问题在 PC→模块→板子的下行路径）
-            wifi_f4_send_string("ACK j0: got cmd\r\n");
+            cmd_txt("ACK j0: got cmd\r\n");
 
             if (0U == has_arg)
             {
                 r = cam_sccb_test();
-                wifi_f4_send_string("ACK j1: sccb done\r\n");     // SCCB 没卡住 ⇒ 走到这
+                cmd_txt("ACK j1: sccb done\r\n");     // SCCB 没卡住 ⇒ 走到这
                 cam_pin_tristate_all();
-                wifi_f4_send_string("ACK j3: tristate done\r\n"); // 三态检测没卡住 ⇒ 走到这
+                cmd_txt("ACK j3: tristate done\r\n"); // 三态检测没卡住 ⇒ 走到这
             }
             else
             {
@@ -241,13 +247,13 @@ static void cam_cmd_line (char *s)
                     (unsigned)r, (unsigned)cam_sccb_lv0, (unsigned)cam_sccb_lv1,
                     (unsigned)cam_sccb_id0, (unsigned)cam_sccb_id1, (unsigned)cam_sccb_ba,
                     (unsigned)cam_sccb_err);
-            wifi_f4_send_string(b);
+            cmd_txt(b);
 
             //   三态判读：PU=1 & PD=0 ⇒ **空脚**（线没通/脚没引出）；PU=1 & PD=1 ⇒ 确实接着东西 ✓
             sprintf(b, "ACK jw: PC12 PU=%u PD=%u | PD2 PU=%u PD=%u   (PU=1&PD=0 = floating)\r\n",
                     (unsigned)cam_pin_c12_pu, (unsigned)cam_pin_c12_pd,
                     (unsigned)cam_pin_d2_pu, (unsigned)cam_pin_d2_pd);
-            wifi_f4_send_string(b);
+            cmd_txt(b);
             return;
         }
 
@@ -276,7 +282,7 @@ static void cam_cmd_line (char *s)
                     (unsigned long)wifi_rd_try, (unsigned long)wifi_rd_busy, (unsigned long)wifi_rd_ok,
                     (unsigned)wifi_rd_cmd, (unsigned)wifi_rd_len, (unsigned)wifi_rd_int,
                     (unsigned long)cam_rx_bytes, (unsigned long)got);
-            wifi_f4_send_string(b);
+            cmd_txt(b);
             return;
         }
 
@@ -288,7 +294,7 @@ static void cam_cmd_line (char *s)
         case 'z':
             cam_pack = (uint8_t)(cam_pack ? 0U : 1U);
             sprintf(b, "ACK z: pack=%u\r\n", (unsigned)cam_pack);
-            wifi_f4_send_string(b);
+            cmd_txt(b);
             return;
 
         // ★ 曝光：`e <行数>` 直接写 R0x0B（Total Shutter Width，单位=行），下一帧生效 ✓
@@ -298,7 +304,7 @@ static void cam_cmd_line (char *s)
             cam_shutter = (uint8_t)cam_cmd_clamp(v, 10U, 110U);
             (void)cam_sccb_write_reg(0x0BU, cam_shutter);
             sprintf(b, "ACK e: shutter=%u rows\r\n", (unsigned)cam_shutter);
-            wifi_f4_send_string(b);
+            cmd_txt(b);
             return;
 
         // ★ 翻转/镜像：`n` 每按一次换一种（0 不翻 → 1 左右镜像 → 2 上下 → 3 180° → 0…）
@@ -307,7 +313,7 @@ static void cam_cmd_line (char *s)
             cam_flip = (uint8_t)((cam_flip + 1U) & 3U);
             cam_sccb_apply_flip();
             sprintf(b, "ACK n: flip=%u (0=none 1=mirror 2=flip-vert 3=180)\r\n", (unsigned)cam_flip);
-            wifi_f4_send_string(b);
+            cmd_txt(b);
             return;
 
         case 'o':
@@ -326,7 +332,7 @@ static void cam_cmd_line (char *s)
             sprintf(b, "ACK o: N=%lu [%s] LEN=%u BUF=[%s]\r\n",
                     (unsigned long)cam_rx_dump_i, hex,
                     (unsigned)cam_cmd_len, cam_cmd_buf);
-            wifi_f4_send_string(b);
+            cmd_txt(b);
             return;
         }
 
@@ -344,21 +350,21 @@ static void cam_cmd_line (char *s)
 
                 sprintf(b, "SCAN C: NP=%u PU=%u PD=%u   (PU=1 & PD=0 = PD2 floating / nothing connected)\r\n",
                         (unsigned)cam_probe_c_np, (unsigned)cam_probe_c_pu, (unsigned)cam_probe_c_pd);
-                wifi_f4_send_string(b);
+                cmd_txt(b);
 
                 sprintf(b, "SCAN RX: %lu %lu %lu %lu %lu %lu %lu\r\n",
                         (unsigned long)cam_scan_rx[0], (unsigned long)cam_scan_rx[1],
                         (unsigned long)cam_scan_rx[2], (unsigned long)cam_scan_rx[3],
                         (unsigned long)cam_scan_rx[4], (unsigned long)cam_scan_rx[5],
                         (unsigned long)cam_scan_rx[6]);
-                wifi_f4_send_string(b);
+                cmd_txt(b);
 
                 sprintf(b, "SCAN EG: %lu %lu %lu %lu %lu %lu %lu   (顺序 9600/115200/57600/38400/19200/4800/230400)\r\n",
                         (unsigned long)cam_scan_eg[0], (unsigned long)cam_scan_eg[1],
                         (unsigned long)cam_scan_eg[2], (unsigned long)cam_scan_eg[3],
                         (unsigned long)cam_scan_eg[4], (unsigned long)cam_scan_eg[5],
                         (unsigned long)cam_scan_eg[6]);
-                wifi_f4_send_string(b);
+                cmd_txt(b);
                 return;
             }
 
@@ -374,7 +380,7 @@ static void cam_cmd_line (char *s)
                     (unsigned long)cam_probe_b_rx, (unsigned long)cam_probe_b_n,
                     (unsigned)cam_probe_c_np, (unsigned)cam_probe_c_pu, (unsigned)cam_probe_c_pd,
                     (unsigned)cam_cfg_line_state());
-            wifi_f4_send_string(b);
+            cmd_txt(b);
             return;
         }
 
@@ -385,22 +391,22 @@ static void cam_cmd_line (char *s)
             sprintf(b, "ACK c: sent A5 %02lX %02lX %02lX\r\n",
                     (unsigned long)(v & 0xFFUL), (unsigned long)((v2 >> 8) & 0xFFUL),
                     (unsigned long)(v2 & 0xFFUL));
-            wifi_f4_send_string(b);
+            cmd_txt(b);
             return;
 
         case 'i':
             cam_cfg_send_pkt(0x00, 0x0000);
-            wifi_f4_send_string("ACK i: INIT sent\r\n");
+            cmd_txt("ACK i: INIT sent\r\n");
             return;
 
         case 'p':
             sprintf(b, "ACK p: LINE=%u (bit1=PC12/TX bit0=PD2/RX)\r\n",
                     (unsigned)cam_cfg_line_state());
-            wifi_f4_send_string(b);
+            cmd_txt(b);
             return;
 
         case '?':
-            wifi_f4_send_string("CMD f<n> g<ms> x<n> y<n> a s b<n> v c<cmd> <val> i p ?\r\n");
+            cmd_txt("CMD f<n> g<ms> x<n> y<n> a s b<n> v c<cmd> <val> i p ?\r\n");
             return;
 
         default:
