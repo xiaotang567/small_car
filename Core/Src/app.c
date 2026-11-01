@@ -140,54 +140,42 @@ static uint8_t cam_tx_tick (uint32_t now)
 
 static void vofa_send_frame (void)
 {
-    static uint8_t img[2820];        /* 188 x 120 / 8 */
-    uint8_t buf[36];
-    float   f[8];
-    int32_t i, r, c;
+    /* ★ 逐飞助手 摄像头图像协议（与官方 seekfree_assistant_camera_send 完全一致）
+       12 字节包头 + 原始灰度，包内**没有长度字段** —— 助手按 宽×高×每像素字节数 自己算
 
-    /* ---- ① 图像：FireWater 前导帧 + 1bit 位数据 ---- */
-    for (i = 0; i < 2820; i++) { img[i] = 0U; }
-    for (r = 0; r < CAM_H; r++)
-    {
-        for (c = 0; c < CAM_TXW; c++)
-        {
-            if (disp_img[r][c] != 0U)
-            {
-                int32_t bit = r * CAM_TXW + c;
-                img[bit >> 3] |= (uint8_t)(1U << (bit & 7));      /* LSB 优先 */
-            }
-        }
-    }
+       [0]  0xAA                  帧头
+       [1]  check_sum = 0xAA + sum([2]..[11])
+       [2]  0x02                  功能码 = CAMERA
+       [3]  0x02                  图像类型 2 = GRAY / MT9V03X（1 字节每像素）
+       [4]  宽 低字节     [5] 宽 高字节
+       [6]  高 低字节     [7] 高 高字节
+       [8]  0x01                  1 = 带图像数据（0 = 只发边线）
+       [9..11] 0x00               保留
+       ↓
+       188 x 120 = 22560 字节灰度（0/255，无需位打包）
+    */
+    uint8_t hdr[12];
+    uint8_t sum;
+    uint8_t i;
 
-    /* VOFA 图像（JustFloat 二进制前导帧，7 个 int32 = 28 字节）
-       {IMG_ID, IMG_SIZE, W, H, FORMAT, +inf, +inf}
-       FORMAT=2 (MonoLSB)，IMG_SIZE 用像素数 */
-    {
-        int32_t meta[7];
-        meta[0] = 0;                                  /* 通道 ID */
-        meta[1] = (int32_t)(CAM_TXW * CAM_H);         /* 图片尺寸（像素数） */
-        meta[2] = (int32_t)CAM_TXW;                   /* 宽 */
-        meta[3] = (int32_t)CAM_H;                     /* 高 */
-        meta[4] = 2;                                  /* Format_MonoLSB */
-        meta[5] = 0x7F800000;                         /* +inf 帧尾 */
-        meta[6] = 0x7F800000;
-        (void)wifi_f4_send((uint8_t *)meta, 28U);
-        (void)wifi_f4_send(img, 2820U);
-    }
+    hdr[0]  = 0xAAU;
+    hdr[2]  = 0x02U;                                    /* 功能码：CAMERA */
+    hdr[3]  = 0x02U;                                    /* 类型：GRAY（MT9V03X）*/
+    hdr[4]  = (uint8_t)((uint16_t)CAM_TXW & 0xFFU);     /* 宽低 */
+    hdr[5]  = (uint8_t)(((uint16_t)CAM_TXW >> 8) & 0xFFU);
+    hdr[6]  = (uint8_t)((uint16_t)CAM_H & 0xFFU);       /* 高低 */
+    hdr[7]  = (uint8_t)(((uint16_t)CAM_H >> 8) & 0xFFU);
+    hdr[8]  = 0x01U;
+    hdr[9]  = 0x00U;
+    hdr[10] = 0x00U;
+    hdr[11] = 0x00U;
 
-    /* ---- ② 波形：8 个 float ---- */
-    f[0] = lf_dbg_a;
-    f[1] = lf_dbg_b;
-    f[2] = lf_dbg_c;
-    f[3] = lf_dbg_dev;
-    f[4] = (float)cam_now;
-    f[5] = (float)cam_ahead;
-    f[6] = (float)cam_fps10 / 10.0f;
-    f[7] = (float)cam_thresh;
+    sum = 0xAAU;
+    for (i = 2U; i < 12U; i++) { sum += hdr[i]; }
+    hdr[1] = sum;
 
-    memcpy(buf, f, 32U);
-    buf[32] = 0x00U; buf[33] = 0x00U; buf[34] = 0x80U; buf[35] = 0x7FU;
-    (void)wifi_f4_send(buf, 36U);
+    (void)wifi_f4_send(hdr, 12U);
+    (void)wifi_f4_send((uint8_t *)disp_img, (uint32_t)((uint32_t)CAM_TXW * (uint32_t)CAM_H));
 }
 
 static void cam_tx_row_done (void)
