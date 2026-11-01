@@ -419,6 +419,11 @@
               <FileType>1</FileType>
               <FilePath>../Core/Src/board_f4.c</FilePath>
             </File>
+            <File>
+              <FileName>cam_f4.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>../Core/Src/cam_f4.c</FilePath>
+            </File>
           </Files>
         </Group>
         <Group>
