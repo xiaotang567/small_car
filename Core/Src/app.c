@@ -138,44 +138,63 @@ static uint8_t cam_tx_tick (uint32_t now)
    ch4=cam_now  ch5=cam_ahead  ch6=FPS  ch7=阈值T */
 #define SEND_MODE_VOFA      1
 
+/* 把 buf 全部发出去（wifi_f4_send 发不完会把剩余长度返回，必须重试，
+   否则一帧少一截 ⇒ 助手永远拼不出完整帧） */
+static void zf_send_all (const uint8_t *buf, uint32_t len)
+{
+    uint32_t rem;
+    uint16_t guard = 0U;
+    uint16_t stall = 0U;
+
+    while ((0U < len) && (guard < 400U))
+    {
+        guard ++;
+        rem = wifi_f4_send(buf, len);
+        if (0U == rem)                     { return; }          /* 发完了 */
+        if (rem >= len)                                         /* 一点没动 */
+        {
+            if (++stall > 40U)             { return; }          /* 链路卡死 ⇒ 弃帧 */
+        }
+        else
+        {
+            stall = 0U;
+            buf  += (len - rem);
+            len   = rem;
+        }
+    }
+}
+
 static void vofa_send_frame (void)
 {
-    /* ★ 逐飞助手 摄像头图像协议（与官方 seekfree_assistant_camera_send 完全一致）
-       12 字节包头 + 原始灰度，包内**没有长度字段** —— 助手按 宽×高×每像素字节数 自己算
+    /* ★ 逐飞助手（新版协议，说明书 V1.4 / 库 seekfree_assistant_camera_data_send）
+       8 字节包头 + 原始灰度，**没有校验和**：
 
-       [0]  0xAA                  帧头
-       [1]  check_sum = 0xAA + sum([2]..[11])
-       [2]  0x02                  功能码 = CAMERA
-       [3]  0x02                  图像类型 2 = GRAY / MT9V03X（1 字节每像素）
-       [4]  宽 低字节     [5] 宽 高字节
-       [6]  高 低字节     [7] 高 高字节
-       [8]  0x01                  1 = 带图像数据（0 = 只发边线）
-       [9..11] 0x00               保留
-       ↓
-       188 x 120 = 22560 字节灰度（0/255，无需位打包）
+         [0] 0xAA                          帧头
+         [1] 0x02                          功能码 CAMERA
+         [2] (type<<5) | (无图像<<4) | 边界数
+                type=2 (MT9V03X/GRAY) ⇒ 2<<5 = 0x40
+                有图像 ⇒ 第4位 = 0
+                不带边线 ⇒ 低4位 = 0     ⇒ 0x40
+         [3] 0x08                          本协议段长度 = sizeof(struct) = 8
+         [4..5] 宽  小端   [6..7] 高 小端
+         ↓
+         188 x 120 = 22560 字节灰度
+
+       ⚠️ 旧版（12 字节 + check_sum）已废弃 —— 那是 2022 年的老库，助手不认
     */
-    uint8_t hdr[12];
-    uint8_t sum;
-    uint8_t i;
+    uint8_t hdr[8];
 
-    hdr[0]  = 0xAAU;
-    hdr[2]  = 0x02U;                                    /* 功能码：CAMERA */
-    hdr[3]  = 0x02U;                                    /* 类型：GRAY（MT9V03X）*/
-    hdr[4]  = (uint8_t)((uint16_t)CAM_TXW & 0xFFU);     /* 宽低 */
-    hdr[5]  = (uint8_t)(((uint16_t)CAM_TXW >> 8) & 0xFFU);
-    hdr[6]  = (uint8_t)((uint16_t)CAM_H & 0xFFU);       /* 高低 */
-    hdr[7]  = (uint8_t)(((uint16_t)CAM_H >> 8) & 0xFFU);
-    hdr[8]  = 0x01U;
-    hdr[9]  = 0x00U;
-    hdr[10] = 0x00U;
-    hdr[11] = 0x00U;
+    hdr[0] = 0xAAU;
+    hdr[1] = 0x02U;
+    hdr[2] = 0x40U;
+    hdr[3] = 0x08U;
+    hdr[4] = (uint8_t)((uint16_t)CAM_TXW & 0xFFU);
+    hdr[5] = (uint8_t)(((uint16_t)CAM_TXW >> 8) & 0xFFU);
+    hdr[6] = (uint8_t)((uint16_t)CAM_H & 0xFFU);
+    hdr[7] = (uint8_t)(((uint16_t)CAM_H >> 8) & 0xFFU);
 
-    sum = 0xAAU;
-    for (i = 2U; i < 12U; i++) { sum += hdr[i]; }
-    hdr[1] = sum;
-
-    (void)wifi_f4_send(hdr, 12U);
-    (void)wifi_f4_send((uint8_t *)disp_img, (uint32_t)((uint32_t)CAM_TXW * (uint32_t)CAM_H));
+    zf_send_all(hdr, 8U);
+    zf_send_all((const uint8_t *)disp_img, (uint32_t)((uint32_t)CAM_TXW * (uint32_t)CAM_H));
 }
 
 static void cam_tx_row_done (void)
