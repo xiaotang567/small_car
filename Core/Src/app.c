@@ -142,7 +142,6 @@ static void vofa_send_frame (void)
 {
     static uint8_t img[2820];        /* 188 x 120 / 8 */
     uint8_t buf[36];
-    char    hdr[48];
     float   f[8];
     int32_t i, r, c;
 
@@ -160,11 +159,21 @@ static void vofa_send_frame (void)
         }
     }
 
-    /* VOFA 图像：IMG_SIZE=像素数 22560，格式 2 = MonoLSB，位打包 LSB 优先 */
-    (void)sprintf(hdr, "image:0,%u,%u,%u,2\n",
-                  (unsigned)(CAM_TXW * CAM_H), (unsigned)CAM_TXW, (unsigned)CAM_H);
-    (void)wifi_f4_send((uint8_t *)hdr, (uint32_t)strlen(hdr));
-    (void)wifi_f4_send(img, 2820U);
+    /* VOFA 图像（JustFloat 二进制前导帧，7 个 int32 = 28 字节）
+       {IMG_ID, IMG_SIZE, W, H, FORMAT, +inf, +inf}
+       FORMAT=2 (MonoLSB)，IMG_SIZE 用像素数 */
+    {
+        int32_t meta[7];
+        meta[0] = 0;                                  /* 通道 ID */
+        meta[1] = (int32_t)(CAM_TXW * CAM_H);         /* 图片尺寸（像素数） */
+        meta[2] = (int32_t)CAM_TXW;                   /* 宽 */
+        meta[3] = (int32_t)CAM_H;                     /* 高 */
+        meta[4] = 2;                                  /* Format_MonoLSB */
+        meta[5] = 0x7F800000;                         /* +inf 帧尾 */
+        meta[6] = 0x7F800000;
+        (void)wifi_f4_send((uint8_t *)meta, 28U);
+        (void)wifi_f4_send(img, 2820U);
+    }
 
     /* ---- ② 波形：8 个 float ---- */
     f[0] = lf_dbg_a;
