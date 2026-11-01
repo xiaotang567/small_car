@@ -1917,7 +1917,8 @@ static void board_cam_draw_route_text (void)
 }
 
 /* ★★★ 寻线算法开关：1 = 八邻域爬线（新）  0 = 逐行±20跟线（旧，保留备用）★★★ */
-#define LF_USE_8NEIGHBOR    0
+#define LF_SEED_ROW        112                 /* 种子行：车头附近，不被遮挡 */
+#define LF_USE_8NEIGHBOR    1
 
 #if LF_USE_8NEIGHBOR
 /* ★★★ 八邻域爬线：从底部种子出发，沿着「白色赛道的左边缘」一路向上爬 ★★★
