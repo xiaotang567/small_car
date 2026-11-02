@@ -387,11 +387,13 @@ uint8_t board_cam_pol_index (void)
 //       否则 `board_cam_init()` 会用 primer 启动 ⇒ 可能落在"会花/黑屏"的组上 ✗✗
 //   📌 回退：把 `CAM_POL_ROTATE` 改回 1 即可恢复老行为。
 //-------------------------------------------------------------------------------------------------------------------
-#define CAM_POL_ROTATE      0       // ★ 1 = 老行为（轮转一整圈、停在目标组）；0 = 只用 PRIMER 组、完全不轮换
+#define CAM_POL_ROTATE      1       // ★★ 2026-11-02：实测 PB7 上**有** 50Hz 场同步（V2=50000），
+                                    //   但 DCMI 的 V=0 / SR=RIS=0 ⇒ 是**极性(VSPOL)不匹配**，不是没信号
+                                    //   ⇒ 必须把 8 组极性都试一遍（整圈轮转是唯一被证实有效的动作）
 #define CAM_POL_MODE        4       // （仅在 CAM_POL_ROTATE=1 时起作用）0 = 普查；4 = 轮转一圈停在目标组
 #define CAM_POL_PRIMER      1U      // ★ 起始组 = **1**（= 当前实测能出图的那一组，原文是 0）
 #define CAM_POL_STORE       1U      // ★ 目标组：**第 1 组**（实测图最清晰的那组）
-#define CAM_POL_STEP_MS     1500UL  // 轮转间隔（每次换一组 = 一次"变化"）
+#define CAM_POL_STEP_MS     800UL   // 8 步 × 0.8s ≈ 6.4 秒收敛完
 #define CAM_POL_MIN_STEPS   8U      // ★ **必须走满一整圈（8 步）之后**才允许停下来
 
 //-------------------------------------------------------------------------------------------------------------------
@@ -617,13 +619,23 @@ void board_cam_set_mode (uint8_t mode)
 //      DCMI 若停在不同步的状态，就**再也等不到 VSYNC**（症状：心跳 `V=0 f=0`、画面全无）✓
 //   ⚠️ `HAL_DCMI_Stop()` 在 DCMI 正处于一帧中间时可能返回 BUSY/ERROR ⇒ **重试 3 次** ✓
 //-------------------------------------------------------------------------------------------------------------------
+/* ★ 安全的 DCMI 停止：HAL_DCMI_Stop() 在 DCMI 卡等 VSYNC 时会**无超时死等**，
+      整块板子挂住（实测日志停在 "switch 188x120" 之后）⇒ 直接写寄存器。 */
+static void cam_dcmi_force_stop (void)
+{
+    DCMI->CR = 0U;                          /* 一次清 ENABLE + CAPTURE，绝不等 */
+    (void)HAL_DMA_Abort(&hdma_dcmi);        /* 有超时 */
+    hdma_dcmi.State = HAL_DMA_STATE_READY;
+    hdcmi.State     = HAL_DCMI_STATE_READY;
+}
+
 uint8_t board_cam_restart (void)
 {
     uint8_t i;
 
     for (i = 0U; i < 3U; i++)
     {
-        (void)HAL_DCMI_Stop(&hdcmi);
+        cam_dcmi_force_stop();              /* ★ 绝不死等 */
         HAL_Delay(2);
 
         if (0U == board_cam_start()) { return 0U; }
