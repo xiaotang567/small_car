@@ -1,4 +1,5 @@
-/*********************************************************************************************************************
+/*#endif
+********************************************************************************************************************
 * 文件名称          wifi_f4
 * 适用平台          STM32F407（HAL 库）
 * 说明              逐飞 高速WIFI6B21-SPI V2.0 模块驱动 —— STM32F4 精简移植版。见 wifi_f4.h 的说明。
@@ -420,6 +421,7 @@ static uint8_t wf_get_mac (void)
    兜底：解析失败就用宏 WIFI_PC_IP ✓ */
 static char wf_pc_ip[16] = WIFI_PC_IP;
 
+#if !(WF_PC_USE_FIXED)   /* 固定 IP 模式下这个函数不用，包起来免得报"未引用" */
 static void wf_derive_pc_ip (void)
 {
     unsigned a = 0U, b = 0U, c = 0U;
@@ -429,6 +431,7 @@ static void wf_derive_pc_ip (void)
         (void)sprintf(wf_pc_ip, "%u.%u.%u.%u", a, b, c, (unsigned)WF_PC_LAST_OCTET);
     }
 }
+#endif
 
 static uint8_t wf_get_ip (void)
 {
@@ -510,7 +513,9 @@ uint8_t wifi_f4_init (void)
     // ---- 连热点 ----
     if (wf_wifi_connect(WIFI_SSID, WIFI_PASSWORD)) { wf_last_err = 2; return 2; }
     if (wf_get_ip())                               { wf_last_err = 2; return 2; }
-    wf_derive_pc_ip();                             /* ★ 自动推导电脑 IP ✓ */
+#if !(WF_PC_USE_FIXED)
+    wf_derive_pc_ip();                             /* 自动推导电脑 IP（固定模式下不执行）*/
+#endif
     wifi_f4_progress = 2;
 
     // ---- 连电脑的 TCP 服务端 ----

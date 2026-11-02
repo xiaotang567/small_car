@@ -66,7 +66,9 @@
 /* ★ 自动推导：模块 IP 前三段 + 这个末段 = 电脑 IP（实测电脑末段恒为 77）*/
 #define WF_PC_LAST_OCTET     77U
 
-#define WIFI_PC_IP          "192.168.165.77"     // 电脑的 IPv4（热点网段会变！用 ipconfig 查）
+#define WIFI_PC_IP          "192.168.212.77"     // ★ 固定成当前电脑 IP（2026-11-02 实测）
+#define WF_PC_USE_FIXED     1                   // ★ 1 = 只用上面这个固定 IP（不做自动推导）
+                                                //   0 = 用"模块IP前三段 + 末段77"自动推导
                                                 // 2026-10-19 更新：189.77 → 53.77（SSID 没变，只换了网段 ✓）
 #define WIFI_PC_PORT        "8086"              // 上位机监听端口
 #define WIFI_LOCAL_PORT     "6666"              // 模块自己的本地端口
