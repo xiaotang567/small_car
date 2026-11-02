@@ -98,6 +98,7 @@ void HardFault_Handler(void)
   RTC->BKP2R = sp[5];                     /* LR */
   RTC->BKP3R = SCB->CFSR;                 /* 可配置故障状态：位段告诉是哪类故障 */
   RTC->BKP4R = SCB->HFSR;
+  RTC->BKP5R = SCB->BFAR;              /* ★ 出错的具体地址（BusFault 时有效）*/
 
   NVIC_SystemReset();                     /* 立刻重启，别卡在 while(1) */
   while (1) { }

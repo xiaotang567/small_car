@@ -751,6 +751,18 @@ void board_cam_harvest (void)
                全部自动成立，不用再改 analyze 和 classify_route ✓
                若以后把摄像头装正，把下一行注释掉即可回到原样 ✓ */
             uint32_t dst = (uint32_t)disp_in_frame;   // ★ 帧内行号（VSYNC 归零）⇒ 一趟正好一帧 ✓
+            /* ★★ 2026-11-02 越界保护 ★★
+               disp_in_frame 一旦 > CAM_H（漏掉 VSYNC 时会发生），
+               dst = 119 - 120 = -1 ⇒ 写地址落到 0x0FFFFF44（CCM 之外）⇒ BusFault。
+               实测崩溃 PC 正好落在这条 STRB 上（CFSR=0x8200 BusFault+PRECISERR）。*/
+            if (dst >= (uint32_t)CAM_H)
+            {
+                disp_in_frame = 0U;
+                disp_fill     = 0U;
+                (void)memset(disp_map, 0, sizeof(disp_map));
+                disp_armed    = 0U;
+                break;
+            }
             dst = (uint32_t)((uint32_t)CAM_H - 1U) - dst;   /* ← 上下翻转（装反时用）*/
             // ★★ 源行地址按**运行时的行宽**算：752 模式 = 752 字节/行；188 模式 = 188 字节/行。
             //    用"扁平指针 + 行宽乘法"而不是 `cam_image[row][col]`，因为数组的固定行距是 752，

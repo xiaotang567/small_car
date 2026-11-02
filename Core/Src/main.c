@@ -66,6 +66,7 @@ volatile uint32_t flt_pc   = 0U;      /* 出错处的 PC */
 volatile uint32_t flt_lr   = 0U;
 volatile uint32_t flt_cfsr = 0U;      /* 可配置故障状态 */
 volatile uint32_t flt_hfsr = 0U;
+volatile uint32_t flt_bfar = 0U;      /* BusFault 出错地址 */
 
 int main(void)
 {
@@ -121,6 +122,7 @@ int main(void)
       flt_lr   = RTC->BKP2R;
       flt_cfsr = RTC->BKP3R;
       flt_hfsr = RTC->BKP4R;
+      flt_bfar = RTC->BKP5R;
       RTC->BKP0R = 0U;                    /* 只报一次 */
     }
   }
