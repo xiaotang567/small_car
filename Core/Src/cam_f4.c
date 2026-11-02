@@ -673,16 +673,17 @@ uint8_t board_cam_restart (void)
 
 static void cam_frame_start (void)
 {
-    if (0U == cam_aligned)                          // ★ 开机第一次：把收割相位对齐到帧首
-    {
-        disp_ln       = 0U;
-        disp_next_row = (uint16_t)board_cam_write_row();
-        cam_aligned   = 1U;
-    }
-
-    disp_fill  = 0U;                                // 本帧的"已填行数"重新数
-    disp_armed = 1U;                                // ★★ 从现在起允许拷贝/计数
-    disp_frame ++;
+    /* ★★★ 2026-11-02：**每一帧**都把收割游标对齐到"DMA 现在的写入行" ★★★
+       原来只在开机对齐一次（cam_aligned），之后每帧只清计数、不对齐游标
+       ⇒ 每帧都从"上一帧的旧位置"继续拷 ⇒ 画面上下错开（接缝）。
+       VSYNC 就是帧首，此刻 DMA 的写入位置就是新帧的第 0 行 ⇒ 在这里对齐最准。 */
+    disp_next_row = (uint16_t)board_cam_write_row();
+    disp_ln       = 0U;                             /* 行计数从帧首归零 */
+    (void)memset(disp_map, 0, sizeof(disp_map));    /* "哪些行已填"的位图也要清 */
+    disp_fill    = 0U;
+    disp_armed   = 1U;
+    if (0U == cam_aligned) { cam_aligned = 1U; }   /* 只做标记，避免"已赋值未使用"告警 */
+    disp_frame  ++;
 }
 
 // ⚠️ 这个回调**目前永远不会被调用**（VSYNC 中断没使能，见上面的说明）。
@@ -729,40 +730,8 @@ void board_cam_harvest (void)
        以前用 disp_ln 回绕（每 120 行）当帧边界，但那个相位和传感器的实际帧边界**无关**
        ⇒ 一趟常常横跨两帧 ⇒ 画面出现一条**横向接缝**（位置随机，重启几次碰巧对齐就消失）✗
        现在：VSYNC 一到 ⇒ 本趟结束、从 0 重新数 ⇒ **一趟 = 一帧** ✓ */
-    if (0U != disp_vsync_flag)
-    {
-        disp_vsync_flag = 0U;
-
-        /* ★★★ 自动标定抽行步长（2026-11-02）★★★
-           代码里对"一帧到底多少行"有过 240 / 480 / 120 三种说法，一直没定论。
-           这里直接**量**：两次 VSYNC 之间走了多少行，就是真实帧长。
-             dstep = 真实帧长 / CAM_H      （保证每帧正好抽 120 行）
-             cam_span = dstep * CAM_H      （disp_ln 的回绕点与真实帧长对齐）
-           这样不管传感器 binning 实际生效成什么样，都能自动对上。 */
-        /* ⚠️ 2026-11-02 暂时停用自动标定：
-           实测它会测到 360 行（因为 VSYNC 被漏掉 2 次，两次处理之间过了 3 帧）
-           ⇒ dstep 被算成 3 ⇒ 画面出现 3 个重复 ⇒ 比原来更糟。
-           改为固定用文档的 240 行（dstep=2）。 */
-        if (0)
-        if (rows_since_vsync >= (uint32_t)CAM_H)
-        {
-            uint32_t d = rows_since_vsync / (uint32_t)CAM_H;
-            if (d < 1U) { d = 1U; }
-            if (d > 8U) { d = 8U; }
-            cam_dstep = (uint16_t)d;
-            cam_span  = (uint16_t)(d * (uint32_t)CAM_H);
-        }
-        rows_since_vsync = 0U;
-
-        /* ⚠️ 这里**不重置 disp_ln**（原注释：轮询总比真实帧首晚几行，
-           强行归零会让"凑齐"永远等不到 ⇒ 接缝）。让 disp_ln 自由跑，
-           靠 cam_span 与真实帧长对齐来保证回绕点落在帧首。 */
-        disp_in_frame = 0U;
-        disp_fill     = 0U;
-        (void)memset(disp_map, 0, sizeof(disp_map));
-        disp_armed    = 1U;
-        disp_pass    ++;
-    }
+    /* 帧首处理全部放在 VSYNC 中断里的 cam_frame_start()；这里不再重复。*/
+    disp_vsync_flag = 0U;
 
     // ⚠️ 用 while 不是 if：主循环每圈可能已经过去好几行 ⇒ 一次把落下的全补齐
     while (disp_next_row != w)
