@@ -16,6 +16,7 @@ extern uint8_t           cam_cmd_dx;
 extern uint8_t           cam_cmd_dy;
 extern uint8_t           cam_dbg_level;
 extern uint32_t          cam_rst_flags;
+extern volatile uint32_t flt_pc, flt_lr, flt_cfsr, flt_hfsr;
 extern uint8_t           cam_pack;
 extern uint32_t          cam_to_cnt;
 extern uint8_t           cam_frz_fill;

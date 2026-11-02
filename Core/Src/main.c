@@ -61,6 +61,12 @@ static void MX_DCMI_Init(void);
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
 
+/* ★ 上次 HardFault 的现场（由 HardFault_Handler 写进 RTC 备份寄存器，开机读回）*/
+volatile uint32_t flt_pc   = 0U;      /* 出错处的 PC */
+volatile uint32_t flt_lr   = 0U;
+volatile uint32_t flt_cfsr = 0U;      /* 可配置故障状态 */
+volatile uint32_t flt_hfsr = 0U;
+
 int main(void)
 {
 
@@ -104,6 +110,20 @@ int main(void)
   //     bit31 LPWRRSTF = 低功耗复位
   //   ⚠️ 读完要写 RMVF 清掉，否则下次看到的还是老标志。
   cam_rst_flags = (uint32_t)((RCC->CSR >> 25) & 0x7FU);
+
+  /* ★ 开机读"上次是不是 HardFault 挂的"，以及挂在哪 */
+  {
+    RCC->APB1ENR |= (1UL << 28);
+    PWR->CR      |= (1UL << 8);
+    if (0xA5A5A5A5UL == RTC->BKP0R)
+    {
+      flt_pc   = RTC->BKP1R;
+      flt_lr   = RTC->BKP2R;
+      flt_cfsr = RTC->BKP3R;
+      flt_hfsr = RTC->BKP4R;
+      RTC->BKP0R = 0U;                    /* 只报一次 */
+    }
+  }
   RCC->CSR |= RCC_CSR_RMVF;
 
   // ---- 板载 LED（PB2）：没有屏幕，靠它看状态 ----

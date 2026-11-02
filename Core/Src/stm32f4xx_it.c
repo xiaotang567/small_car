@@ -83,27 +83,24 @@ void NMI_Handler(void)
   */
 void HardFault_Handler(void)
 {
-  /* USER CODE BEGIN HardFault_IRQn 0 */
+  /* ★★★ 2026-11-02：把出错现场存进 RTC 备份寄存器 → 软复位 → 开机由心跳打印 ★★★
+     为什么不用 while(1)：那样只知道"挂了"，不知道"挂在哪"。
+     备份寄存器（RTC->BKPxR）掉电前不会丢、软复位更不会丢 ⇒ 下次上电就能读出来。 */
+  uint32_t *sp;
 
-  /* USER CODE END HardFault_IRQn 0 */
-  while (1)
-  {
-    /* ★★★ 进 HardFault ⇒ 板载 LED(PB2) **快闪**（不依赖任何通信）★★★
-       快闪(约10Hz) = MCU 挂在 HardFault ／ 常亮 = MCU 正常在跑 ／ 闪N下 = WiFi 状态码
-       寄存器直接操作，Fault 里不调 HAL。*/
-    {
-      volatile uint32_t _i;
-      RCC->AHB1ENR |= (1UL << 1);                                  /* GPIOB 时钟 */
-      GPIOB->MODER  = (GPIOB->MODER & ~(3UL << 4)) | (1UL << 4);   /* PB2 输出 */
-      while (1)
-      {
-        GPIOB->ODR ^= (1UL << 2);
-        for (_i = 0U; _i < 300000U; _i++) { }
-      }
-    }
-    /* USER CODE BEGIN W1_HardFault_IRQn 0 */
-    /* USER CODE END W1_HardFault_IRQn 0 */
-  }
+  sp = (uint32_t *)__get_MSP();   /* 本工程不用 RTOS，永远走主栈（ARMCC5 没有 __get_LR）*/
+
+  RCC->APB1ENR |= (1UL << 28);            /* PWREN：备份域访问要先开这个 */
+  PWR->CR      |= (1UL << 8);             /* DBP=1：解除备份域写保护 */
+
+  RTC->BKP0R = 0xA5A5A5A5UL;              /* 魔数：确实发生过 HardFault */
+  RTC->BKP1R = sp[6];                     /* ★ 出错处的 PC（栈帧里的返回地址）*/
+  RTC->BKP2R = sp[5];                     /* LR */
+  RTC->BKP3R = SCB->CFSR;                 /* 可配置故障状态：位段告诉是哪类故障 */
+  RTC->BKP4R = SCB->HFSR;
+
+  NVIC_SystemReset();                     /* 立刻重启，别卡在 while(1) */
+  while (1) { }
 }
 
 /**
