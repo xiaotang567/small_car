@@ -1563,7 +1563,11 @@ uint8_t cam_sccb_set_bin4 (void)
     //   （想更亮/更暗：后续可以做成命令，动态改 R0x0B ✓）
     if (0U == cam_sccb_read_reg(0x0BU, &v))
     {
-        (void)cam_sccb_write_reg(0x0BU, cam_shutter);   // ★ 阈值之外的亮度由曝光决定；150 ≈ 5.5ms（可 `e <n>` 实时调）
+        {   /* ★ 硬上限：行 bin4 后一帧只有 120 行，快门一旦 ≥ 它，帧永远结束不了 */
+            uint8_t sh = cam_shutter;
+            if (sh > 110U) { sh = 110U; }
+            (void)cam_sccb_write_reg(0x0BU, sh);
+        }
     }
     else { err = 1U; }
 
@@ -1588,7 +1592,11 @@ uint8_t cam_sccb_set_bin4 (void)
     return cam_bin_ok;
 }
 
-volatile uint8_t cam_shutter = 150U;  // ★ 曝光 R0x0B（行数）：出厂 443 在行bin4 下卡死成帧；150≈5.5ms
+volatile uint8_t cam_shutter = 100U;  // ★★ 曝光 R0x0B（行数）—— **必须 < 一帧行数（行 bin4 后 = 120）**
+                                      //   ⚠️ 原来写 150：150 > 120 ⇒ 传感器**永远完不成一帧**
+                                      //      ⇒ PCLK 一直在跑（PF 有值）但 VSYNC/HREF 一个边沿都没有
+                                      //      ⇒ DCMI 的 SR/RIS 全 0、DMA 的 NDTR 一动不动 ✓ 实测完全吻合
+                                      //   100 ≈ 3.7ms 曝光（写入口还有 110 的硬上限兜底）
 volatile uint8_t cam_flip = 0U;       // 0=不翻 1=左右镜像(ColumnFlip) 2=上下(RowFlip) 3=两者(180°)
 
 //-------------------------------------------------------------------------------------------------------------------
