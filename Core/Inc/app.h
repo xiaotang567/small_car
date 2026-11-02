@@ -6,7 +6,7 @@
 /* ★ 上位机模式：1 = 逐飞助手（发图像，**不发任何文本**）
         0 = 自定义协议（发图像 + 文本心跳）*/
 #ifndef SEND_MODE_VOFA
-#define SEND_MODE_VOFA      0      /* 0 = 自研上位机 cam_view.py（默认）；1 = 逐飞助手 */
+#define SEND_MODE_VOFA      1      /* 1 = 逐飞助手（当前）；0 = 自研上位机 cam_view.py */
 #endif
 
 /* ---- 上位机可调参数（命令通道 / 相位机 / 主循环 共享）---- */
