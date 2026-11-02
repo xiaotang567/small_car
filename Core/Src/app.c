@@ -191,6 +191,12 @@ static void vofa_send_frame (void)
 
        ⚠️ 旧版（12 字节 + check_sum）已废弃 —— 那是 2022 年的老库，助手不认
     */
+    /* ★ 整帧一个缓冲：包头 + 图像**一次发出**
+       之前分成两次 wifi_f4_send（8 字节 + 22560 字节），模块会拆成两个"包"，
+       助手的解析如果按包边界走就会把起点算错 ⇒ 画面整体右移。
+       放 CCM（34KB 空闲），只被 CPU 读写。*/
+    static uint8_t tx_frame[8U + (uint32_t)CAM_H * (uint32_t)CAM_TXW]
+        __attribute__((section(".ccmram")));
     uint8_t hdr[8];
 
     hdr[0] = 0xAAU;
@@ -202,8 +208,10 @@ static void vofa_send_frame (void)
     hdr[6] = (uint8_t)((uint16_t)CAM_H & 0xFFU);
     hdr[7] = (uint8_t)(((uint16_t)CAM_H >> 8) & 0xFFU);
 
-    zf_send_all(hdr, 8U);
-    zf_send_all((const uint8_t *)disp_img, (uint32_t)((uint32_t)CAM_TXW * (uint32_t)CAM_H));
+    memcpy(tx_frame, hdr, 8U);
+    memcpy(tx_frame + 8U, (const void *)disp_img,
+           (size_t)((uint32_t)CAM_TXW * (uint32_t)CAM_H));
+    (void)zf_send_all(tx_frame, 8U + (uint32_t)CAM_TXW * (uint32_t)CAM_H);
 }
 
 static void cam_tx_row_done (void)
