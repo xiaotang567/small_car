@@ -739,6 +739,11 @@ void board_cam_harvest (void)
              dstep = 真实帧长 / CAM_H      （保证每帧正好抽 120 行）
              cam_span = dstep * CAM_H      （disp_ln 的回绕点与真实帧长对齐）
            这样不管传感器 binning 实际生效成什么样，都能自动对上。 */
+        /* ⚠️ 2026-11-02 暂时停用自动标定：
+           实测它会测到 360 行（因为 VSYNC 被漏掉 2 次，两次处理之间过了 3 帧）
+           ⇒ dstep 被算成 3 ⇒ 画面出现 3 个重复 ⇒ 比原来更糟。
+           改为固定用文档的 240 行（dstep=2）。 */
+        if (0)
         if (rows_since_vsync >= (uint32_t)CAM_H)
         {
             uint32_t d = rows_since_vsync / (uint32_t)CAM_H;
