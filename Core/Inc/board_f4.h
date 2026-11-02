@@ -80,7 +80,6 @@ extern volatile uint32_t disp_lag_max;               // ★ 单次收割最多�
 extern volatile uint8_t  disp_fill;                  // ★★ 本帧已填到第几行（1..CAM_H）；VSYNC 清零
 extern volatile uint8_t  disp_done;                  // ★★ 1 = **本帧 120 行全部来自同一帧**（可以发）
 extern volatile uint8_t  disp_armed;
-extern volatile uint8_t  disp_need_fresh;   /* 1 = 下一次 VSYNC 迟到，只清不武装 */                 // ★★ 1 = 已跨过帧首，允许收割（相位机开始新一轮时清 0）
 extern volatile uint32_t cam_vsync_isr_cnt;          // ★★ VSYNC 中断进了几次（V= 在涨 ⇒ 中断真的在工作）
 extern volatile uint16_t cam_span;                   // ★★ 一帧的摄像头行数（实测 240；`board_cam_set_span` 可改）
 void    board_cam_set_span (uint16_t rows);          // ★ 实时改"一帧多少行"（抽行步长随之重算）

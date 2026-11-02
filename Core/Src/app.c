@@ -422,10 +422,6 @@ void app_loop (void)
                 cam_tx_row = (uint16_t)(txh - 1U);
                 cam_tx_row_done();
 
-                /* ★ 发送期间的 VSYNC 是"迟到"的（最多晚 10ms ≈ 30 行），
-                   拿它当帧首必然错位。⇒ 丢掉下一次 VSYNC，等再下一次（准时的）才开收。*/
-                disp_need_fresh = 1U;
-
             }
             else if (0U == wifi_f4_send(fpkt, (uint32_t)(12U + flen + 2U)))
             {

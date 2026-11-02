@@ -514,7 +514,6 @@ volatile uint32_t disp_lag_max = 0;              // ★ 单次收割最多补了
 volatile uint8_t  disp_fill   = 0;               // ★★ 本帧已经填到第几行（1..CAM_H）；**VSYNC 时清 0**
 volatile uint8_t  disp_done   = 0;               // ★★ 1 = **本帧的 120 行全部来自同一帧**，可以拿去发
 volatile uint8_t  disp_vsync_flag = 0;   // ★ VSYNC 中断置位（真实帧首信号）
-volatile uint8_t  disp_need_fresh = 0U;  /* ★ 1 = 下一次 VSYNC 是发送阻塞期间积压的（迟到），只清计数、不武装 */
 volatile uint16_t disp_in_frame   = 0;   // ★ 本帧内已收行数（0..119），VSYNC 归零
 volatile uint8_t  disp_armed  = 0;               // ★★ 1 = 已经跨过帧首，允许拷贝/计数（见下面说明）
 // ★★ 120 位的"哪些 dst 行已经填过"位图（15 字节）—— **去重计数**用，见 `board_cam_harvest()` ★★
@@ -540,6 +539,7 @@ void board_cam_new_pass (void)
     disp_hold  = 0U;      // 解冻
 }
 static   uint16_t disp_next_row = 0;             // 下一条要收割的缓冲行（0..CAM_H-1）
+static   uint32_t rows_since_vsync = 0;       /* ★ 距上次 VSYNC 走了多少行（用来自动标定帧长）*/
 static   uint32_t disp_ln       = 0;             // 正在填的是帧里的第几行（0 .. cam_span-1）
 
 //-------------------------------------------------------------------------------------------------------------------
@@ -611,7 +611,11 @@ void board_cam_set_mode (uint8_t mode)
     cam_last_start_err = board_cam_restart();
 
     cam_aligned = 0U;                            // 允许重新对齐一次相位
-    board_cam_set_span((uint16_t)((0U == mode) ? 240U : 120U));   // ★ 传感器实际帧长=120 行（行 bin4 ✓）
+    /* ★★★ 2026-11-02 更正：文档写的是 188×240 —— 一帧 **240 行** ★★★
+       原来这里写成 120（以为行 bin4 生效），导致每趟只抓了 240 行帧的**一半**
+       ⇒ 抽行步长 dstep=1 而不是 2 ⇒ 画面上下错开（接缝固定出现）✗
+       ⇒ 正确：cam_span=240，dstep=240/120=2（每 2 行取 1 行，正好一帧 120 行）*/
+    board_cam_set_span((uint16_t)((0U == mode) ? 240U : 240U));
 }
 
 //-------------------------------------------------------------------------------------------------------------------
@@ -728,28 +732,31 @@ void board_cam_harvest (void)
     if (0U != disp_vsync_flag)
     {
         disp_vsync_flag = 0U;
-        disp_in_frame   = 0U;
-        if (0U != disp_need_fresh)
+
+        /* ★★★ 自动标定抽行步长（2026-11-02）★★★
+           代码里对"一帧到底多少行"有过 240 / 480 / 120 三种说法，一直没定论。
+           这里直接**量**：两次 VSYNC 之间走了多少行，就是真实帧长。
+             dstep = 真实帧长 / CAM_H      （保证每帧正好抽 120 行）
+             cam_span = dstep * CAM_H      （disp_ln 的回绕点与真实帧长对齐）
+           这样不管传感器 binning 实际生效成什么样，都能自动对上。 */
+        if (rows_since_vsync >= (uint32_t)CAM_H)
         {
-            /* 这次 VSYNC 是发送阻塞期间积压的（迟到最多 10ms ≈ 30 行），
-               用它当帧首会让画面上下错开 ⇒ 只清计数、**不武装**，
-               等下一次准时的 VSYNC 再开始收。*/
-            disp_need_fresh = 0U;
-            disp_in_frame   = 0U;
-            disp_fill       = 0U;
-            (void)memset(disp_map, 0, sizeof(disp_map));
-            disp_armed      = 0U;
-            disp_ln         = 0U;
-            disp_pass      ++;
+            uint32_t d = rows_since_vsync / (uint32_t)CAM_H;
+            if (d < 1U) { d = 1U; }
+            if (d > 8U) { d = 8U; }
+            cam_dstep = (uint16_t)d;
+            cam_span  = (uint16_t)(d * (uint32_t)CAM_H);
         }
-        else
-        {
-        disp_fill       = 0U;
+        rows_since_vsync = 0U;
+
+        /* ⚠️ 这里**不重置 disp_ln**（原注释：轮询总比真实帧首晚几行，
+           强行归零会让"凑齐"永远等不到 ⇒ 接缝）。让 disp_ln 自由跑，
+           靠 cam_span 与真实帧长对齐来保证回绕点落在帧首。 */
+        disp_in_frame = 0U;
+        disp_fill     = 0U;
         (void)memset(disp_map, 0, sizeof(disp_map));
-        disp_armed      = 1U;
-        disp_pass      ++;
-        disp_ln         = 0U;      /* 关键：行计数也必须在帧首归零 */
-    }
+        disp_armed    = 1U;
+        disp_pass    ++;
     }
 
     // ⚠️ 用 while 不是 if：主循环每圈可能已经过去好几行 ⇒ 一次把落下的全补齐
@@ -818,6 +825,7 @@ void board_cam_harvest (void)
         }
         disp_next_row = (uint16_t)((disp_next_row + 1U) % (uint16_t)cam_ring_rows);
         disp_ln       = (disp_ln + 1U) % (uint32_t)cam_span;
+        rows_since_vsync ++;
         nlag ++;
 
         if (0U == disp_ln)
