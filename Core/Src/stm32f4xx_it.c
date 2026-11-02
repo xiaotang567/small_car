@@ -88,6 +88,19 @@ void HardFault_Handler(void)
   /* USER CODE END HardFault_IRQn 0 */
   while (1)
   {
+    /* ★★★ 进 HardFault ⇒ 板载 LED(PB2) **快闪**（不依赖任何通信）★★★
+       快闪(约10Hz) = MCU 挂在 HardFault ／ 常亮 = MCU 正常在跑 ／ 闪N下 = WiFi 状态码
+       寄存器直接操作，Fault 里不调 HAL。*/
+    {
+      volatile uint32_t _i;
+      RCC->AHB1ENR |= (1UL << 1);                                  /* GPIOB 时钟 */
+      GPIOB->MODER  = (GPIOB->MODER & ~(3UL << 4)) | (1UL << 4);   /* PB2 输出 */
+      while (1)
+      {
+        GPIOB->ODR ^= (1UL << 2);
+        for (_i = 0U; _i < 300000U; _i++) { }
+      }
+    }
     /* USER CODE BEGIN W1_HardFault_IRQn 0 */
     /* USER CODE END W1_HardFault_IRQn 0 */
   }
