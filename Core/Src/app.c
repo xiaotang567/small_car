@@ -421,6 +421,13 @@ void app_loop (void)
                 vofa_send_frame();
                 cam_tx_row = (uint16_t)(txh - 1U);
                 cam_tx_row_done();
+
+                /* ★★★ 发完立刻处理一次 VSYNC ★★★
+                   接缝固定出现在约 78% 处（第 90 行），折算下来帧首被推迟了约 30 行 ≈ 5ms，
+                   正好是发送 22.5KB 的耗时量级 —— 这段时间主循环被占死，
+                   VSYNC 只能等发送结束才被处理，下一趟就从"帧中间"开始，收满 120 行时已跨帧。
+                   ⇒ 发完立刻收割一次，把这段延迟抹掉。*/
+                board_cam_harvest();
             }
             else if (0U == wifi_f4_send(fpkt, (uint32_t)(12U + flen + 2U)))
             {
