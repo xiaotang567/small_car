@@ -732,6 +732,7 @@ void board_cam_harvest (void)
         (void)memset(disp_map, 0, sizeof(disp_map));
         disp_armed      = 1U;
         disp_pass      ++;
+        disp_ln         = 0U;      /* 关键：行计数也必须在帧首归零 */
     }
 
     // ⚠️ 用 while 不是 if：主循环每圈可能已经过去好几行 ⇒ 一次把落下的全补齐
