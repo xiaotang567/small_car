@@ -514,6 +514,7 @@ volatile uint32_t disp_lag_max = 0;              // ★ 单次收割最多补了
 volatile uint8_t  disp_fill   = 0;               // ★★ 本帧已经填到第几行（1..CAM_H）；**VSYNC 时清 0**
 volatile uint8_t  disp_done   = 0;               // ★★ 1 = **本帧的 120 行全部来自同一帧**，可以拿去发
 volatile uint8_t  disp_vsync_flag = 0;   // ★ VSYNC 中断置位（真实帧首信号）
+volatile uint8_t  disp_need_fresh = 0U;  /* ★ 1 = 下一次 VSYNC 是发送阻塞期间积压的（迟到），只清计数、不武装 */
 volatile uint16_t disp_in_frame   = 0;   // ★ 本帧内已收行数（0..119），VSYNC 归零
 volatile uint8_t  disp_armed  = 0;               // ★★ 1 = 已经跨过帧首，允许拷贝/计数（见下面说明）
 // ★★ 120 位的"哪些 dst 行已经填过"位图（15 字节）—— **去重计数**用，见 `board_cam_harvest()` ★★
@@ -728,11 +729,27 @@ void board_cam_harvest (void)
     {
         disp_vsync_flag = 0U;
         disp_in_frame   = 0U;
+        if (0U != disp_need_fresh)
+        {
+            /* 这次 VSYNC 是发送阻塞期间积压的（迟到最多 10ms ≈ 30 行），
+               用它当帧首会让画面上下错开 ⇒ 只清计数、**不武装**，
+               等下一次准时的 VSYNC 再开始收。*/
+            disp_need_fresh = 0U;
+            disp_in_frame   = 0U;
+            disp_fill       = 0U;
+            (void)memset(disp_map, 0, sizeof(disp_map));
+            disp_armed      = 0U;
+            disp_ln         = 0U;
+            disp_pass      ++;
+        }
+        else
+        {
         disp_fill       = 0U;
         (void)memset(disp_map, 0, sizeof(disp_map));
         disp_armed      = 1U;
         disp_pass      ++;
         disp_ln         = 0U;      /* 关键：行计数也必须在帧首归零 */
+    }
     }
 
     // ⚠️ 用 while 不是 if：主循环每圈可能已经过去好几行 ⇒ 一次把落下的全补齐
