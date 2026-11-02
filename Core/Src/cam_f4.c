@@ -820,13 +820,13 @@ void board_cam_harvest (void)
 //-------------------------------------------------------------------------------------------------------------------
 uint32_t board_cam_write_row (void)
 {
-    // ★ 用**运行时**的一行字节数（752 或 188）—— 模式切换后 DMA 长度也跟着变了
-    uint32_t words = (uint32_t)((uint32_t)cam_row_bytes * CAM_H / 4U);
+    // ★★ 总长必须与 board_cam_start() 装载的 DMA 长度一致：都是整块缓冲 CAM_W*CAM_H
+    uint32_t total_words = (uint32_t)(((uint32_t)CAM_W * (uint32_t)CAM_H) / 4U);   /* ★ 必须与 start 的装载长度一致（22560 字）*/
     uint32_t nd    = (uint32_t)(hdma_dcmi.Instance->NDTR & 0xFFFFU);
 
-    if (nd > words) { return 0U; }                       // 保险：NDTR 不会大于重装值
+    if (nd > total_words) { return 0U; }               /* 保险：NDTR 不会大于重装值 */
 
-    return (((words - nd) * 4U) / (uint32_t)cam_row_bytes) % (uint32_t)cam_ring_rows;
+    return (((total_words - nd) * 4U) / (uint32_t)cam_row_bytes) % (uint32_t)cam_ring_rows;
 }
 
 //-------------------------------------------------------------------------------------------------------------------
