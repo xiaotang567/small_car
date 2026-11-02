@@ -81,7 +81,7 @@ static uint8_t cam_tx_tick (uint32_t now)
         //   （旧代码在这里"每轮循环 TO++"也是个 bug ⇒ TO 一秒涨几千 ✓ 已修）
         if ((now - cam_t_phase) >= 1000UL)
         {
-            char cb[160];
+            static char cb[160];   /* ★ static：不吃栈 */
 
             // ★★★ 2026-10-20 关键修正：自愈重启只在"真没帧"时才做！★★★
             //   实测（CAM1）：同步成功之后，**每秒一次的无条件重启把采集压到 ~1.2fps**
@@ -547,7 +547,7 @@ void app_loop (void)
     //      ⇒ 输出绝不能挂在另一个可能坏掉的外设上。心跳永远发，摄像头状态放在内容里。
     if (wifi_f4_is_ready() && ((HAL_GetTick() - t_hb) >= 500))
     {
-      char buf[320];
+      static char buf[320];   /* ★ static：进 .bss，不吃栈 */
       t_hb = HAL_GetTick();
       board_cam_dbg();                            // 抓一份 DCMI/DMA 寄存器快照
 
