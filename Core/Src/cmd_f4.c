@@ -43,7 +43,19 @@ static void cmd_txt (const char *s)
 //   ⚠️ 回的短文本行会被上位机打印出来（它把"魔数之前的连续 ASCII"当文本）✓
 //=========================================== 实时命令通道 ===========================================
 
-uint16_t cam_cmd_fps    = 20U;      // ★★ 默认 **不限**（提速：原来 1帧/秒 → 0=不限）✓
+/* ★★★ 2026-11-02 最终值：**0（不限速）** ★★★
+   沿革与结论（三次实测）：
+     f=20 + 助手(22568B/帧) → 11.1fps
+     f=0  + 助手(22568B/帧) → **0.9fps**（模块内部只有一块缓冲，被连续压榨后
+                               丢弃/半包 ⇒ 助手反复重新同步 ⇒ TCP 窗口收缩，吞吐掉 10 倍）
+     f=30 + cam_view.py(2894B/帧) → 仍然偏慢
+   ⇒ **关键不是 f，而是"一帧几个块"**：
+       助手 22568B = 6 个 4088B 块 ⇒ 块间等待模块排空，f 一旦调小就崩；
+       cam_view.py 位打包 2894B = **1 个块**，发完即完，不存在"等下一块"的环节
+       ⇒ 这时 f=0 是安全的，相 0 只等 5ms。
+   ⇒ 一帧 = 打包 ~1ms + 发送 ~4.4ms + 歇 5ms ≈ 10ms，上限由传感器 50fps 决定。
+   ⚠️ 只有**切回助手模式**（SEND_MODE_VOFA=1）时才需要把它调回 20~30，否则会重演 0.9fps。*/
+uint16_t cam_cmd_fps    = 0U;       // 0 = 不限速（相 0 只等 5ms）
 uint16_t cam_cmd_gap_ms = 0U;      // ★★ 默认 **0 = 不等**（开机即最快）；若坏行增多用 `g 1`/`g 2` 回退 ✓
 uint8_t  cam_cmd_dx     = 1U;      // 横向抽点（1 = 188 列）
 uint8_t  cam_cmd_dy     = 1U;      // 纵向抽点（1 = 120 行）
@@ -152,7 +164,8 @@ static void cam_cmd_line (char *s)
             cam_cmd_dy = cam_cmd_clamp(cam_cmd_num(s + 1), 1U, 8U);
             break;
 
-        case 'a': cam_cmd_fps = 0U; cam_cmd_gap_ms = 6U; cam_cmd_dx = 1U; cam_cmd_dy = 1U; break;
+        /* ⚠️ 恢复默认值要和"当前模式"配套：cam_view.py 模式下 0 是安全的（1 个块/帧）*/
+        case 'a': cam_cmd_fps = 0U; cam_cmd_gap_ms = 0U; cam_cmd_dx = 1U; cam_cmd_dy = 1U; break;
 
         case 'd':                                   // ★ 心跳档位：0 静默 / 1 精简(默认) / 2 全量
             cam_dbg_level = cam_cmd_clamp(cam_cmd_num(s + 1), 0U, 2U);

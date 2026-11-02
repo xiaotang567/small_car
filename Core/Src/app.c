@@ -148,9 +148,17 @@ static uint8_t cam_tx_tick (uint32_t now)
    ch4=cam_now  ch5=cam_ahead  ch6=FPS  ch7=阈值T */
 
 /* 把 buf 全部发出去（wifi_f4_send 发不完会把剩余长度返回，必须重试，
-   否则一帧少一截 ⇒ 助手永远拼不出完整帧） */
-static void zf_send_all (const uint8_t *buf, uint32_t len)
+   否则一帧少一截 ⇒ 助手永远拼不出完整帧）
+   ★★★ 2026-11-02 改：**返回"实际发出去多少字节"** ★★★
+   原来返回 void，链路过载时 `stall > 12` 直接 `return` 把剩下的字节**扔掉**
+   ⇒ 上位机是按固定 22568 字节切帧的（助手协议里**没有长度、没有校验**）
+   ⇒ 少一截就**永久错位**，画面从此斜切/错行，只有重连才恢复。
+   这正是"时不时畸变"的来源：只要某一帧赶上模块忙，之后就一直歪。
+   ⇒ 现在把"发了多少"告诉调用方，由 `vofa_send_frame()` 用**补零**把长度补齐
+     （这一帧后半截是黑的，但**字节流长度始终对齐** ⇒ 下一帧立刻恢复正常 ✓）*/
+static uint32_t zf_send_all (const uint8_t *buf, uint32_t len)
 {
+    uint32_t total = len;
     uint32_t rem;
     uint16_t guard = 0U;
     uint16_t stall = 0U;
@@ -159,10 +167,13 @@ static void zf_send_all (const uint8_t *buf, uint32_t len)
     {
         guard ++;
         rem = wifi_f4_send(buf, len);
-        if (0U == rem)                     { return; }          /* 发完了 */
+        if (0U == rem)                     { return total; }    /* 发完了 */
         if (rem >= len)                                         /* 一点没动 */
         {
-            if (++stall > 12U)             { return; }          /* 链路卡死 ⇒ 弃帧 */
+            /* ⚠️ 阈值从 12 降到 **3**：现在每次 `wifi_f4_send()` 最坏会等 33ms
+               （按块大小给的预算），12 次就是 **400ms 阻塞主循环** —— 太狠了。
+               3 次 ≈ 100ms 已经足够判定"链路真的堵死"，再多等也没用。 */
+            if (++stall > 3U)              { break; }           /* 链路卡死 ⇒ 交给调用方补零 */
         }
         else
         {
@@ -171,7 +182,41 @@ static void zf_send_all (const uint8_t *buf, uint32_t len)
             len   = rem;
         }
     }
+    return (uint32_t)(total - len);        /* 已发出的字节数 */
 }
+
+/* ★ 补零到指定总长：只为了"把字节流长度凑齐"，内容是什么无所谓。
+   带时间预算（最坏 ≈46ms），绝不允许它把主循环按死。
+   ⚠️ 用封顶块 256B 而不是按剩余长度一次发：模块对大块的等待预算更贵，
+      分小块反而更快停手（真堵死时差距很明显）。 */
+static void zf_pad_to (uint32_t sent, uint32_t total)
+{
+    static const uint8_t z[256] = {0};
+    uint8_t  guard = 0U;
+    uint32_t n     = (total > sent) ? (total - sent) : 0U;
+
+    while ((0U < n) && (guard < 20U))
+    {
+        uint32_t k = (n > (uint32_t)sizeof(z)) ? (uint32_t)sizeof(z) : n;
+
+        guard ++;
+        if (0U != wifi_f4_send(z, k)) { break; }   /* 连补零都发不动 ⇒ 放弃，别死等 */
+        n -= k;
+    }
+}
+
+/* ★★★ 发送抽点系数（2026-11-02）★★★
+   为什么要抽：助手上实测 FPS 6.9、字节/秒 24528 ⇒ 这条链路真实吞吐只有
+   **约 204KB/s**（模块每消化 4088B 要 ~20ms）。而一帧 188×120 原始灰度 = 22568B
+   ⇒ 22568 ÷ 4088 = **6 个块** ⇒ 6 × 26ms ≈ 157ms ⇒ **6.4fps**（和实测 6.9 吻合）。
+   ⇒ **188×120 在这条链路上物理上到不了 16fps**，无论怎么调间隔。
+   抽 2×2 后：94×60 = 5640B = **2 个块** ⇒ 约 28~52ms/帧 ⇒ **19~35fps** ✓
+   ✅ 抽点**不裁视野**：还是整个画面、宽高比也一样（94/60 = 188/120），只是采样变粗；
+   ✅ 助手按包头里的宽高自适应显示，**上位机不用改任何设置**；
+   ⚠️ 想回到全分辨率：把下面这个 2 改成 1 即可（代价：帧率掉回 6~7fps）。*/
+#define VOFA_DECIM      2U
+#define VOFA_TXW        ((uint16_t)(CAM_TXW / VOFA_DECIM))   /* 94  */
+#define VOFA_TXH        ((uint16_t)(CAM_H   / VOFA_DECIM))   /* 60  */
 
 static void vofa_send_frame (void)
 {
@@ -187,7 +232,7 @@ static void vofa_send_frame (void)
          [3] 0x08                          本协议段长度 = sizeof(struct) = 8
          [4..5] 宽  小端   [6..7] 高 小端
          ↓
-         188 x 120 = 22560 字节灰度
+         VOFA_TXW x VOFA_TXH = 94 x 60 = 5640 字节灰度
 
        ⚠️ 旧版（12 字节 + check_sum）已废弃 —— 那是 2022 年的老库，助手不认
     */
@@ -195,23 +240,46 @@ static void vofa_send_frame (void)
        之前分成两次 wifi_f4_send（8 字节 + 22560 字节），模块会拆成两个"包"，
        助手的解析如果按包边界走就会把起点算错 ⇒ 画面整体右移。
        放 CCM（34KB 空闲），只被 CPU 读写。*/
-    static uint8_t tx_frame[8U + (uint32_t)CAM_H * (uint32_t)CAM_TXW]
+    static uint8_t tx_frame[8U + (uint32_t)VOFA_TXW * (uint32_t)VOFA_TXH]
         __attribute__((section(".ccmram")));
     uint8_t hdr[8];
+    uint16_t r, c;
 
     hdr[0] = 0xAAU;
     hdr[1] = 0x02U;
     hdr[2] = 0x40U;
     hdr[3] = 0x08U;
-    hdr[4] = (uint8_t)((uint16_t)CAM_TXW & 0xFFU);
-    hdr[5] = (uint8_t)(((uint16_t)CAM_TXW >> 8) & 0xFFU);
-    hdr[6] = (uint8_t)((uint16_t)CAM_H & 0xFFU);
-    hdr[7] = (uint8_t)(((uint16_t)CAM_H >> 8) & 0xFFU);
+    hdr[4] = (uint8_t)(VOFA_TXW & 0xFFU);
+    hdr[5] = (uint8_t)((VOFA_TXW >> 8) & 0xFFU);
+    hdr[6] = (uint8_t)(VOFA_TXH & 0xFFU);
+    hdr[7] = (uint8_t)((VOFA_TXH >> 8) & 0xFFU);
 
     memcpy(tx_frame, hdr, 8U);
-    memcpy(tx_frame + 8U, (const void *)disp_img,
-           (size_t)((uint32_t)CAM_TXW * (uint32_t)CAM_H));
-    (void)zf_send_all(tx_frame, 8U + (uint32_t)CAM_TXW * (uint32_t)CAM_H);
+
+    /* ★ 2×2 抽点（横竖各隔一个取一个）—— 抽的同时完成，不需要中间缓冲 */
+    for (r = 0U; r < VOFA_TXH; r++)
+    {
+        const uint8_t *src = &disp_img[(uint32_t)r * VOFA_DECIM][0];
+        uint8_t       *dst = &tx_frame[8U + (uint32_t)r * VOFA_TXW];
+
+        for (c = 0U; c < VOFA_TXW; c++)
+        {
+            dst[c] = src[(uint32_t)c * VOFA_DECIM];
+        }
+    }
+
+    /* ★★★ 2026-11-02：发不完就**补零凑齐长度**，绝不让字节流错位 ★★★
+       上位机按固定 8 + W×H 字节切帧，协议里没有长度也没有校验
+       ⇒ 这一次少发 N 字节，从这一帧起**全部歪掉**（斜切/错行/半屏灰），
+         只有重连才会恢复 —— 这就是"时不时错位"的真正来源。
+       补零后：这一帧后半截是黑的（一眼能看出丢了一帧），但字节数仍然对齐
+       ⇒ **下一帧立刻恢复正常**，不需要任何人去重启。 */
+    {
+        uint32_t total = 8U + (uint32_t)VOFA_TXW * (uint32_t)VOFA_TXH;
+        uint32_t sent  = zf_send_all(tx_frame, total);
+
+        if (sent < total) { zf_pad_to(sent, total); }
+    }
 }
 
 static void cam_tx_row_done (void)
