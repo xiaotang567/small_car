@@ -2567,6 +2567,11 @@ static void lf_draw_edge_marks (void)
 
     for (r = 0U; r < (uint16_t)CAM_H; r++)
     {
+        /* ★ 种子以下的行是"补出来"的（crawl 只往上走，下面沿用种子值），
+           在那里画 3 像素标记会变成两条竖直的长方形 ⇒ 看起来像图像里的异物。
+           只画真实爬到过的行（r ≤ 种子行）✓ */
+        if ((int32_t)r > lf_sd_row) { continue; }
+
         if (0xFFU != cam_bound[r])                       /* 左边界：往左涂 */
         {
             x = (int16_t)cam_bound[r];
