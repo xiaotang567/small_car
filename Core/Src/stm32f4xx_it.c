@@ -229,4 +229,13 @@ void DCMI_IRQHandler(void)
 {
   board_cam_irq();
 }
+
+/* ★ 2026-11-03：188 模式下用 TIM6 每 50µs 轮询 DCMI->SR 的 VSYNC 位
+   （PB7 必须留在 DCMI，上一版把它改成 TIM4 就彻底没图了）*/
+extern void board_vsync_poll_irq(void);
+
+void TIM6_DAC_IRQHandler(void)
+{
+  board_vsync_poll_irq();
+}
 /* USER CODE END 1 */

@@ -624,7 +624,7 @@ void app_loop (void)
     //      ⇒ 输出绝不能挂在另一个可能坏掉的外设上。心跳永远发，摄像头状态放在内容里。
     if (wifi_f4_is_ready() && ((HAL_GetTick() - t_hb) >= 500))
     {
-      static char buf[320];   /* ★ static：进 .bss，不吃栈 */
+      static char buf[448];   /* ★ static：进 .bss，不吃栈 */
       t_hb = HAL_GetTick();
       board_cam_dbg();                            // 抓一份 DCMI/DMA 寄存器快照
 
@@ -641,17 +641,22 @@ void app_loop (void)
         //     MD  = 当前采集模式（0 = 752 宽 / 1 = 188 宽）
         //     BIN = 188×120 配置是否成功（1 = 已写并回读一致）
         //     R0D/R0E = 两个 Read Mode 寄存器的**回读值**（列 bin 在 R0D[3:2]、行 bin 在 R0E[1:0]）
-        sprintf(buf, "S f=%lu V=%lu LG=%lu TO=%lu F=%u P=%u RX=%lu CAM=%u ID=%04X N=%u MD=%u BIN=%u R0D=%04X W=%u E=%u K=%lu R=%04lX RST=%02lX PC=%08lX CF=%04lX BA=%08lX\r\n",
+        sprintf(buf, "S f=%lu V=%lu VS=%lu LG=%lu TO=%lu F=%u FL=%u P=%u RX=%lu CAM=%u ID=%04X N=%u MD=%u BIN=%u R0D=%04X W=%u E=%u K=%lu R=%04lX IE=%04lX MI=%04lX LW=%lu GP=%lu FW=2055 RST=%02lX PC=%08lX CF=%04lX BA=%08lX\r\n",
                 (unsigned long)cam_frame_cnt, (unsigned long)cam_vsync_isr_cnt,
+                (unsigned long)cam_vs_cap_cnt,
                 (unsigned long)disp_lag_max,
                 (unsigned long)cam_to_cnt, (unsigned)cam_frz_fill,
+                (unsigned)cam_frm_lines,
                 (unsigned)dbg_pol_idx,
                 (unsigned long)cam_rx_bytes,
                 (unsigned)cam_if_ok, (unsigned)cam_if_id, (unsigned)cam_if_tries,
                 (unsigned)cam_mode, (unsigned)cam_bin_ok,
                 (unsigned)cam_r0d,
                 (unsigned)board_cam_write_row(), (unsigned)cam_last_start_err,
-                (unsigned long)t_pclk, (unsigned long)dcmi_ris, (unsigned long)cam_rst_flags,
+                (unsigned long)t_pclk, (unsigned long)dcmi_ris,
+                (unsigned long)dbg_dcmi_ier, (unsigned long)dbg_dcmi_misr,
+                (unsigned long)cam_line_isr_cnt, (unsigned long)cam_ln_gap_cnt,
+                (unsigned long)cam_rst_flags,
                 (unsigned long)flt_pc, (unsigned long)flt_cfsr, (unsigned long)flt_bfar);
         dbg_txt(buf);
       }

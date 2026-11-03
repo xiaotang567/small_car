@@ -68,17 +68,58 @@ volatile uint32_t cam_line  = 0;
 //   ⚠️ 只清 FRAME 这一位（`ICR = 0x01`），别的位一概不动（LINE 那一位由下面单独清）。
 volatile uint16_t cam_frame_row = 0xFFFFU;
 
+//-------------------------------------------------------------------------------------------------------------------
+// ★★★ 188 模式：整帧拷贝（2026-11-03）★★★
+//   旧做法是"主循环逐行收割"：一帧 120 行必须在**一个 VSYNC 周期（20ms）内**扫完，
+//   主循环只要被 WiFi/命令/分析占住超过几毫秒，就会漏掉一截 ⇒ 下一个 VSYNC 一清计数，
+//   那一帧就只剩 70~90 行 ⇒ 画面上出现**固定高度的分割线**（实测在 120 行里的第 43 行：
+//   下方 77 行是新帧、上方 43 行是上一帧残留）✗
+//   ⇒ 现在改成：**VSYNC 上升沿只记录"帧首在环形缓冲的第几行"**，等下一帧到来时
+//     一次性把上一帧 120 行整块 memcpy 出来（约 0.2ms，远小于缓冲里 4 帧的寿命 80ms）。
+//     主循环再慢也不会把一帧切成两半 ✓
+//-------------------------------------------------------------------------------------------------------------------
+volatile uint16_t cam_frm_start_row = 0U;    // 最近一次 VSYNC 时 DMA 写在环形缓冲的第几行
+volatile uint16_t cam_frm_lines     = 0U;    // 相邻两次 VSYNC 之间走了多少行（= 实测帧长）
+volatile uint8_t  cam_frm_aligned   = 0U;    // 1 = 已经拿到过至少一个帧首
+volatile uint8_t  cam_frm_req       = 0U;    // 1 = 有一整帧待拷贝
+volatile uint16_t cam_frm_copy_row  = 0U;    // 待拷贝那一帧的帧首行号
+static   uint32_t cam_frm_last_tick = 0U;    // 最近一次帧首的 tick（ms）——无 VSYNC 时走兜底路径
+static   uint8_t  cam_crop_on       = 0U;    // 188 模式尝试 DCMI CROP（失败会自动关，见 board_cam_poll）
+
 // 活引脚"占空比"采样（主循环每轮采一次，很便宜）
 volatile uint32_t live_hi[4] = {0};
 volatile uint32_t live_n     = 0;
 
 static void cam_frame_start (void);     // 前置声明（定义在后面；它做"帧首重置 + 武装"）
+static void cam_frame_boundary (void);  // 前置声明（188 模式的帧首处理）
 
 void board_cam_poll (void)
 {
     static uint16_t nd_prev = 0;
     uint16_t nd  = (uint16_t)(hdma_dcmi.Instance->NDTR & 0xFFFFU);
     uint32_t ris;
+
+    /* ★★ CROP 兜底：188 模式开了 CROP 后，300ms 里 DMA 剩余量一次都没变 ⇒
+       这颗 DCMI / 传感器组合不吃 CROP（老版本 10-14 就遇到过"只出 1 行"）
+       ⇒ 自动关掉 CROP 并重启一次，绝不让画面黑掉。 */
+    {
+        static uint32_t nd_last = 0xFFFFFFFFU;
+        static uint32_t nd_tick = 0U;
+
+        if (nd != nd_last)
+        {
+            nd_last = nd;
+            nd_tick = HAL_GetTick();
+        }
+        else if ((1U == cam_mode) && (0U != cam_crop_on) &&
+                 ((HAL_GetTick() - nd_tick) > 300U))
+        {
+            cam_crop_on = 0U;
+            (void)board_cam_restart();
+            nd_last = (uint16_t)(hdma_dcmi.Instance->NDTR & 0xFFFFU);
+            nd_tick = HAL_GetTick();
+        }
+    }
 
     // ---- 0. ★ 活引脚采样：PA6(PCLK) / PB7(VSYNC) / PA4(HREF) / PC6(D0) ----
     //   🔑 这一项能**实时**回答"HREF 到底跳不跳"：
@@ -119,11 +160,18 @@ void board_cam_poll (void)
     if (ris & 0x01UL)
     {
         hdcmi.Instance->ICR = 0x01UL;                       // 只清 FRAME 这一位
-        cam_frame_row = (uint16_t)board_cam_write_row();    // 记下帧首在缓冲里的行号
-        cam_frame_cnt++;                                    // ★ 这里才是**唯一可靠**的帧计数
-        cam_frame_start();                                  // ★★ 帧首处理：重置收割计数 + 武装
-                                                            //    （原来写在 VSYNC 中断里，而那个中断
-                                                            //      从没使能过 ⇒ 这段以前从没执行过！）
+        /* ★ 188 模式：帧首只认 VSYNC 上升沿（见下面 2.7 那段）。
+           ⚠️ 这里的 FRAME 标志是 DMA/HAL 那条链路的，**触发时刻不固定**
+              （HAL 的 FRAME 中断会把它清掉，主循环偶尔才抢得到一次）⇒ 188 模式绝不能用它对齐，
+              否则会在半帧处把计数清掉 ⇒ 就是那条"分割线"。 */
+        if (0U == cam_mode)
+        {
+            cam_frame_row = (uint16_t)board_cam_write_row();    // 记下帧首在缓冲里的行号
+            cam_frame_cnt++;                                    // ★ 这里才是**唯一可靠**的帧计数
+            cam_frame_start();                                  // ★★ 帧首处理：重置收割计数 + 武装
+                                                                //    （原来写在 VSYNC 中断里，而那个中断
+                                                                //      从没使能过 ⇒ 这段以前从没执行过！）
+        }
     }
 
     // ---- 3. 原来的状态位 & DMA 完成计数 ----
@@ -133,15 +181,18 @@ void board_cam_poll (void)
     // ---- 2.7 ★★ 帧首的**第二条来源**（不依赖任何中断）：轮询 VSYNC 状态位的**边沿** ★★
     //   🔑 为什么这条靠得住：VSYNC 的"有效窗口"约占一帧的 10% ⇒ 一帧 16.7ms 里约 **1.7ms**，
     //      而主循环一轮只要 ~0.1ms ⇒ **一定能在窗口内看到它**，不会漏（这和"电平持续时间短"不同）。
-    //   ⚠️ 它只负责**对齐一次**（`cam_frame_start()` 里的 `cam_aligned` 保证），
-    //      之后帧首由"行计数器回绕"自检测负责（见 board_cam_harvest）。
-    //      为什么不每帧都用它对齐：轮询总有 ~0.1ms 延迟 ≈ 3 行，若每帧都归零，
-    //      一帧内只能走完 480-3 行 ⇒ `disp_fill` 到不了 120 ⇒ 永远等超时 ⇒ 又会出缝。
+    //   ★ 2026-11-03：**188 模式只认这一条**（每帧都对齐，见 cam_frame_boundary）。
+    //      以前这里会在半帧处 `cam_frame_start()` 清计数 ⇒ 一帧只填了 70~90 行
+    //      ⇒ 上方留着上一帧的旧内容 = 那条**固定高度的分割线** ✗
     {
         static uint8_t vs_prev = 0U;
         uint8_t        vs_now  = (__HAL_DCMI_GET_FLAG(&hdcmi, DCMI_FLAG_VSYNC)) ? 1U : 0U;
 
-        if ((0U != vs_now) && (0U == vs_prev)) { cam_frame_start(); }   // 上升沿 = 帧首
+        if ((0U != vs_now) && (0U == vs_prev))          // 上升沿 = 帧首
+        {
+            if (1U == cam_mode) { cam_frame_boundary(); }
+            else                { cam_frame_start(); }
+        }
         vs_prev = vs_now;
     }
 
@@ -244,6 +295,8 @@ volatile uint32_t dbg_pb7_af     = 0;
 volatile uint32_t dbg_dcmi_clk   = 0;
 volatile uint32_t dbg_dcmi_sr    = 0;
 volatile uint32_t dbg_dcmi_ris   = 0;
+volatile uint32_t dbg_dcmi_ier   = 0;    /* ★ 中断使能：bit4=LINE bit3=VSYNC bit0=FRAME */
+volatile uint32_t dbg_dcmi_misr  = 0;    /* ★ 屏蔽后的中断状态：哪些中断真的挂起来了 */
 volatile uint8_t  dbg_pol_idx    = 0;
 volatile uint8_t  dbg_pol_locked = 0;
 volatile uint32_t dbg_pin_bad    = 0;
@@ -267,6 +320,8 @@ void board_cam_dbg (void)
 
     dbg_dcmi_sr    = hdcmi.Instance->SR;              // B0=HSYNC B1=VSYNC B2=FNE
     dbg_dcmi_ris   = hdcmi.Instance->RISR;            // 原始中断标志：B1=FRAME B2=OVR B3=ERR B4=VSYNC B5=LINE
+    dbg_dcmi_ier   = hdcmi.Instance->IER;             // ★ 中断使能位
+    dbg_dcmi_misr  = hdcmi.Instance->MISR;            // ★ 已使能且挂起的中断
 
     // ---- 11 根 DCMI 引脚逐根查：MODER 必须 = 2(复用) **且 AFR 必须 = 13(DCMI)** ----
     //   ⚠️ 上一版只查了 MODER（是不是复用模式），**复用号也可能是错的** ——
@@ -274,7 +329,7 @@ void board_cam_dbg (void)
     if ((2U != ((GPIOA->MODER >>  8) & 0x3U)) || (13U != ((GPIOA->AFR[0] >> 16) & 0xFU))) { bad |= (1UL << 0); }  // PA4  HSYNC
     if ((2U != ((GPIOA->MODER >> 12) & 0x3U)) || (13U != ((GPIOA->AFR[0] >> 24) & 0xFU))) { bad |= (1UL << 1); }  // PA6  PIXCLK
     if ((2U != ((GPIOB->MODER >> 12) & 0x3U)) || (13U != ((GPIOB->AFR[0] >> 24) & 0xFU))) { bad |= (1UL << 2); }  // PB6  D5
-    if ((2U != ((GPIOB->MODER >> 14) & 0x3U)) || (13U != ((GPIOB->AFR[0] >> 28) & 0xFU))) { bad |= (1UL << 3); }  // PB7  VSYNC
+    if ((2U != ((GPIOB->MODER >> 14) & 0x3U)) || (13U != ((GPIOB->AFR[0] >> 28) & 0xFU))) { bad |= (1UL << 3); }  // PB7  VSYNC（AF13 不动）
     if ((2U != ((GPIOC->MODER >> 12) & 0x3U)) || (13U != ((GPIOC->AFR[0] >> 24) & 0xFU))) { bad |= (1UL << 4); }  // PC6  D0
     if ((2U != ((GPIOC->MODER >> 14) & 0x3U)) || (13U != ((GPIOC->AFR[0] >> 28) & 0xFU))) { bad |= (1UL << 5); }  // PC7  D1
     if ((2U != ((GPIOC->MODER >> 16) & 0x3U)) || (13U != ((GPIOC->AFR[1] >>  0) & 0xFU))) { bad |= (1UL << 6); }  // PC8  D2
@@ -387,9 +442,13 @@ uint8_t board_cam_pol_index (void)
 //       否则 `board_cam_init()` 会用 primer 启动 ⇒ 可能落在"会花/黑屏"的组上 ✗✗
 //   📌 回退：把 `CAM_POL_ROTATE` 改回 1 即可恢复老行为。
 //-------------------------------------------------------------------------------------------------------------------
-#define CAM_POL_ROTATE      1       // ★★ 2026-11-02：实测 PB7 上**有** 50Hz 场同步（V2=50000），
-                                    //   但 DCMI 的 V=0 / SR=RIS=0 ⇒ 是**极性(VSPOL)不匹配**，不是没信号
-                                    //   ⇒ 必须把 8 组极性都试一遍（整圈轮转是唯一被证实有效的动作）
+#define CAM_POL_ROTATE      0       // ★★ 2026-11-03：**固定在第 1 组**，不再轮换。
+                                    //   用户实测：第 1 组能出图（第 3 组会斜），而轮换每 0.8s
+                                    //   强改一次 DCMI->CR ⇒ 前 6.4 秒画面本来就不可信，
+                                    //   而且"改极性"会把正在同步的 DCMI 再打乱一次。
+                                    //   ⚠️ 实测依据：PCLK 只在有效像素期间有时钟（K≈1134kHz =
+                                    //      188×120×50），DCMI 在消隐期采不到 VSYNC/HSYNC，
+                                    //      所以分帧本来就不稳 —— 先固定极性，再解决硬件（见文档）。
 #define CAM_POL_MODE        4       // （仅在 CAM_POL_ROTATE=1 时起作用）0 = 普查；4 = 轮转一圈停在目标组
 #define CAM_POL_PRIMER      1U      // ★ 起始组 = **1**（= 当前实测能出图的那一组，原文是 0）
 #define CAM_POL_STORE       1U      // ★ 目标组：**第 1 组**（实测图最清晰的那组）
@@ -537,6 +596,8 @@ void board_cam_new_pass (void)
     disp_done  = 0U;      // 锁存的"采齐"标志（只在这里清）
     disp_armed = 0U;      // 等下一个帧边界再武装
     disp_hold  = 0U;      // 解冻
+
+    cam_frm_req = 0U;     // ★ 188 模式：丢掉上一轮还没拷的旧请求（下一帧首会重新给）
 }
 static   uint16_t disp_next_row = 0;             // 下一条要收割的缓冲行（0..CAM_H-1）
 static   uint32_t rows_since_vsync = 0;       /* ★ 距上次 VSYNC 走了多少行（用来自动标定帧长）*/
@@ -611,6 +672,9 @@ void board_cam_set_mode (uint8_t mode)
     cam_last_start_err = board_cam_restart();
 
     cam_aligned = 0U;                            // 允许重新对齐一次相位
+    cam_frm_aligned = 0U;                        // ★ 188 模式：DMA 刚重启，旧的帧首行号作废
+    cam_frm_req     = 0U;
+    cam_frm_lines   = 0U;
     /* ★★★ 2026-11-02 更正：文档写的是 188×240 —— 一帧 **240 行** ★★★
        原来这里写成 120（以为行 bin4 生效），导致每趟只抓了 240 行帧的**一半**
        ⇒ 抽行步长 dstep=1 而不是 2 ⇒ 画面上下错开（接缝固定出现）✗
@@ -621,6 +685,10 @@ void board_cam_set_mode (uint8_t mode)
        ⇒ 真实一帧就是 **120 行**，步长必须是 1。
        之前的"接缝"不是帧长问题，而是"每帧没对齐 DMA 游标"——那个已经单独修了。*/
     board_cam_set_span((uint16_t)((0U == mode) ? 240U : 120U));
+
+    /* ★ 188 模式：TIM6 轮询 VSYNC 的方案先停用（实测 SR 位在消隐期不更新，VS=0，且无图）
+       ⇒ 先恢复到"PB7 留给 DCMI + 极性重写"的稳定版本，保证有图。 */
+    (void)board_vsync_poll_init;   /* 先停用：实测 SR 位在消隐期不更新（VS=0），且会丢图 */
 }
 
 //-------------------------------------------------------------------------------------------------------------------
@@ -686,9 +754,84 @@ static void cam_frame_start (void)
     disp_ln       = 0U;                             /* 行计数从帧首归零 */
     (void)memset(disp_map, 0, sizeof(disp_map));    /* "哪些行已填"的位图也要清 */
     disp_fill    = 0U;
+    disp_in_frame = 0U;                             /* ★ 2026-11-03 补：不清它 ⇒ 半帧处重来时
+                                                       dst 会从 119-k 开始 ⇒ 上下两半错位 */
     disp_armed   = 1U;
     if (0U == cam_aligned) { cam_aligned = 1U; }   /* 只做标记，避免"已赋值未使用"告警 */
     disp_frame  ++;
+}
+
+//-------------------------------------------------------------------------------------------------------------------
+// 函数简介     ★★ 188 模式的"帧首"：只记录帧首行号，并挂一个"整帧拷贝"请求 ★★
+// 备注信息     为什么要"等到下一次帧首才拷"：VSYNC 上升沿到来时，**上一帧已经完整**
+//              躺在环形缓冲里（480 行 = 4 帧，寿命 80ms）⇒ 这时整块 memcpy 最安全，
+//              既不会被下一帧的 DMA 覆盖，也不依赖主循环这一帧扫了多少行 ✓
+//              以前逐行收割要求"20ms 内扫完 120 行"，主循环一被 WiFi 占住就只剩 70~90 行
+//              ⇒ 上方 30~40 行留着上一帧 ⇒ 固定高度的分割线 ✗（实测就在第 43 行）
+//-------------------------------------------------------------------------------------------------------------------
+static void cam_frame_boundary (void)
+{
+    uint16_t r;
+    uint32_t now = HAL_GetTick();
+    uint16_t len;
+    uint8_t  recent;
+
+    /* ★★ 去重：同一帧可能被"VSYNC 中断"和"主循环轮询"各触发一次 ★★
+       帧周期 ~15ms（~65fps），5ms 以内再进来的就是同一帧的重复触发 ⇒ 直接丢掉。
+       这条是 2026-11-03 晚加的：实测主循环被 WiFi 发送占住时会**整帧错过** VSYNC 低电平，
+       轮询法永远等不到上升沿 ⇒ FL 一直是 0、只能走兜底滑窗。改由**中断**记帧首后，
+       中断和轮询都会调到这里，必须去重。 */
+    if ((now - cam_frm_last_tick) < 5U) { return; }
+
+    r      = (uint16_t)board_cam_write_row();
+    recent = ((now - cam_frm_last_tick) <= 100U) ? 1U : 0U;   /* 上一帧首也是"真"的 */
+
+    if ((0U != cam_frm_aligned) && (0U != recent))
+    {
+        /* 两次帧首之间 DMA 走了多少行 = 这一帧的真实行数（诊断用，正常应为 120） */
+        len = (uint16_t)(((uint32_t)r + (uint32_t)cam_ring_rows - (uint32_t)cam_frm_start_row)
+                         % (uint32_t)cam_ring_rows);
+        cam_frm_lines = len;
+
+        /* 太短（< 半帧）只可能是噪声/重复边沿 ⇒ 丢掉；
+           太长（> 缓冲-一帧）说明那一帧已经被 DMA 绕回覆盖 ⇒ 也丢掉。
+           其余（哪怕因为主循环被占住漏了一次 VSYNC ⇒ 240）仍从**真正的帧首**开始拷，
+           顶多是旧一帧的画面，绝不会出现"上下两半来自不同位置" ✓ */
+        if ((len >= (uint16_t)(CAM_H / 2)) &&
+            (len <= (uint16_t)(cam_ring_rows - (uint16_t)CAM_H)))
+        {
+            cam_frm_copy_row = cam_frm_start_row;
+            cam_frm_req      = 1U;
+        }
+    }
+    else
+    {
+        cam_frm_lines = 0U;             /* 同步断了 ⇒ 这个数没有意义 */
+    }
+
+    cam_frm_start_row = r;
+    cam_frm_aligned   = 1U;
+    cam_frm_last_tick = now;
+    cam_frame_cnt ++;               /* 心跳里的 f 以 VSYNC 为准（原来靠 FRAME 标志，只有 2Hz） */
+}
+
+//-------------------------------------------------------------------------------------------------------------------
+// 函数简介     把环形缓冲里从 start_row 开始的 **120 行整块**搬进 disp_img（上下翻转）
+// 备注信息     120 次 188B 的 memcpy ≈ 0.2ms（CCM 里），比一帧 20ms 短 100 倍 ⇒ 不可能被打断 ✓
+//-------------------------------------------------------------------------------------------------------------------
+static void cam_copy_whole_frame (uint16_t start_row)
+{
+    uint32_t r;
+    const uint8_t *flat = &cam_image[0][0];
+
+    for (r = 0U; r < (uint32_t)CAM_H; r++)
+    {
+        uint32_t src = ((uint32_t)start_row + r) % (uint32_t)cam_ring_rows;
+
+        (void)memcpy(&disp_img[(uint32_t)(CAM_H - 1U) - r][0],
+                     &flat[src * (uint32_t)cam_row_bytes],
+                     (size_t)CAM_TXW);
+    }
 }
 
 // ⚠️ 这个回调**目前永远不会被调用**（VSYNC 中断没使能，见上面的说明）。
@@ -698,12 +841,117 @@ static void cam_frame_start (void)
 //    此时**帧首完全靠下面的"行计数器回绕自检测"兜底**（见 board_cam_harvest 里那一句）。
 volatile uint32_t cam_vsync_isr_cnt = 0;
 
+//-------------------------------------------------------------------------------------------------------------------
+// ★★★ 2026-11-03 晚 v2：**PB7 留在 DCMI，用 TIM6 每 50µs 读 `DCMI->SR` 的 VSYNC 位** ★★★
+//   上一版把 PB7 改成 TIM4 捕获，结果 DCMI 直接没图了 ⇒ 说明 DCMI 的采集**依赖 PB7 作为 VSYNC 输入**
+//   （只是它的 VSYNC 中断/标志没传上来）。所以引脚必须留在 AF13，不能借走。
+//   ⇒ 保持 PB7 = DCMI_VSYNC，另开 TIM6 50µs 中断去读 SR 的 bit1：
+//      主循环每 4ms 才转一圈会错过 1~2ms 的 VSYNC 脉冲，50µs 的定时器中断不会 ✓
+//   边沿检测到上升沿 ⇒ cam_frame_boundary()（内部 5ms 去重）。
+//-------------------------------------------------------------------------------------------------------------------
+volatile uint32_t cam_vs_cap_cnt = 0;   /* TIM6 轮询到的 VSYNC 边沿数（正常 ~50/s） */
+volatile uint32_t cam_vs_hz      = 0;   /* 由两次边沿的 ms 差算出的场频 */
+static   uint8_t  cam_vs_prev    = 0U;
+static   uint32_t cam_vs_last_t  = 0U;
+
+void board_vsync_poll_init (void)
+{
+    __HAL_RCC_TIM6_CLK_ENABLE();
+
+    TIM6->CR1  = 0U;
+    TIM6->PSC  = 83U;               /* 84MHz / 84 = 1MHz */
+    TIM6->ARR  = 49U;               /* 50µs 一次更新中断 */
+    TIM6->DIER = 0x0001U;           /* UIE */
+    TIM6->EGR  = 0x0001U;
+    TIM6->SR   = 0U;
+    TIM6->CR1  = 0x0001U;
+
+    HAL_NVIC_SetPriority(TIM6_DAC_IRQn, 7U, 0U);
+    HAL_NVIC_EnableIRQ(TIM6_DAC_IRQn);
+}
+
+/* stm32f4xx_it.c 的 TIM6_DAC_IRQHandler 转发到这里 */
+void board_vsync_poll_irq (void)
+{
+    if (0U != (TIM6->SR & 0x0001U))
+    {
+        uint8_t now;
+
+        TIM6->SR = 0U;
+        now = (0U != (DCMI->SR & DCMI_SR_VSYNC)) ? 1U : 0U;
+
+        if ((0U != now) && (0U == cam_vs_prev))
+        {
+            uint32_t t = HAL_GetTick();
+
+            cam_vs_cap_cnt ++;
+
+            if (1U == cam_mode)
+            {
+                if (0U != cam_vs_last_t)
+                {
+                    uint32_t d = t - cam_vs_last_t;
+                    cam_vs_hz = (0U != d) ? (1000U / d) : 0U;
+                }
+                cam_vs_last_t = t;
+                cam_frame_boundary();
+            }
+        }
+        cam_vs_prev = now;
+    }
+}
+
+//-------------------------------------------------------------------------------------------------------------------
+// ★★ LINE 中断：用"行间隔突然变大"来识别场消隐 ⇒ 不依赖 VSYNC 也能找到帧首 ★★
+//   背景（2026-11-03 晚）：硬件改完后 DCMI 的 VSYNC 仍然收不到（心跳 V 不涨、FL=0），
+//   但**行**是正常在采的（图像有内容）。每行结束时 DCMI 会进 LINE 中断，
+//   而场消隐期间没有行 ⇒ 两次 LINE 之间的 DWT 周期数会从 ~0.2ms 跳到 ~1ms+。
+//   用这个"大间隔"标记新一帧的第一行 ⇒ 调用 cam_frame_boundary() 记帧首 ✓
+//   （cam_frame_boundary 内部有 5ms 去重，和 VSYNC 中断/轮询重复触发也不怕）
+//-------------------------------------------------------------------------------------------------------------------
+static volatile uint32_t cam_ln_cyc  = 0U;
+static volatile uint8_t  cam_ln_seen = 0U;
+volatile uint32_t cam_line_isr_cnt = 0U;   /* LINE 中断进了几次（诊断：应该 ~120×帧率） */
+volatile uint32_t cam_ln_gap_cnt   = 0U;   /* 其中"行间隔突然变大"（= 场消隐）几次 */
+
+void HAL_DCMI_LineEventCallback (DCMI_HandleTypeDef *hdcmi_)
+{
+    uint32_t cyc;
+
+    (void)hdcmi_;
+
+    cam_line_isr_cnt ++;
+
+    if (1U != cam_mode) { return; }
+
+    cyc = DWT->CYCCNT;
+
+    if (0U != cam_ln_seen)
+    {
+        /* 正常行间隔 ≈ 128~200µs（@168MHz 约 2.2~3.4 万周期）；
+           场消隐至少 0.5ms（8.4 万周期）⇒ 超过阈值就是"新一帧的第一行" */
+        if ((cyc - cam_ln_cyc) > 84000U)
+        {
+            cam_ln_gap_cnt ++;
+            cam_frame_boundary();
+        }
+    }
+    cam_ln_cyc  = cyc;
+    cam_ln_seen = 1U;
+}
+
 void HAL_DCMI_VsyncEventCallback (DCMI_HandleTypeDef *hdcmi_)
 {
     disp_vsync_flag = 1U;                 // ★ 告诉收割：真实帧首到了（用来对齐一趟）
     (void)hdcmi_;
     cam_vsync_isr_cnt ++;
-    cam_frame_start();
+    /* ★★ 2026-11-03 晚：**188 模式也用中断记帧首** ★★
+       轮询 SR.VSYNC 的上升沿要求主循环在 1~2ms 的低电平窗口里至少转一圈；
+       而发一帧图/WiFi 等待就可能占住 4ms ⇒ 整帧错过 VSYNC 低电平 ⇒ `vs_prev` 永远下不来
+       ⇒ FL 恒 0、只能走"每 120 行滑窗"兜底 ⇒ 画面有横向接缝。
+       硬件中断不会漏帧 ⇒ 这里直接记帧首（函数内部有 5ms 去重，轮询再触发也没事）。*/
+    if (1U == cam_mode) { cam_frame_boundary(); }
+    else                { cam_frame_start();    }
 }
 
 //-------------------------------------------------------------------------------------------------------------------
@@ -730,6 +978,58 @@ void board_cam_harvest (void)
 {
     uint16_t w    = (uint16_t)board_cam_write_row();   // DMA 当前写到第几行（还没写完的那行）
     uint32_t nlag = 0U;
+
+    /* ★★★ 188 模式：**整帧拷贝**，不再逐行收割（2026-11-03）★★★
+       帧首由 board_cam_poll() 的 VSYNC 上升沿给出（cam_frm_req），这里只负责
+       把上一帧 120 行一次性 memcpy 出来 ⇒ 主循环再慢也不会把一帧切成两半 ✓
+       旧的逐行路径（下面）只在 752 全分辨率模式下还用得到。 */
+    if (1U == cam_mode)
+    {
+        /* ---- ① 真·VSYNC 帧首：把上一帧整块拷出来 ---- */
+        if (0U != cam_frm_req)
+        {
+            cam_frm_req = 0U;                       /* 这一帧要么拷、要么丢，绝不挂到下一轮 */
+
+            if ((0U == disp_hold) && (0U == disp_done))
+            {
+                cam_copy_whole_frame(cam_frm_copy_row);
+                disp_fill = (uint8_t)CAM_H;
+                disp_done = 1U;
+                disp_frame ++;
+            }
+        }
+
+        /* ---- ② 兜底：100ms 都没见到 VSYNC 边沿（PCLK 被门控时 DCMI 会漏帧同步）----
+           就按"每 120 行"自己滑一个窗口出来：画面可能仍有接缝，但绝不会黑屏。
+           把摄像头 U2/R2 的硬件改动做好之后，这条路径不会被执行 ✓ */
+        if ((HAL_GetTick() - cam_frm_last_tick) > 100U)
+        {
+            uint16_t ww = (uint16_t)board_cam_write_row();
+
+            while (disp_next_row != ww)
+            {
+                disp_next_row = (uint16_t)((disp_next_row + 1U) % cam_ring_rows);
+                disp_ln ++;
+
+                if (disp_ln >= (uint32_t)CAM_H)
+                {
+                    disp_ln = 0U;
+
+                    if ((0U == disp_hold) && (0U == disp_done))
+                    {
+                        /* 最后 120 行（= 当前写入位置往回数 120 行）都是写完了的 */
+                        cam_frm_copy_row = (uint16_t)(((uint32_t)ww + (uint32_t)cam_ring_rows -
+                                                       (uint32_t)CAM_H) % (uint32_t)cam_ring_rows);
+                        cam_copy_whole_frame(cam_frm_copy_row);
+                        disp_fill = (uint8_t)CAM_H;
+                        disp_done = 1U;
+                        disp_frame ++;
+                    }
+                }
+            }
+        }
+        return;
+    }
 
     /* ★★★ 用**真实帧边界（VSYNC）**对齐一趟 ★★★
        以前用 disp_ln 回绕（每 120 行）当帧边界，但那个相位和传感器的实际帧边界**无关**
@@ -861,6 +1161,27 @@ uint8_t board_cam_start (void)
     //    ⚠️ 教训：**同一个"宽度"概念在多个地方用到时，改成运行时量就必须**逐处**核对**，
     //       漏一处（这里就是漏了 DMA 长度）整个链路就静默失效。
     // ★ 整块缓冲作为 DMA 环：188×480 = 752×120 = 90240 字节（两模式通用）✓
+
+    // ★★★ 188 模式：打开 DCMI 的 CROP，把**每行强制截成 188 像素** ★★★
+    //   🔥 2026-11-03 晚：为什么现在才敢开 —— 实测画面稳定地"每行往左漂 ~0.3~0.5 像素"
+    //      （三条独立竖边同斜率、水平边不斜）⇒ DCMI 采到的每行像素数并不固定（188/189 抖动），
+    //      而我们的行宽写死 188 ⇒ 逐行累积 shear（画面越往下越偏）。
+    //   CROP 的计数器在**每个 HSYNC 重新从 0 开始**：每行只取前 188 个像素，
+    //   多出来的（第 189 个）直接丢 ⇒ 行宽恒定 188，shear 从根上消失 ✓
+    //   ⚠️ 老版本 10-14 试过 CROP 失败（"只出 1 行"），那次是在 752 模式下配的；
+    //      这里**只在 188 模式**开，并且带"300ms DMA 不动就自动关 CROP 重启"的兜底。
+    if ((1U == cam_mode) && (0U != cam_crop_on))
+    {
+        DCMI->CR      &= ~DCMI_CR_CROP;
+        DCMI->CWSTRTR  = 0U;
+        DCMI->CWSIZER  = ((uint32_t)CAM_H << 16) | (uint32_t)CAM_TXW;   /* 120 行 × 188 像素 */
+        DCMI->CR      |= DCMI_CR_CROP;
+    }
+    else
+    {
+        DCMI->CR &= ~DCMI_CR_CROP;
+    }
+
     if (HAL_DCMI_Start_DMA(&hdcmi, DCMI_MODE_CONTINUOUS,
                            (uint32_t)cam_image,
                            (uint32_t)(((uint32_t)CAM_W * (uint32_t)CAM_H) / 4U)) != HAL_OK)
@@ -880,8 +1201,21 @@ uint8_t board_cam_start (void)
     disp_next_row = (uint16_t)board_cam_write_row();
     disp_ln       = 0U;
 
+    /* ★ 188 模式：DMA 刚重启，环里混着旧数据/旧行号 ⇒ 帧首对齐状态清零，
+       等下一个 VSYNC 重新记第一帧的起点（第一帧不拷，第二帧才有参考）*/
+    cam_frm_aligned = 0U;
+    cam_frm_req     = 0U;
+    cam_frm_lines   = 0U;
+
     // ★ **每帧都要** VSYNC 中断（用来记录帧边界位置）—— 不 Stop、不重启，开销极小
     __HAL_DCMI_ENABLE_IT(&hdcmi, DCMI_IT_VSYNC);
+
+    /* ★★ 重新写一次极性 ★★
+       `cam_dcmi_force_stop()` 会把 CR 整个清 0，而 `HAL_DCMI_Start_DMA()` 只补
+       ENABLE + CAPTURE，**不会补 PCKPOL/HSPOL/VSPOL** ⇒ 切 188 模式重启后 CR 会掉成 0x4001
+       （极性组 0），PCKPOL 从"上升沿"变成"下降沿" —— 采样边沿错了，轻则花、重则一帧都收不到。
+       `board_cam_init` 里启动后补过一次，但 `board_cam_set_mode(1)` 的 restart 没有 ⇒ 这里统一补。 */
+    board_cam_apply_polarity(dbg_pol_idx);
 
     return 0;
 }
@@ -1010,6 +1344,8 @@ volatile uint32_t dbg_vsync_khz = 0;
 
 uint32_t board_vsync_hz (void)
 {
+    /* ★ 188 模式 PB7 已经借给 TIM4 了，不能再改成 TIM4 测频（会把捕获配置冲掉）*/
+    if (1U == cam_mode) { return cam_vs_hz; }
     board_vsync_measure();
     return dbg_vsync_khz * 1000UL;                                // 换算回 Hz
 }
@@ -2435,6 +2771,11 @@ uint8_t cam_cfg_camera (void)
 //-------------------------------------------------------------------------------------------------------------------
 uint8_t board_cam_init (void)
 {
+    /* ★ DWT 周期计数器：LINE 中断用它测"两行之间的间隔"来识别场消隐（见 HAL_DCMI_LineEventCallback） */
+    CoreDebug->DEMCR |= CoreDebug_DEMCR_TRCENA_Msk;
+    DWT->CYCCNT = 0U;
+    DWT->CTRL  |= DWT_CTRL_CYCCNTENA_Msk;
+
 #if (CAM_CFG_ENABLE)
     // ★ 第 1 步：先用串口把摄像头配成 188×120（顺便把 PCLK消隐打开 —— DCMI 必须要它）
     cam_cfg_camera();

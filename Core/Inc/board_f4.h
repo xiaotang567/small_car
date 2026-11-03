@@ -81,6 +81,8 @@ extern volatile uint8_t  disp_fill;                  // ★★ 本帧已填到�
 extern volatile uint8_t  disp_done;                  // ★★ 1 = **本帧 120 行全部来自同一帧**（可以发）
 extern volatile uint8_t  disp_armed;
 extern volatile uint32_t cam_vsync_isr_cnt;          // ★★ VSYNC 中断进了几次（V= 在涨 ⇒ 中断真的在工作）
+extern volatile uint16_t cam_frm_lines;              // ★ 188 模式实测帧长（相邻两次 VSYNC 之间走了多少行）
+extern volatile uint16_t cam_frm_start_row;          // ★ 最近一次 VSYNC 时 DMA 写在环形缓冲的第几行
 extern volatile uint16_t cam_span;                   // ★★ 一帧的摄像头行数（实测 240；`board_cam_set_span` 可改）
 void    board_cam_set_span (uint16_t rows);          // ★ 实时改"一帧多少行"（抽行步长随之重算）
 void    board_cam_harvest (void);                    // 主循环每轮调一次（逐行收割）
@@ -282,6 +284,13 @@ extern volatile uint32_t dbg_pin_bad;
 
 // ---- 🔑 DCMI 原始状态寄存器（比 HAL 的 FLAG 宏可信）----
 extern volatile uint32_t dbg_dcmi_sr, dbg_dcmi_ris;   // SR=同步脚状态  RIS=原始中断标志(ERR/OVR/FRAME)
+extern volatile uint32_t dbg_dcmi_ier, dbg_dcmi_misr; // ★ IER=使能位  MISR=已使能且挂起的中断
+extern volatile uint32_t cam_line_isr_cnt;            // ★ LINE 中断进了几次（诊断：应 ~120×帧率）
+extern volatile uint32_t cam_ln_gap_cnt;              // ★ 其中"行间隔变大"（场消隐）几次
+extern volatile uint32_t cam_vs_cap_cnt;              // ★ TIM4 捕获到几次 VSYNC（188 模式）
+extern volatile uint32_t cam_vs_hz;                   // ★ TIM4 测出的场频
+void board_vsync_poll_init (void);                    // 188 模式：TIM6 每 50µs 轮询 DCMI->SR 的 VSYNC
+void board_vsync_poll_irq  (void);                    // TIM6_DAC 中断转发
 extern volatile uint8_t  dbg_pol_idx;                 // 当前试到第几种极性组合(0~7)
 extern volatile uint8_t  dbg_pol_locked;              // 1 = 已锁定(说明采到帧了)
 
