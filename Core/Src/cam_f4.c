@@ -2196,6 +2196,80 @@ static void board_cam_draw_route_text (void)
 
 /* ★★★ 右边界跟踪（与左边界完全镜像）★★★
    白在左 ⇒ 左手法则：每步优先左转(d-1) → 直行(d) → 右转(d+1) */
+//-------------------------------------------------------------------------------------------------------------------
+// ★★★ 双边巡线的"公共种子"（2026-11-03）★★★
+//   旧版左右两条边各扫各的"最宽白段" ⇒ 画面里只要有一块更宽的白墙/反光，两边就会各认一条、直接跑飞。
+//   现在两条边共用同一个种子，并且优先选"穿过画面中心列"的白带
+//   （车在赛道上 ⇒ 底行中心列一定落在赛道里），其次才比宽度和离中心的距离。
+//-------------------------------------------------------------------------------------------------------------------
+static int32_t lf_sd_l   = -1;
+static int32_t lf_sd_r   = -1;
+static int32_t lf_sd_row = LF_SEED_ROW;
+static uint8_t lf_sd_ok  = 0U;
+
+static void lf_find_seed (void)
+{
+    const int32_t cx = (int32_t)CAM_TXW / 2;
+    int32_t r, c, l;
+    int32_t best = -1000000, bl = -1, br = -1, brow = LF_SEED_ROW;
+
+    lf_sd_ok = 0U;
+
+    /* ① 从最底行往上找，第一条"穿过画面中心列"的白带就是赛道。
+       ⚠️ 不能只死盯第 112 行：实测车头/阴影会把最下面十几行压成全黑，
+          旧版在这里直接 return ⇒ 整帧没有边界 ⇒ 一直显示 R3-3（丢线）。*/
+    for (r = (int32_t)CAM_H - 2; r >= (int32_t)CAM_H / 2; r--)
+    {
+        l = -1;
+        for (c = 2; c < (int32_t)CAM_TXW - 2; c++)
+        {
+            if (disp_img[r][c] == 255U) { if (l < 0) { l = c; } }
+            else if (l >= 0)
+            {
+                if (((c - 1 - l) >= 16) && (cx >= l) && (cx <= c - 1))
+                {
+                    bl = l; br = c - 1; brow = r;
+                    goto lf_seed_found;
+                }
+                l = -1;
+            }
+        }
+        if ((l >= 0) && (((int32_t)CAM_TXW - 3 - l) >= 16) && (cx >= l))
+        {
+            bl = l; br = (int32_t)CAM_TXW - 3; brow = r;
+            goto lf_seed_found;
+        }
+    }
+
+    /* ② 兜底：整幅都没有穿过中心的白带 ⇒ 按"宽度 + 靠下 + 离中心近"打分 */
+    for (r = (int32_t)CAM_H - 2; r >= (int32_t)CAM_H / 2; r--)
+    {
+        l = -1;
+        for (c = 2; c < (int32_t)CAM_TXW - 2; c++)
+        {
+            if (disp_img[r][c] == 255U) { if (l < 0) { l = c; } }
+            else if (l >= 0)
+            {
+                int32_t w = c - 1 - l;
+                if (w >= 12)
+                {
+                    int32_t mid = (l + c - 1) / 2;
+                    int32_t sc  = w * 2 + (r - (int32_t)CAM_H / 2) * 4
+                                - ((mid > cx) ? (mid - cx) : (cx - mid)) * 2;
+                    if (sc > best) { best = sc; bl = l; br = c - 1; brow = r; }
+                }
+                l = -1;
+            }
+        }
+    }
+
+lf_seed_found:
+    if (bl >= 0)
+    {
+        lf_sd_l = bl; lf_sd_r = br; lf_sd_row = brow; lf_sd_ok = 1U;
+    }
+}
+
 static void lf_trace_right_8 (void)
 {
     static const int8_t dr8[8] = { -1, -1,  0,  1,  1,  1,  0, -1 };
@@ -2205,23 +2279,9 @@ static void lf_trace_right_8 (void)
 
     for (r = 0; r < CAM_H; r++) { cam_bound_r[r] = 0xFF; }
 
-    /* 种子：第 112 行最宽白段的**右端** */
-    {
-        int32_t l = -1, q = -1, bl = -1, br = -1, c2;
-        r = LF_SEED_ROW;
-        for (c2 = 2; c2 < (int32_t)CAM_TXW - 2; c2++)
-        {
-            if (disp_img[r][c2] == 255U) { if (l < 0) { l = c2; } q = c2; }
-            else if (l >= 0)
-            {
-                if ((bl < 0) || ((q - l) > (br - bl))) { bl = l; br = q; }
-                l = -1; q = -1;
-            }
-        }
-        if (l >= 0 && ((bl < 0) || ((q - l) > (br - bl)))) { bl = l; br = q; }
-        if ((bl < 0) || ((br - bl) < 30)) { return; }
-        r0 = LF_SEED_ROW; c0 = br;
-    }
+    /* 种子：与左边界共用同一个白带（由 lf_find_seed 选出）*/
+    if (0U == lf_sd_ok) { return; }
+    r0 = lf_sd_row; c0 = lf_sd_r;
 
     r = r0; c = c0; d = 0;
     cam_bound_r[r] = (uint8_t)c;
@@ -2238,6 +2298,31 @@ static void lf_trace_right_8 (void)
             if ((tr < 0) || (tr >= (int32_t)CAM_H) || (tc < 1) || (tc >= (int32_t)CAM_TXW - 1)) { continue; }
             if ((disp_img[tr][tc] == 255U) && (disp_img[tr][tc + 1] == 0U)) { nr = tr; nc = tc; nd = t; break; }
         }
+
+        /* ★ 断点跨越：反光/噪点会让边缘断 1~2 像素 ⇒ 沿当前方向跳一下再试 */
+        if (nr < 0)
+        {
+            int32_t j;
+            for (j = 1; (j <= 2) && (nr < 0); j++)
+            {
+                int32_t tr = r + dr8[d] * j;
+                int32_t tc = c + dc8[d] * j;
+                if ((tr < 0) || (tr >= (int32_t)CAM_H) || (tc < 1) || (tc >= (int32_t)CAM_TXW - 1)) { break; }
+                if ((disp_img[tr][tc] == 255U) && (disp_img[tr][tc + 1] == 0U)) { nr = tr; nc = tc; nd = d; }
+            }
+        }
+        if (nr < 0)
+        {
+            int32_t dc;
+            for (dc = -2; (dc <= 2) && (nr < 0); dc++)   /* 正上方一行、左右各 2 像素 */
+            {
+                int32_t tr = r - 1;
+                int32_t tc = c + dc;
+                if ((tr < 0) || (tc < 1) || (tc >= (int32_t)CAM_TXW - 1)) { continue; }
+                if ((disp_img[tr][tc] == 255U) && (disp_img[tr][tc + 1] == 0U)) { nr = tr; nc = tc; nd = 0; }
+            }
+        }
+
         if (nr < 0) { break; }
         r = nr; c = nc; d = nd;
         if (cam_bound_r[r] == 0xFF) { cam_bound_r[r] = (uint8_t)c; }
@@ -2263,26 +2348,9 @@ static void lf_trace_left_8 (void)
 
     for (r = 0; r < CAM_H; r++) { cam_bound[r] = 0xFF; }
 
-    /* ① 种子：第 112 行（车头附近、不被遮挡）最宽白段的左端 */
-    {
-        int32_t l = -1, bl = -1, br = -1, c2;
-        r = LF_SEED_ROW;
-        for (c2 = 2; c2 < (int32_t)CAM_TXW - 2; c2++)
-        {
-            if (disp_img[r][c2] == 255U) { if (l < 0) { l = c2; } }
-            else if (l >= 0)
-            {
-                if ((bl < 0) || ((c2 - 1 - l) > (br - bl))) { bl = l; br = c2 - 1; }
-                l = -1;
-            }
-        }
-        if (l >= 0)
-        {
-            if ((bl < 0) || ((((int32_t)CAM_TXW - 3) - l) > (br - bl))) { bl = l; br = (int32_t)CAM_TXW - 3; }
-        }
-        if ((bl < 0) || ((br - bl) < 30)) { return; }
-        r0 = LF_SEED_ROW; c0 = bl;
-    }
+    /* ① 种子：与右边界共用同一个白带（由 lf_find_seed 选出）*/
+    if (0U == lf_sd_ok) { return; }
+    r0 = lf_sd_row; c0 = lf_sd_l;
 
     /* ② 方向状态机：上一步方向记录在 d，每步只试 "右转 → 直行 → 左转"（白在右 = 右手法则）*/
     r = r0; c = c0; d = 0;
@@ -2301,6 +2369,31 @@ static void lf_trace_left_8 (void)
             if ((tr < 0) || (tr >= (int32_t)CAM_H) || (tc < 1) || (tc >= (int32_t)CAM_TXW - 1)) { continue; }
             if ((disp_img[tr][tc] == 255U) && (disp_img[tr][tc - 1] == 0U)) { nr = tr; nc = tc; nd = t; break; }
         }
+
+        /* ★ 断点跨越：反光/噪点会让边缘断 1~2 像素 ⇒ 沿当前方向跳一下再试 */
+        if (nr < 0)
+        {
+            int32_t j;
+            for (j = 1; (j <= 2) && (nr < 0); j++)
+            {
+                int32_t tr = r + dr8[d] * j;
+                int32_t tc = c + dc8[d] * j;
+                if ((tr < 0) || (tr >= (int32_t)CAM_H) || (tc < 1) || (tc >= (int32_t)CAM_TXW - 1)) { break; }
+                if ((disp_img[tr][tc] == 255U) && (disp_img[tr][tc - 1] == 0U)) { nr = tr; nc = tc; nd = d; }
+            }
+        }
+        if (nr < 0)
+        {
+            int32_t dc;
+            for (dc = -2; (dc <= 2) && (nr < 0); dc++)   /* 正上方一行、左右各 2 像素 */
+            {
+                int32_t tr = r - 1;
+                int32_t tc = c + dc;
+                if ((tr < 0) || (tc < 1) || (tc >= (int32_t)CAM_TXW - 1)) { continue; }
+                if ((disp_img[tr][tc] == 255U) && (disp_img[tr][tc - 1] == 0U)) { nr = tr; nc = tc; nd = 0; }
+            }
+        }
+
         if (nr < 0) { break; }
         r = nr; c = nc; d = nd;
         if (cam_bound[r] == 0xFF) { cam_bound[r] = (uint8_t)c; }
@@ -2308,6 +2401,85 @@ static void lf_trace_left_8 (void)
 
     /* ③ 种子以下的行（113~119）沿用种子值，避免近段缺数据 */
     for (r = r0 + 1; r < (int32_t)CAM_H; r++) { cam_bound[r] = cam_bound[r0]; }
+}
+
+//-------------------------------------------------------------------------------------------------------------------
+// ★★★ 双边校正：左右两条边互相校验，把"只有一边"的行补成两边 ★★★
+//   以前两条边各爬各的：一边被反光/阴影打断，那一行就只有单边 ⇒ `cam_center` 置 0xFF
+//   ⇒ 路线判据经常凑不够 3 行 ⇒ 画面一直是 R3-3（丢线）。
+//   规则（宽度用**上一行的宽度**做参考，天然适应透视：越往上越窄）：
+//     ① 两边都在、但宽度相对上一行离谱（<0.6 或 >1.6 倍）⇒ 保留更贴近上一行的那条，另一条按参考宽度补；
+//     ② 只有一条边 ⇒ 用参考宽度补出另一条；
+//     ③ 两条都没有 ⇒ 保持 0xFF（中心也无效）。
+//-------------------------------------------------------------------------------------------------------------------
+#define LF_ABS(x)  (((x) < 0) ? -(x) : (x))
+
+static void lf_dual_fixup (void)
+{
+    int32_t r, wsum = 0, wn = 0, wtyp;
+    int32_t lastl = -1, lastr = -1, lastw = 0;
+
+    for (r = 0; r < (int32_t)CAM_H; r++)
+    {
+        if ((cam_bound[r] != 0xFFU) && (cam_bound_r[r] != 0xFFU) && (cam_bound_r[r] > cam_bound[r]))
+        {
+            wsum += (int32_t)cam_bound_r[r] - (int32_t)cam_bound[r];
+            wn++;
+        }
+    }
+    if (0 == wn) { return; }
+
+    wtyp = wsum / wn;
+    if (wtyp < 16) { wtyp = 16; }
+
+    for (r = 0; r < (int32_t)CAM_H; r++)
+    {
+        int32_t l  = (cam_bound[r]   != 0xFFU) ? (int32_t)cam_bound[r]   : -1;
+        int32_t rr = (cam_bound_r[r] != 0xFFU) ? (int32_t)cam_bound_r[r] : -1;
+        int32_t wref = (lastw > 0) ? lastw : wtyp;
+
+        /* ① 宽度离谱 */
+        if ((l >= 0) && (rr >= 0))
+        {
+            int32_t w = rr - l;
+
+            if ((w < (wref * 60) / 100) || (w > (wref * 160) / 100))
+            {
+                int32_t dl = (lastl >= 0) ? LF_ABS(l - lastl) : 0;
+                int32_t dr = (lastr >= 0) ? LF_ABS(rr - lastr) : 0;
+
+                if (dl <= dr)                       /* 左边更贴近上一行 ⇒ 信左边 */
+                {
+                    int32_t x = l + wref;
+                    if (x < (int32_t)CAM_TXW - 2) { cam_bound_r[r] = (uint8_t)x; rr = x; }
+                    else { cam_bound[r] = 0xFFU; l = -1; }
+                }
+                else
+                {
+                    int32_t x = rr - wref;
+                    if (x > 1) { cam_bound[r] = (uint8_t)x; l = x; }
+                    else { cam_bound_r[r] = 0xFFU; rr = -1; }
+                }
+            }
+        }
+
+        /* ② 只有一边 ⇒ 按参考宽度补另一边 */
+        if ((l >= 0) && (rr < 0))
+        {
+            int32_t x = l + wref;
+            if (x < (int32_t)CAM_TXW - 2) { cam_bound_r[r] = (uint8_t)x; rr = x; }
+        }
+        else if ((l < 0) && (rr >= 0))
+        {
+            int32_t x = rr - wref;
+            if (x > 1) { cam_bound[r] = (uint8_t)x; l = x; }
+        }
+
+        if ((l >= 0) && (rr >= 0))
+        {
+            lastl = l; lastr = rr; lastw = rr - l;
+        }
+    }
 }
 #endif
 
@@ -2385,8 +2557,10 @@ void board_cam_analyze (void)
     }
 
     #if LF_USE_8NEIGHBOR
+    lf_find_seed();                           /* ★ 双边共用种子（中心列优先） */
     lf_trace_left_8();                        /* 左边界 */
     lf_trace_right_8();                       /* 右边界 */
+    lf_dual_fixup();                          /* ★ 双边互校正：补边 + 宽度异常剔除 */
     /* 中线 = (左 + 右) / 2；任一边没找到就置 0xFF */
     for (r = 0U; r < (uint32_t)CAM_H; r++)
     {
