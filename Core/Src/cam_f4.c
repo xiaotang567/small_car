@@ -2297,6 +2297,10 @@ lf_seed_found:
     }
 }
 
+/* 每条边"真实爬到过"的行标记：补出来的行不画标记、也不当作可信边界 */
+static uint8_t lf_real_l[CAM_H];
+static uint8_t lf_real_r[CAM_H];
+
 static void lf_trace_right_8 (void)
 {
     static const int8_t dr8[8] = { -1, -1,  0,  1,  1,  1,  0, -1 };
@@ -2304,20 +2308,19 @@ static void lf_trace_right_8 (void)
     int32_t  r, c, k, d, r0 = -1, c0 = -1;
     uint16_t guard = 0U;
 
-    for (r = 0; r < CAM_H; r++) { cam_bound_r[r] = 0xFF; }
+    for (r = 0; r < CAM_H; r++) { cam_bound_r[r] = 0xFF; lf_real_r[r] = 0U; }
 
-    /* 种子：与左边界共用同一个白带（由 lf_find_seed 选出）*/
     if (0U == lf_sd_ok) { return; }
     r0 = lf_sd_row; c0 = lf_sd_r;
 
     r = r0; c = c0; d = 0;
-    cam_bound_r[r] = (uint8_t)c;
+    cam_bound_r[r] = (uint8_t)c; lf_real_r[r] = 1U;
 
     while ((r > 0) && (guard < 1500U))
     {
         int32_t nr = -1, nc = -1, nd = d;
         guard ++;
-        for (k = -1; k <= 1; k++)                 /* 左转 → 直行 → 右转 */
+        for (k = -1; k <= 1; k++)
         {
             int32_t t  = (d + k + 8) % 8;
             int32_t tr = r + dr8[t];
@@ -2325,8 +2328,6 @@ static void lf_trace_right_8 (void)
             if ((tr < 0) || (tr >= (int32_t)CAM_H) || (tc < 1) || (tc >= (int32_t)CAM_TXW - 1)) { continue; }
             if ((disp_img[tr][tc] == 255U) && (disp_img[tr][tc + 1] == 0U)) { nr = tr; nc = tc; nd = t; break; }
         }
-
-        /* ★ 断点跨越：反光/噪点会让边缘断 1~2 像素 ⇒ 沿当前方向跳一下再试 */
         if (nr < 0)
         {
             int32_t j;
@@ -2341,7 +2342,7 @@ static void lf_trace_right_8 (void)
         if (nr < 0)
         {
             int32_t dc;
-            for (dc = -2; (dc <= 2) && (nr < 0); dc++)   /* 正上方一行、左右各 2 像素 */
+            for (dc = -2; (dc <= 2) && (nr < 0); dc++)
             {
                 int32_t tr = r - 1;
                 int32_t tc = c + dc;
@@ -2349,13 +2350,33 @@ static void lf_trace_right_8 (void)
                 if ((disp_img[tr][tc] == 255U) && (disp_img[tr][tc + 1] == 0U)) { nr = tr; nc = tc; nd = 0; }
             }
         }
-
         if (nr < 0) { break; }
         r = nr; c = nc; d = nd;
-        if (cam_bound_r[r] == 0xFF) { cam_bound_r[r] = (uint8_t)c; }
+        if (0U == lf_real_r[r]) { cam_bound_r[r] = (uint8_t)c; lf_real_r[r] = 1U; }
     }
 
-    for (r = r0 + 1; r < (int32_t)CAM_H; r++) { cam_bound_r[r] = cam_bound_r[r0]; }
+    r = r0; c = c0; d = 4;
+    while (r < (int32_t)CAM_H - 1)
+    {
+        int32_t nr = -1, nc = -1, nd = d;
+
+        for (k = -1; k <= 1; k++)
+        {
+            int32_t t  = (d + k + 8) % 8;
+            int32_t tr = r + dr8[t];
+            int32_t tc = c + dc8[t];
+            if ((tr < 0) || (tr >= (int32_t)CAM_H) || (tc < 1) || (tc >= (int32_t)CAM_TXW - 1)) { continue; }
+            if ((disp_img[tr][tc] == 255U) && (disp_img[tr][tc + 1] == 0U)) { nr = tr; nc = tc; nd = t; break; }
+        }
+        if (nr < 0) { break; }
+        r = nr; c = nc; d = nd;
+        if (0U == lf_real_r[r]) { cam_bound_r[r] = (uint8_t)c; lf_real_r[r] = 1U; }
+    }
+
+    for (r = r + 1; r < (int32_t)CAM_H; r++)
+    {
+        if (0U == lf_real_r[r]) { cam_bound_r[r] = (uint8_t)c; }
+    }
 }
 
 /* ★★★ 寻线算法开关：1 = 八邻域爬线（新）  0 = 逐行±20跟线（旧，保留备用）★★★ */
@@ -2367,21 +2388,18 @@ static void lf_trace_right_8 (void)
      · 天然沿「连通的同一条边」走 ⇒ 不会被背景白块骗走 */
 static void lf_trace_left_8 (void)
 {
-    /* 8 方向：0=上 1=右上 2=右 3=右下 4=下 5=左下 6=左 7=左上 */
     static const int8_t dr8[8] = { -1, -1,  0,  1,  1,  1,  0, -1 };
     static const int8_t dc8[8] = {  0,  1,  1,  1,  0, -1, -1, -1 };
     int32_t  r, c, k, d, r0 = -1, c0 = -1;
     uint16_t guard = 0U;
 
-    for (r = 0; r < CAM_H; r++) { cam_bound[r] = 0xFF; }
+    for (r = 0; r < CAM_H; r++) { cam_bound[r] = 0xFF; lf_real_l[r] = 0U; }
 
-    /* ① 种子：与右边界共用同一个白带（由 lf_find_seed 选出）*/
     if (0U == lf_sd_ok) { return; }
     r0 = lf_sd_row; c0 = lf_sd_l;
 
-    /* ② 方向状态机：上一步方向记录在 d，每步只试 "右转 → 直行 → 左转"（白在右 = 右手法则）*/
     r = r0; c = c0; d = 0;
-    cam_bound[r] = (uint8_t)c;
+    cam_bound[r] = (uint8_t)c; lf_real_l[r] = 1U;
 
     while ((r > 0) && (guard < 1500U))
     {
@@ -2396,8 +2414,6 @@ static void lf_trace_left_8 (void)
             if ((tr < 0) || (tr >= (int32_t)CAM_H) || (tc < 1) || (tc >= (int32_t)CAM_TXW - 1)) { continue; }
             if ((disp_img[tr][tc] == 255U) && (disp_img[tr][tc - 1] == 0U)) { nr = tr; nc = tc; nd = t; break; }
         }
-
-        /* ★ 断点跨越：反光/噪点会让边缘断 1~2 像素 ⇒ 沿当前方向跳一下再试 */
         if (nr < 0)
         {
             int32_t j;
@@ -2412,7 +2428,7 @@ static void lf_trace_left_8 (void)
         if (nr < 0)
         {
             int32_t dc;
-            for (dc = -2; (dc <= 2) && (nr < 0); dc++)   /* 正上方一行、左右各 2 像素 */
+            for (dc = -2; (dc <= 2) && (nr < 0); dc++)
             {
                 int32_t tr = r - 1;
                 int32_t tc = c + dc;
@@ -2420,14 +2436,33 @@ static void lf_trace_left_8 (void)
                 if ((disp_img[tr][tc] == 255U) && (disp_img[tr][tc - 1] == 0U)) { nr = tr; nc = tc; nd = 0; }
             }
         }
-
         if (nr < 0) { break; }
         r = nr; c = nc; d = nd;
-        if (cam_bound[r] == 0xFF) { cam_bound[r] = (uint8_t)c; }
+        if (0U == lf_real_l[r]) { cam_bound[r] = (uint8_t)c; lf_real_l[r] = 1U; }
     }
 
-    /* ③ 种子以下的行（113~119）沿用种子值，避免近段缺数据 */
-    for (r = r0 + 1; r < (int32_t)CAM_H; r++) { cam_bound[r] = cam_bound[r0]; }
+    r = r0; c = c0; d = 4;
+    while (r < (int32_t)CAM_H - 1)
+    {
+        int32_t nr = -1, nc = -1, nd = d;
+
+        for (k = -1; k <= 1; k++)
+        {
+            int32_t t  = (d + k + 8) % 8;
+            int32_t tr = r + dr8[t];
+            int32_t tc = c + dc8[t];
+            if ((tr < 0) || (tr >= (int32_t)CAM_H) || (tc < 1) || (tc >= (int32_t)CAM_TXW - 1)) { continue; }
+            if ((disp_img[tr][tc] == 255U) && (disp_img[tr][tc - 1] == 0U)) { nr = tr; nc = tc; nd = t; break; }
+        }
+        if (nr < 0) { break; }
+        r = nr; c = nc; d = nd;
+        if (0U == lf_real_l[r]) { cam_bound[r] = (uint8_t)c; lf_real_l[r] = 1U; }
+    }
+
+    for (r = r + 1; r < (int32_t)CAM_H; r++)
+    {
+        if (0U == lf_real_l[r]) { cam_bound[r] = (uint8_t)c; }
+    }
 }
 
 //-------------------------------------------------------------------------------------------------------------------
@@ -2567,12 +2602,9 @@ static void lf_draw_edge_marks (void)
 
     for (r = 0U; r < (uint16_t)CAM_H; r++)
     {
-        /* ★ 种子以下的行是"补出来"的（crawl 只往上走，下面沿用种子值），
-           在那里画 3 像素标记会变成两条竖直的长方形 ⇒ 看起来像图像里的异物。
-           只画真实爬到过的行（r ≤ 种子行）✓ */
-        if ((int32_t)r > lf_sd_row) { continue; }
-
-        if (0xFFU != cam_bound[r])                       /* 左边界：往左涂 */
+        /* ★ 只在"真实爬到过"的行画标记（lf_real_*）：
+           种子以下爬不到、只能沿用旧值的行不画，避免出现两条竖直的长方形。*/
+        if (0xFFU != cam_bound[r] && 0U != lf_real_l[r])   /* 左边界：往左涂 */
         {
             x = (int16_t)cam_bound[r];
             for (k = 1; k <= LF_EDGE_MARK_PX; k++)
@@ -2582,7 +2614,7 @@ static void lf_draw_edge_marks (void)
             }
         }
 
-        if (0xFFU != cam_bound_r[r])                     /* 右边界：往右涂 */
+        if (0xFFU != cam_bound_r[r] && 0U != lf_real_r[r]) /* 右边界：往右涂 */
         {
             x = (int16_t)cam_bound_r[r];
             for (k = 1; k <= LF_EDGE_MARK_PX; k++)
