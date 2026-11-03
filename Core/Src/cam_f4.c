@@ -769,9 +769,8 @@ static void cam_frame_start (void)
 //              以前逐行收割要求"20ms 内扫完 120 行"，主循环一被 WiFi 占住就只剩 70~90 行
 //              ⇒ 上方 30~40 行留着上一帧 ⇒ 固定高度的分割线 ✗（实测就在第 43 行）
 //-------------------------------------------------------------------------------------------------------------------
-static void cam_frame_boundary (void)
+static void cam_frame_boundary_at (uint16_t r)
 {
-    uint16_t r;
     uint32_t now = HAL_GetTick();
     uint16_t len;
     uint8_t  recent;
@@ -783,7 +782,6 @@ static void cam_frame_boundary (void)
        中断和轮询都会调到这里，必须去重。 */
     if ((now - cam_frm_last_tick) < 5U) { return; }
 
-    r      = (uint16_t)board_cam_write_row();
     recent = ((now - cam_frm_last_tick) <= 100U) ? 1U : 0U;   /* 上一帧首也是"真"的 */
 
     if ((0U != cam_frm_aligned) && (0U != recent))
@@ -793,12 +791,12 @@ static void cam_frame_boundary (void)
                          % (uint32_t)cam_ring_rows);
         cam_frm_lines = len;
 
-        /* 太短（< 半帧）只可能是噪声/重复边沿 ⇒ 丢掉；
-           太长（> 缓冲-一帧）说明那一帧已经被 DMA 绕回覆盖 ⇒ 也丢掉。
-           其余（哪怕因为主循环被占住漏了一次 VSYNC ⇒ 240）仍从**真正的帧首**开始拷，
-           顶多是旧一帧的画面，绝不会出现"上下两半来自不同位置" ✓ */
-        if ((len >= (uint16_t)(CAM_H / 2)) &&
-            (len <= (uint16_t)(cam_ring_rows - (uint16_t)CAM_H)))
+        /* ★ 短间隔 = 伪帧首（LINE 抖动/中断风暴）：**不拷贝，也不更新帧首**。
+           否则下一帧的起点会跟着错位，运动时画面就会「一跳一跳」（部分新、部分旧）。
+           长度 90 行 ≈ 0.75 帧；真帧 120、漏一帧 240，都在 90 以上 ✓ */
+        if (len < 90U) { return; }
+
+        if (len <= (uint16_t)(cam_ring_rows - (uint16_t)CAM_H))
         {
             cam_frm_copy_row = cam_frm_start_row;
             cam_frm_req      = 1U;
@@ -813,6 +811,11 @@ static void cam_frame_boundary (void)
     cam_frm_aligned   = 1U;
     cam_frm_last_tick = now;
     cam_frame_cnt ++;               /* 心跳里的 f 以 VSYNC 为准（原来靠 FRAME 标志，只有 2Hz） */
+}
+
+static void cam_frame_boundary (void)
+{
+    cam_frame_boundary_at((uint16_t)board_cam_write_row());
 }
 
 //-------------------------------------------------------------------------------------------------------------------
@@ -932,8 +935,15 @@ void HAL_DCMI_LineEventCallback (DCMI_HandleTypeDef *hdcmi_)
            场消隐至少 0.5ms（8.4 万周期）⇒ 超过阈值就是"新一帧的第一行" */
         if ((cyc - cam_ln_cyc) > 84000U)
         {
+            /* ★ LINE 中断在"这一行的**结束**"触发：此刻 DMA 已经写到下一行，
+               所以帧首 = 当前写入行 − 1。不减这一下，拷贝会从第二行开始，
+               运动时最底下会多出一条来自下一帧的横带（"部分在跳"）。*/
+            uint16_t r = (uint16_t)board_cam_write_row();
+
+            r = (0U != r) ? (uint16_t)(r - 1U) : (uint16_t)(cam_ring_rows - 1U);
+
             cam_ln_gap_cnt ++;
-            cam_frame_boundary();
+            cam_frame_boundary_at(r);
         }
     }
     cam_ln_cyc  = cyc;
@@ -2207,6 +2217,13 @@ static int32_t lf_sd_r   = -1;
 static int32_t lf_sd_row = LF_SEED_ROW;
 static uint8_t lf_sd_ok  = 0U;
 
+#define LF_ABS(x)  (((x) < 0) ? -(x) : (x))
+
+/* 上一帧的种子：新种子和它接近时直接沿用，防止种子行在两行之间来回跳 */
+static int32_t lf_ps_l   = -1;
+static int32_t lf_ps_r   = -1;
+static int32_t lf_ps_row = LF_SEED_ROW;
+
 static void lf_find_seed (void)
 {
     const int32_t cx = (int32_t)CAM_TXW / 2;
@@ -2266,7 +2283,17 @@ static void lf_find_seed (void)
 lf_seed_found:
     if (bl >= 0)
     {
+        /* ★ 种子防抖：和上一帧接近（行差≤6、中心差≤10）就沿用上一帧的种子，
+           避免种子行在 104/105 之间来回跳 ⇒ 整条边跟着抖。*/
+        if ((lf_ps_l >= 0) &&
+            (LF_ABS(brow - lf_ps_row) <= 6) &&
+            (LF_ABS(((bl + br) / 2) - ((lf_ps_l + lf_ps_r) / 2)) <= 10))
+        {
+            bl = lf_ps_l; br = lf_ps_r; brow = lf_ps_row;
+        }
+
         lf_sd_l = bl; lf_sd_r = br; lf_sd_row = brow; lf_sd_ok = 1U;
+        lf_ps_l = bl; lf_ps_r = br; lf_ps_row = brow;
     }
 }
 
@@ -2412,8 +2439,6 @@ static void lf_trace_left_8 (void)
 //     ② 只有一条边 ⇒ 用参考宽度补出另一条；
 //     ③ 两条都没有 ⇒ 保持 0xFF（中心也无效）。
 //-------------------------------------------------------------------------------------------------------------------
-#define LF_ABS(x)  (((x) < 0) ? -(x) : (x))
-
 static void lf_dual_fixup (void)
 {
     int32_t r, wsum = 0, wn = 0, wtyp;
@@ -2479,6 +2504,51 @@ static void lf_dual_fixup (void)
         {
             lastl = l; lastr = rr; lastw = rr - l;
         }
+    }
+}
+
+//-------------------------------------------------------------------------------------------------------------------
+// ★★★ 边界的时域平滑（2026-11-03）★★★
+//   问题：二值图边缘每帧会抖 1~2 像素（阈值/噪声），八邻域爬线又会在两条候选路径之间跳
+//         ⇒ 画面里画出来的左右边"一跳一跳"，R 码也跟着乱跳。
+//   做法：和上一帧的边界比较，差 ≤4 像素就做 (3×本帧 + 1×上帧)/4 的轻度平滑；
+//         差 >4 说明真的拐弯了，直接采用本帧（不拖后腿）。
+//-------------------------------------------------------------------------------------------------------------------
+static uint8_t lf_pl[CAM_H];
+static uint8_t lf_pr[CAM_H];
+static uint8_t lf_pok = 0U;
+
+static void lf_temporal (void)
+{
+    uint8_t r;
+
+    if (0U == lf_pok)
+    {
+        for (r = 0U; r < (uint8_t)CAM_H; r++) { lf_pl[r] = cam_bound[r]; lf_pr[r] = cam_bound_r[r]; }
+        lf_pok = 1U;
+        return;
+    }
+
+    for (r = 0U; r < (uint8_t)CAM_H; r++)
+    {
+        uint8_t l  = cam_bound[r];
+        uint8_t rr = cam_bound_r[r];
+
+        if ((l != 0xFFU) && (lf_pl[r] != 0xFFU) &&
+            (LF_ABS((int32_t)l - (int32_t)lf_pl[r]) <= 4))
+        {
+            l = (uint8_t)(((int32_t)l * 3 + (int32_t)lf_pl[r]) / 4);
+        }
+        if ((rr != 0xFFU) && (lf_pr[r] != 0xFFU) &&
+            (LF_ABS((int32_t)rr - (int32_t)lf_pr[r]) <= 4))
+        {
+            rr = (uint8_t)(((int32_t)rr * 3 + (int32_t)lf_pr[r]) / 4);
+        }
+
+        cam_bound[r]   = l;
+        cam_bound_r[r] = rr;
+        lf_pl[r] = l;
+        lf_pr[r] = rr;
     }
 }
 #endif
@@ -2561,6 +2631,7 @@ void board_cam_analyze (void)
     lf_trace_left_8();                        /* 左边界 */
     lf_trace_right_8();                       /* 右边界 */
     lf_dual_fixup();                          /* ★ 双边互校正：补边 + 宽度异常剔除 */
+    lf_temporal();                            /* ★ 时域平滑：抑制逐帧 1~2px 抖动 */
     /* 中线 = (左 + 右) / 2；任一边没找到就置 0xFF */
     for (r = 0U; r < (uint32_t)CAM_H; r++)
     {
