@@ -69,6 +69,33 @@ def score_vert(buf, w, h):
     return tot // max(h - 1, 1)
 
 
+def edge_overlay(im, h, edges, scale):
+    """把板子发来的「左右边界数组」画成**红线**（纯显示，不做任何转向判断）
+
+    edges[r] = (左x, 右x)；None = 这一行板子没找到边界
+      · 相邻两行都有效、且横向差 ≤12 ⇒ 连一条红线（差太大就不连，免得一道线横穿画面）
+      · 每行再点一个 scale×scale 的红方块 ⇒ 孤立行（两侧都断）也看得见
+    """
+    d = ImageDraw.Draw(im)
+    S = scale
+    wd = max(2, S // 2)
+
+    for side in (0, 1):                    # 0 = 左边界   1 = 右边界
+        prev = None
+        for r in range(min(h, len(edges))):
+            x = edges[r][side]
+            if x is None:
+                prev = None                # 这一行没找到 ⇒ 红线在这里断开
+                continue
+            px = x * S + S // 2
+            py = r * S + S // 2
+            if (prev is not None) and (abs(x - prev[0]) <= 12):
+                d.line([(prev[1], prev[2]), (px, py)], fill=(255, 0, 0), width=wd)
+            d.rectangle([x * S, r * S, x * S + S - 1, r * S + S - 1], fill=(255, 0, 0))
+            prev = (x, px, py)
+    return im
+
+
 class Frame(object):
     """一个"极性组"对应一张正在拼的图"""
     def __init__(self, w, h, pol):
@@ -102,6 +129,14 @@ class Viewer(object):
         self.t_fps = 0.0
         self.n_fps = 0
         self.bounds = None                  # ★ 每行的亮/暗交界列（板子算好发来，这里只画）
+        # ★★ 2026-11-05：板子八邻域巡线算出来的左右边界，整包发来，PC **只画红线** ★★
+        #    self.edges      = 最近一包：[(左x, 右x), ...]，None = 这一行没找到（画线时断开）
+        #    self.shot_edges = 正在显示的那张图对应的一包（图像和线就不会错位）
+        self.edges = None
+        self.shot_edges = None
+        self.edge_pkts = 0                  # 收到几包（校验通过）
+        self.edge_nl = 0                    # 最近一包左边界有效行数
+        self.edge_nr = 0                    # 最近一包右边界有效行数
         self.t_last = 0.0
         self.t_draw = 0.0
         self.root = None
@@ -184,12 +219,23 @@ class Viewer(object):
             self.shot = (w, h, pol, bytes(f.buf))   # 快照：板子之后再怎么写都不影响这张
             self.draw()
 
+    # ---------------------------------------------------------------- 边界数组
+    def on_edges(self, edges):
+        """★ 板子发来的「左右边界数组」（八邻域巡线的结果）
+           这里**只画**，不做任何转向判断 —— 用户要求先不做左右转 ✓"""
+        self.edge_pkts += 1
+        self.edge_nl = sum(1 for e in edges if e[0] is not None)
+        self.edge_nr = sum(1 for e in edges if e[1] is not None)
+        self.edges = edges
+        self.shot_edges = edges             # 立刻挂到当前这张图上并重画
+        self.draw(force=True)               # ★ force：不等 16ms 节流，线和图必须同一帧
+
     # ---------------------------------------------------------------- 显示
-    def draw(self):
+    def draw(self, force=False):
         if self.shot is None:               # ★ 还没有"完整一帧" ⇒ 什么都不画（旧图继续挂着）
             return
         now = time.time()
-        if (now - self.t_draw) * 1000.0 < DRAW_MIN_MS:
+        if (not force) and ((now - self.t_draw) * 1000.0 < DRAW_MIN_MS):
             return
         self.t_draw = now
 
@@ -205,48 +251,16 @@ class Viewer(object):
 
             im = im.resize((w * SCALE, h * SCALE), Image.NEAREST)
 
-            # ★ 帧率已由单片机画进图像；这里只额外叠一条**红色左边界**
-            #   算法与 MCU 的 board_cam_analyze() 一致：从 c=1 往右扫，找第一个
-            #   「与左邻不同、自身与右侧连续 2 像素相同」的列（0xFF = 该行没找到）
+            # ★★★ 左右边界线：**板子八邻域巡线算好的点**，这里只负责画成红线 ★★★
+            #   🔑 2026-11-05 改：以前这里是**PC 自己**按"从中间往左扫、上行±20"重算一遍边界
+            #      ⇒ 屏幕上那条红线和板子真正在用的边界其实是两套东西（会看到"线在图上，
+            #        但板子的判断和它不一致"）。现在板子把 120 对 (左x, 右x) 整包发来
+            #      （0xFD 包），PC 只画 —— 这样**看到的线 = 单片机实际用的线** ✓
+            #   0xFF（这里转成 None）= 这一行没找到边界 ⇒ 线在那一行断开，不瞎连 ✓
             try:
-                # ★ 与 MCU 一致：从最底行往上"跟线"，每行只在上行边界 ±12 内找
-                #   （不能每行独立从最左边扫 —— 背景里一块白就会把边界拽走）
-                bnd = [0xFF] * h
-                prev = -1
-                for r in range(h - 1, -1, -1):
-                    base = r * w
-                    b = 0xFF
-                    if prev < 0:
-                        hi, lo = w // 2, 2
-                    else:
-                        hi, lo = min(prev + 20, w - 3), max(prev - 20, 2)
-                    for c in range(hi, lo - 1, -1):
-                        if buf[base + c] == 255 and buf[base + c - 1] == 0:
-                            b = c
-                            break
-                    bnd[r] = b
-                    if b != 0xFF:
-                        prev = b
-
-                im = im.convert('RGB')
-                _d = ImageDraw.Draw(im)
-                S = SCALE
-                wd = max(2, S // 2)
-
-                for r in range(1, h):                 # 相邻行连线 ⇒ 斜边也连续
-                    b0, b1 = bnd[r - 1], bnd[r]
-                    if b0 == 0xFF or b1 == 0xFF:
-                        continue
-                    if abs(b1 - b0) > 10:             # 跳变太大不连
-                        continue
-                    lo, hi = (b0, b1) if b0 <= b1 else (b1, b0)
-                    _d.line([(lo * S, r * S + S // 2), (hi * S + S - 1, r * S + S // 2)],
-                            fill=(255, 0, 0), width=wd)
-
-                for r, b in enumerate(bnd):           # 每行的点（孤立行也能看见）
-                    if b != 0xFF:
-                        _d.rectangle([b * S, r * S, b * S + S - 1, r * S + S - 1],
-                                     fill=(255, 0, 0))
+                if self.shot_edges:
+                    im = im.convert('RGB')
+                    edge_overlay(im, h, self.shot_edges, SCALE)
             except Exception:
                 pass
 
@@ -256,9 +270,10 @@ class Viewer(object):
             #     ER  = DCMI 看门狗**重启过几次**（低 8 位）
             #     PIN = 活引脚电平： bit3=PA6(PCLK) bit2=PB7(VSYNC) bit1=**PA4(HREF)** bit0=PC6(D0)
             _v = getattr(self, 'bpl', 0)          # 解析器把 byte8/byte9 拼成了它
-            self.root.title('small_car 图传  极性=%d  ER=%d  PIN=%X  完整帧 %d  FPS=%.1f  行 好%d/坏%d  %dx%d'
+            self.root.title('small_car 图传  极性=%d  ER=%d  PIN=%X  完整帧 %d  FPS=%.1f  行 好%d/坏%d  边包 %d (L%d/R%d)  %dx%d'
                             % (pol, (_v >> 8) & 0xFF, _v & 0xFF,
-                               self.nframe, self.fps, self.okrows, self.badrows, w, h))
+                               self.nframe, self.fps, self.okrows, self.badrows,
+                               self.edge_pkts, self.edge_nl, self.edge_nr, w, h))
             self.root.update()
 
             # ★★ 每 1.2 秒把"PC 拼出来的整帧"按**极性组号**存一张 PNG ★★
@@ -471,6 +486,30 @@ def run():
                     if len(buf) < 12:
                         break                       # 包头还没收全
                     row, w, pol, h = buf[4], buf[5], buf[6], buf[7]
+
+                    # ★★ 边界数组包（row=0xFD）★★
+                    #    载荷 = 每行 [左边界x][右边界x]；0xFF = 这一行没找到
+                    #    🔑 这是**板子八邻域巡线的结果**，PC 只负责画红线（不再自己扫）
+                    if row == 0xFD:
+                        if len(buf) < 14:
+                            break
+                        elen  = (buf[8] << 8) | buf[9]
+                        erows = buf[5]
+                        need  = 12 + elen + 2
+                        if len(buf) < need:
+                            break
+                        pay = bytes(buf[12:12 + elen])
+                        ck2 = sum(pay) & 0xFFFF
+                        if ((buf[12 + elen] << 8) | buf[12 + elen + 1]) == ck2:
+                            ed = []
+                            for rr in range(min(erows, elen // 2)):
+                                l  = pay[2 * rr]
+                                r2 = pay[2 * rr + 1]
+                                ed.append((None if l  >= 188 else l,
+                                           None if r2 >= 188 else r2))
+                            v.on_edges(ed)
+                        del buf[:need]
+                        continue
 
                     # ★★ 边界行包（row=0xFE）：载荷 = 每行的亮/暗交界列
                     #    **单片机已经算好**，这里只存下来画蓝线 ✓（pkt[9] = Otsu 阈值）

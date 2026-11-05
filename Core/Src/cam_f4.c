@@ -2588,43 +2588,11 @@ static void lf_temporal (void)
 }
 #endif
 
-/* ★★★ 在图像上标出左右两条寻线：边界"外侧 3 个像素"涂白 ★★★
-   左边界 cam_bound[r]  ：赛道在右、背景在左 ⇒ 外侧 = x-1, x-2, x-3（往左）
-   右边界 cam_bound_r[r]：赛道在左、背景在右 ⇒ 外侧 = x+1, x+2, x+3（往右）
-   ⇒ 白点落在**黑色背景**上，和白色赛道分得开，一眼能看出来。
-   （逐飞助手是 1bit 黑白图，没法画彩色线，所以在图里涂白最直接） */
-#define LF_EDGE_MARK_PX     3
-
-static void lf_draw_edge_marks (void)
-{
-    uint16_t r;
-    int16_t  x, k, xx;
-
-    for (r = 0U; r < (uint16_t)CAM_H; r++)
-    {
-        /* ★ 只在"真实爬到过"的行画标记（lf_real_*）：
-           种子以下爬不到、只能沿用旧值的行不画，避免出现两条竖直的长方形。*/
-        if (0xFFU != cam_bound[r] && 0U != lf_real_l[r])   /* 左边界：往左涂 */
-        {
-            x = (int16_t)cam_bound[r];
-            for (k = 1; k <= LF_EDGE_MARK_PX; k++)
-            {
-                xx = (int16_t)(x - k);
-                if ((xx >= 0) && (xx < (int16_t)CAM_TXW)) { disp_img[r][xx] = 255U; }
-            }
-        }
-
-        if (0xFFU != cam_bound_r[r] && 0U != lf_real_r[r]) /* 右边界：往右涂 */
-        {
-            x = (int16_t)cam_bound_r[r];
-            for (k = 1; k <= LF_EDGE_MARK_PX; k++)
-            {
-                xx = (int16_t)(x + k);
-                if ((xx >= 0) && (xx < (int16_t)CAM_TXW)) { disp_img[r][xx] = 255U; }
-            }
-        }
-    }
-}
+/* ★★★ 2026-11-05：**图像里不再涂白标记** ★★★
+   原来的做法是在边界外侧涂 3 个白像素（逐飞助手那种 1bit 图只能这么画）。
+   现在左右边界**整包发给上位机**（见 app.c 的 `cam_send_edges()`），
+   由上位机用**红线**画出来 ⇒ 板子保持"纯二值图"，红线不会和白色赛道混在一起 ✓
+   （那两个"竖直长方形"也就彻底没有了 —— 那是补行涂白造成的）*/
 
 void board_cam_analyze (void)
 {
@@ -2682,7 +2650,7 @@ void board_cam_analyze (void)
         }
     }
 
-    lf_draw_edge_marks();                     /* ★ 左右边界外侧各涂 3 像素白（八邻域画线）*/
+    /* ★ 左右边界留在 cam_bound[] / cam_bound_r[] 里，由 app.c 打包发给上位机画红线 */
 #else
 /* ③ 从下往上"跟线"找左边界 ★★★
        ⚠️ 不能每行独立"从最左边扫"：背景里只要有一块白（墙/纸/反光），

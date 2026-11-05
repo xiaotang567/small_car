@@ -119,13 +119,19 @@ static void cam_cmd_status (void)
 {
     char b[140];
 
-    sprintf(b, "CFG f=%u g=%u x=%u y=%u (%ux%u) d=%u CST=%u RV=%06lX LINE=%u\r\n",
+    /* ★ 2026-11-05：后面加上 FW / EDG / EL / ER ——
+       FW  = 固件标签（烧的是不是这一版，一眼确认，不用翻心跳）
+       EDG = 已经发出去几包"左右边界数组"（0xFD）；**在涨 ⇒ 新固件在发** ✓
+       EL/ER = 最近一包里左/右边界各有几行有效（120 = 整幅都爬到了）✓ */
+    sprintf(b, "CFG f=%u g=%u x=%u y=%u (%ux%u) d=%u CST=%u RV=%06lX LINE=%u FW=2060 EDG=%lu EL=%u ER=%u\r\n",
             (unsigned)cam_cmd_fps, (unsigned)cam_cmd_gap_ms,
             (unsigned)cam_cmd_dx, (unsigned)cam_cmd_dy,
             (unsigned)(CAM_TXW / cam_cmd_dx), (unsigned)(CAM_H / cam_cmd_dy),
             (unsigned)cam_dbg_level,
             (unsigned)cam_cfg_state, (unsigned long)(cam_cfg_ver & 0xFFFFFFUL),
-            (unsigned)cam_cfg_line_state());
+            (unsigned)cam_cfg_line_state(),
+            (unsigned long)cam_edge_pkt_cnt,
+            (unsigned)cam_edge_l_cnt, (unsigned)cam_edge_r_cnt);
     cmd_txt(b);
 }
 

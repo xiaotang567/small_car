@@ -33,6 +33,12 @@ extern volatile uint32_t cam_rx_bytes;
 extern volatile uint8_t  cam_rx_dump[32];
 extern volatile uint32_t cam_rx_dump_i;
 
+/* ★ 边界数组包（0xFD）的发送统计：上位机 `s` 里回 EL/ER/EDG，
+   用来确认"新固件在发边界数组"+"这一帧左右各爬到多少行"（不用看图也能判断） */
+extern uint32_t          cam_edge_pkt_cnt;
+extern uint8_t           cam_edge_l_cnt;
+extern uint8_t           cam_edge_r_cnt;
+
 void cam_cmd_poll (void);
 void app_loop     (void);
 

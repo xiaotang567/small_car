@@ -282,6 +282,61 @@ static void vofa_send_frame (void)
     }
 }
 
+/* ★★★ 左右边界数组包（0xFD）—— 把八邻域巡线的结果**原样**发给上位机 ★★★
+   包格式（和整帧包同一个魔数，上位机按长度切 ⇒ 丢包只会丢这一包，不会错位）：
+     magic(4) | 0xFD | 行数 | 保留 | CAM_H | 长度高 | 长度低 | 载荷 | 校验高 低
+     载荷 = 每行 2 字节：[左边界x][右边界x]     0xFF = 这一行没找到
+   ⇒ 上位机把 120 对坐标连成**两条红线**（左/右各一条），自己不再扫边界 ✓
+   ⇒ 板子这边不做任何转向判断（用户要求先不做），只把点发出去 ✓
+
+   代价：240 字节 ≈ 链路一帧里一个块的 6%，20fps 下多约 5KB/s，可以忽略。
+   时间：这一包**紧跟整帧包**发，发不出去就丢掉（下一帧还有一包），绝不重试/死等。
+   ⚠️ 必须在 `cam_tx_row_done()` 里"清 disp_hold **之前**"发：那之后收割会立刻
+      重新填 disp_img、下一帧还会重算边界 ⇒ 先把 120 对坐标拷进 epkt 再发。 */
+static uint8_t  cam_edge_pkt[12U + 2U * 120U + 2U];
+uint32_t        cam_edge_pkt_cnt = 0U;      /* 成功发出去几包（上位机 `s` 里能看） */
+uint8_t         cam_edge_l_cnt   = 0U;      /* 这一包里有几行左边界有效 */
+uint8_t         cam_edge_r_cnt   = 0U;      /* 这一包里有几行右边界有效 */
+
+static void cam_send_edges (void)
+{
+    uint16_t len = 0U, r, ck = 0U;
+
+    cam_edge_pkt[0] = 0xAA; cam_edge_pkt[1] = 0x55;
+    cam_edge_pkt[2] = 0xA5; cam_edge_pkt[3] = 0x5A;
+    cam_edge_pkt[4] = 0xFD;                       /* 包类型：边界数组 */
+    cam_edge_pkt[5] = (uint8_t)CAM_H;             /* 行数 */
+    cam_edge_pkt[6] = 0x00;                       /* 保留 */
+    cam_edge_pkt[7] = (uint8_t)CAM_H;
+
+    cam_edge_l_cnt = 0U;
+    cam_edge_r_cnt = 0U;
+
+    for (r = 0U; r < (uint16_t)CAM_H; r++)
+    {
+        uint8_t l  = cam_bound[r];
+        uint8_t rr = cam_bound_r[r];
+
+        if (l >= (uint8_t)CAM_TXW)  { l  = 0xFFU; } else { cam_edge_l_cnt ++; }
+        if (rr >= (uint8_t)CAM_TXW) { rr = 0xFFU; } else { cam_edge_r_cnt ++; }
+
+        cam_edge_pkt[12U + len] = l;  len ++;
+        cam_edge_pkt[12U + len] = rr; len ++;
+    }
+
+    cam_edge_pkt[8] = (uint8_t)(len >> 8);
+    cam_edge_pkt[9] = (uint8_t)len;
+
+    for (r = 0U; r < len; r++) { ck = (uint16_t)(ck + cam_edge_pkt[12U + r]); }
+    cam_edge_pkt[12U + len]       = (uint8_t)(ck >> 8);
+    cam_edge_pkt[12U + len + 1U]  = (uint8_t)ck;
+
+    if (0U == wifi_f4_send(cam_edge_pkt, (uint32_t)(12U + len + 2U)))
+    {
+        cam_edge_pkt_cnt ++;
+    }
+}
+
 static void cam_tx_row_done (void)
 {
     uint16_t txh = (uint16_t)((uint16_t)CAM_H / (uint16_t)cam_cmd_dy);
@@ -292,6 +347,11 @@ static void cam_tx_row_done (void)
     {
         // ★ 边界包已取消（用户要求不画蓝线）⇒ 不再发 0xFE 包，省 132 字节/帧 ✓
         //   二值化仍然在 board_cam_analyze() 里做（Otsu 那部分保留）✓
+        //
+        // ★★★ 2026-11-05：整帧发完，**紧跟一包"左右边界数组"** ★★★
+        //   必须在这里发（disp_hold 还冻着 ⇒ disp_img / cam_bound 都还是这一帧的）；
+        //   等下面 `disp_hold = 0` 之后收割就重新开始了。
+        if (0U == SEND_MODE_VOFA) { cam_send_edges(); }
         cam_tx_row  = 0U;
         disp_hold   = 0U;                       // 解冻
         cam_phase   = 0U;                       // 回"歇"
@@ -641,7 +701,7 @@ void app_loop (void)
         //     MD  = 当前采集模式（0 = 752 宽 / 1 = 188 宽）
         //     BIN = 188×120 配置是否成功（1 = 已写并回读一致）
         //     R0D/R0E = 两个 Read Mode 寄存器的**回读值**（列 bin 在 R0D[3:2]、行 bin 在 R0E[1:0]）
-        sprintf(buf, "S f=%lu V=%lu VS=%lu LG=%lu TO=%lu F=%u FL=%u P=%u RX=%lu CAM=%u ID=%04X N=%u MD=%u BIN=%u R0D=%04X W=%u E=%u K=%lu R=%04lX IE=%04lX MI=%04lX LW=%lu GP=%lu FW=2059 RST=%02lX PC=%08lX CF=%04lX BA=%08lX\r\n",
+        sprintf(buf, "S f=%lu V=%lu VS=%lu LG=%lu TO=%lu F=%u FL=%u P=%u RX=%lu CAM=%u ID=%04X N=%u MD=%u BIN=%u R0D=%04X W=%u E=%u K=%lu R=%04lX IE=%04lX MI=%04lX LW=%lu GP=%lu FW=2060 RST=%02lX PC=%08lX CF=%04lX BA=%08lX\r\n",
                 (unsigned long)cam_frame_cnt, (unsigned long)cam_vsync_isr_cnt,
                 (unsigned long)cam_vs_cap_cnt,
                 (unsigned long)disp_lag_max,
