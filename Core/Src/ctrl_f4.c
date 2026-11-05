@@ -1077,15 +1077,18 @@ void ctrl_oled_hello (void)
 
 //===================================================★ OLED 状态页（WiFi / MPU / 编码器 / 转速）===================================================
 //   布局（2 倍字，每行占两页，共 4 行 = 8 页）：
-//       page 0-1  WiFi OK / ER      page 2-3  MPU OK / NO
+//       page 0-1  WiFi OK / E<n>    page 2-3  MPU OK / <whoami>
 //       page 4-5  ENC 01234         page 6-7  RPM  123
 //   ★ 只在**内容变了**的时候重画，而且**每个 20ms 控制拍只重画一行**：
 //     一行 2 页 ≈ 8.6ms（250kHz 软 I2C）⇒ 摊开后主循环最多被按 8.6ms，
 //     摄像头环形缓冲能存 80ms，不会丢帧。
+//   ⚠️ 2026-11-05 踩坑：第一版让"hello world"先显示 1 秒再由主循环切到状态页，
+//      但 `ctrl_all_init()` 是在 `wifi_f4_init()` **之前**跑的，而后者最长会阻塞几十秒
+//      ⇒ 这段时间里主循环根本没转 ⇒ 屏幕一直停在 hello。
+//      ⇒ 现在**开机就直接画状态页**（`ctrl_oled_first_page()`，只在开机画一次），不再等主循环。
 static char     g_oled_line[4][20];
 static uint8_t  g_oled_dirty  = 0U;
 static uint32_t g_oled_t_txt  = 0U;
-static uint8_t  g_oled_boot   = 0U;      /* 开机先让 "hello world" 显示 1 秒 */
 
 static void oled_line_set (uint8_t i, const char *s)
 {
@@ -1109,31 +1112,54 @@ static void oled_pad (char *b)
     b[n] = 0;
 }
 
-void ctrl_oled_status (void)
+/* 重新生成 4 行文字（内容变了才标 dirty） */
+static void oled_text_update (void)
 {
     char b[20];
+
+    if (0U != wifi_f4_is_ready()) { sprintf(b, "WiFi OK"); }
+    else if (0U == wifi_f4_last_err()) { sprintf(b, "WiFi --"); }   /* 还在初始化（模块没报错）*/
+    else                          { sprintf(b, "WiFi E%u", (unsigned)wifi_f4_last_err()); }
+    oled_pad(b); oled_line_set(0U, b);
+
+    if (0U != g_imu_ok) { sprintf(b, "MPU OK"); }
+    else                { sprintf(b, "MPU %02X", (unsigned)g_imu_who); }
+    oled_pad(b); oled_line_set(1U, b);
+
+    sprintf(b, "ENC %05ld", (long)(g_enc_total % 100000L));
+    oled_pad(b); oled_line_set(2U, b);
+
+    sprintf(b, "RPM %4d", (int)(g_enc_rpm_x10 / 10));
+    oled_pad(b); oled_line_set(3U, b);
+}
+
+/* ★ 开机立刻把 4 行全画出来（约 34ms，只在 `ctrl_all_init()` 里调一次）
+   —— 不能等主循环：`wifi_f4_init()` 可能阻塞几十秒 */
+void ctrl_oled_first_page (void)
+{
+    uint8_t i;
+
+    if (0U == g_oled_ok) { return; }
+
+    oled_text_update();
+    for (i = 0U; i < 4U; i++)
+    {
+        ctrl_oled_text(0U, (uint8_t)(i * 2U), g_oled_line[i], 2U);
+    }
+    g_oled_dirty  = 0U;
+    g_oled_t_txt  = HAL_GetTick();
+}
+
+void ctrl_oled_status (void)
+{
     uint32_t now = HAL_GetTick();
 
     if (0U == g_oled_ok) { return; }
 
-    if (g_oled_boot < 50U) { g_oled_boot ++; return; }      /* 1 秒后再盖掉 hello */
-
     if ((now - g_oled_t_txt) >= 250U)                        /* 4Hz 更新文字 */
     {
         g_oled_t_txt = now;
-
-        if (0U != wifi_f4_is_ready()) { sprintf(b, "WiFi OK"); oled_pad(b); oled_line_set(0U, b); }
-        else { sprintf(b, "WiFi E%u", (unsigned)wifi_f4_last_err()); oled_pad(b); oled_line_set(0U, b); }
-
-        if (0U != g_imu_ok) { sprintf(b, "MPU OK"); }
-        else                { sprintf(b, "MPU %02X", (unsigned)g_imu_who); }
-        oled_pad(b); oled_line_set(1U, b);
-
-        sprintf(b, "ENC %05ld", (long)(g_enc_total % 100000L));
-        oled_pad(b); oled_line_set(2U, b);
-
-        sprintf(b, "RPM %4d", (int)(g_enc_rpm_x10 / 10));
-        oled_pad(b); oled_line_set(3U, b);
+        oled_text_update();
     }
 
     if (0U != g_oled_dirty)                                  /* 每拍最多重画一行（两页） */
@@ -1192,10 +1218,12 @@ void ctrl_all_init (void)
     ctrl_servo_init();
     ctrl_imu_init();
 
-    /* OLED：清屏 + 开机画面 "hello world"（约 40ms，只在开机做一次） */
+    /* OLED：清屏 + **立刻画状态页**（约 40ms，只在开机做一次）
+       ⚠️ 必须在这里画，不能等主循环：`ctrl_all_init()` 之后紧接着就是
+          `wifi_f4_init()`，它最长会阻塞几十秒，那段时间主循环根本不在转。 */
     ctrl_oled_init();
     ctrl_oled_clear();
-    ctrl_oled_hello();
+    ctrl_oled_first_page();
 
     ctrl_speed_init();
 }

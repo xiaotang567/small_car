@@ -149,6 +149,10 @@ uint8_t  ctrl_oled_ok (void);              /* 1 = 总线上真的有 OLED（初�
 /* 状态页（4 行 2 倍字）：WiFi 状态 / MPU 状态 / 编码器累计 / 转速
    ★ 4Hz 更新文字、每 20ms 最多重画一行 ⇒ 不会长时间按住主循环 */
 void     ctrl_oled_status (void);
+/* ★ 开机立刻整页刷一次（在 ctrl_all_init() 里调）：
+   主循环要等 wifi_f4_init() 返回（最长几十秒）才开始转，
+   不先画一次的话屏幕会一直停在开机画面上。约 34ms。 */
+void     ctrl_oled_first_page (void);
 
 /* ---------- 按键 / 蜂鸣器 ---------- */
 void     ctrl_io_init (void);
