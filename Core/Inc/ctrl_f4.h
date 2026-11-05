@@ -140,6 +140,13 @@ uint8_t  ctrl_yaw_ready (void);            /* 1 = 零偏标定完成 */
 void     ctrl_yaw_reset (void);
 
 /* ---------- OLED（SSD1306 128×64，软 I2C：PB10=SCL PB11=SDA）---------- */
+/* 软 I2C 半周期（µs）。1 ⇒ 约 400~500kHz（SSD1306 上限 400kHz，实测多数模块能吃）；
+   OLED 只用来刷状态页，不涉及时序敏感的外设，快一点肉眼差别很大。
+   ⚠️ 屏幕出现花屏/丢像素就把它改回 2 */
+#define CTRL_OLED_I2C_DELAY_US  1
+/* 状态页文字刷新周期（ms）：100 ⇒ **10Hz**（原来 250ms = 4Hz，看着慢）
+   一行 2 页 ≈ 4ms（400kHz）⇒ 10Hz 下最多占 8% CPU，且每次只堵主循环 4ms */
+#define CTRL_OLED_TEXT_MS       100
 void     ctrl_oled_init (void);
 void     ctrl_oled_clear (void);
 /* 在 (x, page) 用 5×7 字体写字；scale=1 → 6×8 / scale=2 → 12×16（占两页） */

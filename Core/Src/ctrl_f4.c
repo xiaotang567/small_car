@@ -866,7 +866,7 @@ static const uint8_t oled_font5x7[95][5] =
     {0x00,0x41,0x36,0x08,0x00}, {0x08,0x08,0x2A,0x1C,0x08}
 };
 
-static void oled_delay (void) { ctrl_delay_us(CTRL_IMU_I2C_DELAY_US); }
+static void oled_delay (void) { ctrl_delay_us(CTRL_OLED_I2C_DELAY_US); }
 
 static void i2c2_start (void)
 {
@@ -1156,20 +1156,23 @@ void ctrl_oled_status (void)
 
     if (0U == g_oled_ok) { return; }
 
-    if ((now - g_oled_t_txt) >= 250U)                        /* 4Hz 更新文字 */
+    if ((now - g_oled_t_txt) >= CTRL_OLED_TEXT_MS)           /* 10Hz 更新文字 */
     {
         g_oled_t_txt = now;
         oled_text_update();
     }
 
-    if (0U != g_oled_dirty)                                  /* 每拍最多重画一行（两页） */
+    if (0U != g_oled_dirty)                                  /* 有脏行就一次补完（最多 4 行 ≈ 16ms）*/
     {
-        uint8_t i = 0U;
-        while ((i < 4U) && (0U == (g_oled_dirty & (uint8_t)(1U << i)))) { i ++; }
-        if (i < 4U)
+        uint8_t i;
+
+        for (i = 0U; i < 4U; i++)
         {
-            g_oled_dirty = (uint8_t)(g_oled_dirty & (uint8_t)~(uint8_t)(1U << i));
-            ctrl_oled_text(0U, (uint8_t)(i * 2U), g_oled_line[i], 2U);
+            if (0U != (g_oled_dirty & (uint8_t)(1U << i)))
+            {
+                g_oled_dirty = (uint8_t)(g_oled_dirty & (uint8_t)~(uint8_t)(1U << i));
+                ctrl_oled_text(0U, (uint8_t)(i * 2U), g_oled_line[i], 2U);
+            }
         }
     }
 }
