@@ -168,11 +168,9 @@ class Viewer(object):
             ln = ln.rstrip('\r')
             if not ln.strip():
                 continue
-            # ★ 2026-11-05：长度上限 130 → 240。
-            #   原来板子的那行状态 `S f=... FW=...` 有 ~200 字符 ⇒ **被这里整行丢掉**，
-            #   结果"卡住"时控制台什么都看不到（这次排查就卡在这儿）。
-            #   240 仍然能挡住二进制垃圾形成的超长"假文本" ✓
-            if not (len(ln) <= 240 and all(32 <= ord(c) < 127 for c in ln)):
+            # （调试期间临时放到 240 是为了看清那行 ~200 字符的 `S ...` 心跳；
+            #   查出"DMA 停摆"之后就改回 130 ⇒ 控制台恢复静默）
+            if not (len(ln) <= 130 and all(32 <= ord(c) < 127 for c in ln)):
                 continue
 
             self.texts += 1
@@ -633,16 +631,6 @@ def run():
             CUR['conn'] = conn                    # ★ 把这条连接交给"控制台打字"那条线程
             conn.settimeout(1.0)
             buf = bytearray()
-
-            # ★★ 连上就自动问一句状态 ★★
-            #   板子回一行 `CFG ... FW=2060 ...` ⇒ **板子在跑 + 双向链路都通**
-            #   （以前这条线只要不通，控制台就一片安静，根本分不清是哪一侧的问题）
-            try:
-                conn.sendall(b's\n')
-                print('[握手] 已自动发送 "s"，等板子回一行 CFG ...')
-                print('       ⇒ 有 CFG 回来 = 板子和链路都正常；一直没有 = 板子/链路的问题')
-            except Exception:
-                pass
 
             def settle():
                 """收尾：画"等边界包"的帧；必要时丢到下一个魔数重来。
