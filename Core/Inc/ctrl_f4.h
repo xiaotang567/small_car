@@ -139,6 +139,13 @@ float    ctrl_yaw_rate  (void);            /* 去零偏后的角速度（°/s）
 uint8_t  ctrl_yaw_ready (void);            /* 1 = 零偏标定完成 */
 void     ctrl_yaw_reset (void);
 
+/* ---------- OLED（SSD1306 128×64，软 I2C：PB10=SCL PB11=SDA）---------- */
+void     ctrl_oled_init (void);
+void     ctrl_oled_clear (void);
+/* 在 (x, page) 用 5×7 字体写字；scale=1 → 6×8 / scale=2 → 12×16（占两页） */
+void     ctrl_oled_text (uint8_t x, uint8_t page, const char *s, uint8_t scale);
+void     ctrl_oled_hello (void);           /* 开机画面：两行 2 倍字的 hello / world */
+
 /* ---------- 按键 / 蜂鸣器 ---------- */
 void     ctrl_io_init (void);
 uint8_t  ctrl_key (uint8_t idx);           /* idx = 1/2，返回 1 = 按下（低电平有效） */

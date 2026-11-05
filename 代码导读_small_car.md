@@ -463,3 +463,14 @@ h              一行汇总：enc/d/rpm/yaw/ready/state/duty/servo/err/who
 1. 控制相关的一切都**不许阻塞**（舵机发送走中断、IMU 一次 0.3ms、其余纯运算）；
 2. 控制中断优先级**必须低于**摄像头（DCMI/DMA 是 0~2，这里用 6/7）；
 3. 新增控制代码**不许碰** DCMI 那 11 根引脚、DMA2_Stream1、PB7。
+### 14.7 OLED（2026-11-05 晚，FW=2063）
+- 硬件：4 针 SSD1306 128×64，**SCL=PB10 / SDA=PB11**（I2C2 那对脚，但本工程没开 HAL 的 I2C 模块 ⇒ **软件 I2C**）
+- 地址：先试 **0x3C**，不应答再试 **0x3D**（两种批次都有）
+- **不占 RAM 显存**：直接按"页(page) + 列"写，没有 1KB framebuffer（这个工程只剩 2.4KB RAM）
+- 开机画面：ctrl_all_init() 里 oled_init() → clear() → hello()，
+  两行 **2 倍字** "hello" / "world"（5 字符 × 12 = 60 像素，居中在 page 2 和 page 4）
+- 代价：清屏 8 页 × 128 字节 ≈ **37ms**（250kHz 软 I2C），只在开机做一次；
+  之后要刷屏请只刷变化的那几页，别整屏刷
+- API：ctrl_oled_init() / ctrl_oled_clear() / ctrl_oled_text(x, page, "str", scale) / ctrl_oled_hello()
+  （scale=1 → 6×8 字体，scale=2 → 12×16 占两页；字体 5×7 ASCII 32~126 已内置）
+- 不亮时先查：模块是不是 4 针 I2C 版（不是 SPI 版）、 x8D 0x14 电荷泵有没有发出去、地址是 0x3C 还是 0x3D
