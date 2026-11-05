@@ -474,7 +474,7 @@ static uint8_t  g_imu_ok   = 0U;
 static int16_t  g_acc[3]   = {0, 0, 0};
 static int16_t  g_gyr[3]   = {0, 0, 0};
 
-static void i2c_delay (void) { ctrl_delay_us(2U); }     /* 半周期 2µs ⇒ 约 250kHz */
+static void i2c_delay (void) { ctrl_delay_us(CTRL_IMU_I2C_DELAY_US); }
 
 static void i2c_start (void)
 {

@@ -78,6 +78,9 @@
 /* ---- MPU9250 ---- */
 #define CTRL_IMU_ADDR           0x68         /* AD0 接地 = 0x68（原工程硬编码） */
 #define CTRL_IMU_PERIOD_MS      20           /* 多久读一次（原工程约 100ms 读一次，这里 20ms 更好） */
+#define CTRL_IMU_I2C_DELAY_US   2            /* 软 I2C 半周期（µs）：2 ⇒ 约 250kHz。
+                                                ⚠️ 模块板上没有上拉电阻、或杜邦线很长时，
+                                                   读不到 WHO_AM_I（who=00）就把这个改大：4 ⇒ 125kHz，5 ⇒ 100kHz */
 
 /* ---- yaw（照抄原工程 yaw.h 的算法与参数）---- */
 #define CTRL_YAW_TICK_MS        20

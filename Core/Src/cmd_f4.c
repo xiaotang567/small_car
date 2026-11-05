@@ -120,6 +120,16 @@ static const char * cam_cmd_arg2 (const char *s)
     return s;
 }
 
+// 跳到"下一个数字"的起点：跳过空格 + 当前这个数（带不带负号都行）
+//   —— 给车模命令用，`w2000 2000` 和 `w 2000 2000` 两种写法都能认
+static const char * cam_cmd_next (const char *s)
+{
+    while ((*s == ' ') || (*s == '\t')) { s ++; }
+    if ((*s == '-') || (*s == '+'))     { s ++; }
+    while ((*s >= '0') && (*s <= '9'))  { s ++; }
+    return s;
+}
+
 static uint8_t cam_cmd_clamp (uint32_t v, uint8_t lo, uint8_t hi)
 {
     if (v < (uint32_t)lo) { return lo; }
@@ -450,18 +460,21 @@ static void cam_cmd_line (char *s)
            h                一行汇总：编码器 / 转速 / 速度环 / 姿态 / 舵机 / IMU
         =============================================================================== */
         case 'q':
-            v = (uint32_t)cam_cmd_snum(s + 1);
-            if ((int32_t)v >  6000) { v =  6000U; }
-            ctrl_speed_set_target((int16_t)(int32_t)v);
-            sprintf(b, "ACK q: target=%d state=%s\r\n",
-                    (int)ctrl_speed_get_target(), ctrl_speed_state_name());
-            cmd_txt(b);
+            {
+                int32_t r = cam_cmd_snum(s + 1);
+                if (r >  6000) { r =  6000; }
+                if (r < -6000) { r = -6000; }
+                ctrl_speed_set_target((int16_t)r);
+                sprintf(b, "ACK q: target=%d state=%s\r\n",
+                        (int)ctrl_speed_get_target(), ctrl_speed_state_name());
+                cmd_txt(b);
+            }
             return;
 
         case 'w':
             {
                 int32_t d1 = cam_cmd_snum(s + 1);
-                int32_t d2 = cam_cmd_snum(cam_cmd_arg2(s + 1));
+                int32_t d2 = cam_cmd_snum(cam_cmd_next(s + 1));
 
                 ctrl_motor_set(1U, (int16_t)d1);
                 ctrl_motor_set(2U, (int16_t)d2);
