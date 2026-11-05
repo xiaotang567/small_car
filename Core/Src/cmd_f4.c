@@ -148,7 +148,7 @@ static void cam_cmd_status (void)
        DRP = 发送看门狗**主动放弃**的帧数（一直飙 ⇒ 链路/模块发不动）✓
        DST = DMA 停摆看门狗重启采集的次数（>0 ⇒ 采集链卡过，但已经自己救回来了）✓
        SELF= 连续 2 秒没有完整帧 ⇒ 重启采集的次数（和 DST 一起看）✓ */
-    sprintf(b, "CFG f=%u g=%u x=%u y=%u (%ux%u) d=%u CST=%u RV=%06lX LINE=%u FW=2066 EDG=%lu EL=%u ER=%u DRP=%lu DST=%lu SELF=%lu\r\n",
+    sprintf(b, "CFG f=%u g=%u x=%u y=%u (%ux%u) d=%u CST=%u RV=%06lX LINE=%u FW=2067 EDG=%lu EL=%u ER=%u DRP=%lu DST=%lu SELF=%lu\r\n",
             (unsigned)cam_cmd_fps, (unsigned)cam_cmd_gap_ms,
             (unsigned)cam_cmd_dx, (unsigned)cam_cmd_dy,
             (unsigned)(CAM_TXW / cam_cmd_dx), (unsigned)(CAM_H / cam_cmd_dy),
@@ -514,9 +514,27 @@ static void cam_cmd_line (char *s)
             }
             return;
 
+        /* s            = 回状态（落到最后）
+           s 0 / s 1    = 上位机图像模式：0 = 原图（8bit 灰度缩略图 94×60）/ 1 = 二值图（默认）*/
+        case 's':
+            {
+                const char *a = s + 1;
+
+                while (*a == ' ') { a ++; }
+                if (0 == *a) { break; }                 /* 单单一个 s ⇒ 回状态 */
+
+                v = cam_cmd_num(a);
+                cam_view_mode = (uint8_t)((0U == v) ? 0U : 1U);
+                sprintf(b, "ACK s: view=%u (%s)\r\n", (unsigned)cam_view_mode,
+                        (0U == cam_view_mode) ? "GRAY 94x60" : "BIN 188x120");
+                cmd_txt(b);
+            }
+            return;
+
         case '?':
             cmd_txt("CMD f<n> g<ms> x<n> y<n> a s b<n> v c<cmd> <val> i p ?\r\n");
             cmd_txt("CAR q<rpm> speed-loop  w<d1> <d2> open-loop  r<pos> servo  l clr-enc  h status\r\n");
+            cmd_txt("IMG s 0 = gray 94x60   s 1 = binary 188x120\r\n");
             return;
 
         default:

@@ -48,6 +48,10 @@ extern uint32_t          cam_tx_drop;
    ⇒ 正常时恒 0；一直涨 = 采集链真的有问题（配合 board_f4.h 的 cam_dma_stall 看） */
 extern uint32_t          cam_self_heal;
 
+/* ★ 上位机"原图 / 二值图"开关：0 = 发 8bit 灰度缩略图（94×60），1 = 发位打包二值整帧（默认）
+   命令：`s 0` / `s 1` */
+extern uint8_t           cam_view_mode;
+
 void cam_cmd_poll (void);
 void app_loop     (void);
 

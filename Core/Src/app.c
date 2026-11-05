@@ -40,6 +40,15 @@ static uint32_t cam_t_p2      = 0;       // ★ 进相 2（开始发这一帧）
 uint32_t        cam_tx_drop   = 0U;      // ★ 因为发不出去而**主动放弃**的帧数（CFG 里的 DRP）
 uint32_t        cam_self_heal = 0U;      // ★ 连续 2 秒没有完整帧 ⇒ 重启采集的次数（CFG 里的 SELF）
 
+/* ★★★ 2026-11-06：上位机"原图/二值图"开关 ★★★
+   0 = 发 **8bit 灰度缩略图**（94×60，`0xFC` 包，8 块）
+   1 = 发 **位打包二值整帧**（188×120，`0xFF` 包）—— 默认，就是原来的行为
+   命令：`s 0` / `s 1` */
+uint8_t         cam_view_mode = 1U;
+
+static void cam_send_edges (void);
+static void cam_send_gray (void);
+
 
 static uint8_t cam_tx_tick (uint32_t now)
 {
@@ -144,6 +153,26 @@ static uint8_t cam_tx_tick (uint32_t now)
 
         if (ready)
         {
+            /* ★★★ 2026-11-06：**原图（灰度）模式** ★★★
+               用户在上位机上点"原图"时（`s 0`），这一帧改成发 8bit 灰度缩略图，
+               不再发位打包的二值整帧。
+               ⚠️ 必须**先发灰度、再** `board_cam_analyze()`：analyze 会把 disp_img **原地二值化**，
+                  发完就再也拿不到灰度了。
+               ⚠️ 这一路**不进相 2**：灰度包在相 1 里一次发完（约 30~50ms，此时 disp_hold=1，
+                  收割是冻住的，不会和采集打架），发完直接回相 0。 */
+            if (0U == cam_view_mode)
+            {
+                cam_send_gray();
+                board_cam_analyze();             // 仍然算边界（原图上也要画红线）
+                cam_send_edges();
+                if (by_timeout) { cam_to_cnt ++; }
+                cam_frz_fill = disp_fill;
+                disp_hold   = 0U;
+                cam_phase   = 0U;
+                cam_t_phase = now;
+                return 0U;
+            }
+
             board_cam_analyze();                 // ★★ 全部在单片机内：Otsu 二值化 + 每行亮/暗交界列 ★★
             if (by_timeout) { cam_to_cnt ++; }   // ★ 没采齐就发 ⇒ 这一幅必有缺陷（心跳里看 TO）
             cam_frz_fill = disp_fill;            // ★ 冻结那一刻实际填了多少行（正常 = 120）
@@ -380,6 +409,63 @@ static void cam_send_edges (void)
     }
 }
 
+/* ★★★ 2026-11-06：**灰度缩略图包（0xFC）**—— 上位机"原图"模式用 ★★★
+   数据 = disp_img（188×120 灰度）做 **2×2 抽取** ⇒ 94×60 的 8bit 缩略图。
+   ⚠️ 必须在 `board_cam_analyze()` **之前**调：分析会把 disp_img 原地二值化。
+
+   为什么分 8 块发：整张 94×60 = 5640 字节，**超过模块一次 SPI 事务的上限 4088**
+   ⇒ 一次发不完会被拆成两块、失败时就是"半个包"⇒ 字节流错位。
+   分块后每块 94×8 = 752 字节 + 包头 14 = 766 字节，**每块都是一个完整事务** ✓
+
+   包格式（沿用同一个魔数，上位机按长度切）：
+     magic(4) | 0xFC | 块号 | 保留 | 本块行数 | 长度高 | 长度低 | 2 预留 | 数据 | 校验高 低
+   一共 8 块，第 8 块只有 4 行（60 = 7×8 + 4）。 */
+#define GRAY_W      94U
+#define GRAY_H      60U
+#define GRAY_ROWS   8U
+
+static void cam_send_gray (void)
+{
+    static uint8_t gp[12U + GRAY_W * GRAY_ROWS + 2U];
+    uint16_t blk;
+
+    for (blk = 0U; blk < 8U; blk++)
+    {
+        uint16_t r0 = (uint16_t)(blk * GRAY_ROWS);
+        uint16_t rows, ri, ci, len = 0U, ck = 0U;
+
+        if (r0 >= GRAY_H) { break; }
+        rows = (uint16_t)(GRAY_H - r0);
+        if (rows > GRAY_ROWS) { rows = GRAY_ROWS; }
+
+        gp[0] = 0xAA; gp[1] = 0x55; gp[2] = 0xA5; gp[3] = 0x5A;
+        gp[4] = 0xFC;                       /* 包类型：灰度缩略图 */
+        gp[5] = (uint8_t)blk;               /* 块号 0..7 */
+        gp[6] = 0U;
+        gp[7] = (uint8_t)rows;              /* 本块几行 */
+
+        for (ri = 0U; ri < rows; ri++)
+        {
+            const uint8_t *src = &disp_img[(uint16_t)(r0 + ri) * 2U][0];
+
+            for (ci = 0U; ci < GRAY_W; ci++)
+            {
+                gp[12U + len] = src[ci * 2U];
+                len ++;
+            }
+        }
+
+        gp[8] = (uint8_t)(len >> 8);
+        gp[9] = (uint8_t)len;
+
+        for (ri = 0U; ri < len; ri++) { ck = (uint16_t)(ck + gp[12U + ri]); }
+        gp[12U + len]      = (uint8_t)(ck >> 8);
+        gp[12U + len + 1U] = (uint8_t)ck;
+
+        if (0U != wifi_f4_send(gp, (uint32_t)(12U + len + 2U))) { break; }   /* 发不动就丢，下一帧还有 */
+    }
+}
+
 static void cam_tx_row_done (void)
 {
     uint16_t txh = (uint16_t)((uint16_t)CAM_H / (uint16_t)cam_cmd_dy);
@@ -423,6 +509,7 @@ void app_loop (void)
     static uint32_t cam_avg = 0;        // 最近一帧的平均亮度
     static uint32_t t_retry = 0;
     static uint32_t t_hb    = 0;
+    static uint32_t t_tel   = 0;         // ★ 遥测行节流（10Hz）
     static uint32_t t_camprobe = 0;      // ★ 自动探测摄像头的节流（见下面那段）
     // ---- 还没连上就每 3 秒自动重试一次 ----
     //   ★ 很关键：wifi_f4_init() 只在开机时连一次 socket。如果那一刻上位机没开，
@@ -726,6 +813,32 @@ void app_loop (void)
         }
     }
 
+    // ==================== ★★ 遥测：10Hz 一行（新上位机的仪表用）★★ ====================
+    //   格式（故意短，别超过 130 字符 —— 上位机的文本行有长度上限）：
+    //     T r=<转速RPM> ax ay az gx gy gz <原始LSB> y=<偏航角, 单位 0.1°> s=<舵机位置> m=<图像模式>
+    //   上位机只按 = 取数，顺序/字段名可以随意加（加新字段要同步改 car_ui.py）
+    if (wifi_f4_is_ready() && ((HAL_GetTick() - t_tel) >= 100U))
+    {
+      static char tb[128];
+      int16_t ax, ay, az, gx, gy, gz;
+      int32_t y10, yi, yf;
+
+      t_tel = HAL_GetTick();
+      ctrl_imu_accel(&ax, &ay, &az);
+      ctrl_imu_gyro(&gx, &gy, &gz);
+
+      y10 = (int32_t)(ctrl_yaw_deg() * 10.0f);
+      yi  = y10 / 10;
+      yf  = (y10 < 0) ? -(y10 % 10) : (y10 % 10);
+
+      sprintf(tb, "T r=%d ax=%d ay=%d az=%d gx=%d gy=%d gz=%d y=%ld.%ld s=%u m=%u\r\n",
+              (int)ctrl_speed_get_rpm(),
+              (int)ax, (int)ay, (int)az, (int)gx, (int)gy, (int)gz,
+              (long)yi, (long)yf,
+              (unsigned)ctrl_servo_get_pos(), (unsigned)cam_view_mode);
+      dbg_txt(tb);
+    }
+
     // ==================== ★ 心跳：每 500ms **无条件**发一条 ★ ====================
     //   🔥 上一版这里是"只在收到摄像头帧时才发"——结果摄像头一出问题，
     //      **一个字节都发不出去**，看起来像"WiFi 挂了"，极难排查。
@@ -749,7 +862,7 @@ void app_loop (void)
         //     MD  = 当前采集模式（0 = 752 宽 / 1 = 188 宽）
         //     BIN = 188×120 配置是否成功（1 = 已写并回读一致）
         //     R0D/R0E = 两个 Read Mode 寄存器的**回读值**（列 bin 在 R0D[3:2]、行 bin 在 R0E[1:0]）
-        sprintf(buf, "S f=%lu V=%lu VS=%lu LG=%lu TO=%lu F=%u FL=%u P=%u RX=%lu CAM=%u ID=%04X N=%u MD=%u BIN=%u R0D=%04X W=%u E=%u K=%lu R=%04lX IE=%04lX MI=%04lX LW=%lu GP=%lu FW=2066 RST=%02lX PC=%08lX CF=%04lX BA=%08lX\r\n",
+        sprintf(buf, "S f=%lu V=%lu VS=%lu LG=%lu TO=%lu F=%u FL=%u P=%u RX=%lu CAM=%u ID=%04X N=%u MD=%u BIN=%u R0D=%04X W=%u E=%u K=%lu R=%04lX IE=%04lX MI=%04lX LW=%lu GP=%lu FW=2067 RST=%02lX PC=%08lX CF=%04lX BA=%08lX\r\n",
                 (unsigned long)cam_frame_cnt, (unsigned long)cam_vsync_isr_cnt,
                 (unsigned long)cam_vs_cap_cnt,
                 (unsigned long)disp_lag_max,
