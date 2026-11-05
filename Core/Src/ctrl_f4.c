@@ -1031,7 +1031,7 @@ void ctrl_oled_init (void)
     gi.Alternate = 0;
     HAL_GPIO_Init(GPIOB, &gi);
     OLED_SCL_H(); OLED_SDA_H();
-    ctrl_delay_us(2000U);
+    ctrl_delay_us(50000U);          /* SSD1306 手册要求上电后等一会儿再发命令（开机只做一次） */
 
     /* 先试 0x3C；没应答（SDA 一直是高）就换 0x3D */
     g_oled_addr = OLED_ADDR_A;
