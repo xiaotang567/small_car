@@ -168,7 +168,11 @@ class Viewer(object):
             ln = ln.rstrip('\r')
             if not ln.strip():
                 continue
-            if not (len(ln) <= 130 and all(32 <= ord(c) < 127 for c in ln)):
+            # ★ 2026-11-05：长度上限 130 → 240。
+            #   原来板子的那行状态 `S f=... FW=...` 有 ~200 字符 ⇒ **被这里整行丢掉**，
+            #   结果"卡住"时控制台什么都看不到（这次排查就卡在这儿）。
+            #   240 仍然能挡住二进制垃圾形成的超长"假文本" ✓
+            if not (len(ln) <= 240 and all(32 <= ord(c) < 127 for c in ln)):
                 continue
 
             self.texts += 1
@@ -630,6 +634,16 @@ def run():
             conn.settimeout(1.0)
             buf = bytearray()
 
+            # ★★ 连上就自动问一句状态 ★★
+            #   板子回一行 `CFG ... FW=2060 ...` ⇒ **板子在跑 + 双向链路都通**
+            #   （以前这条线只要不通，控制台就一片安静，根本分不清是哪一侧的问题）
+            try:
+                conn.sendall(b's\n')
+                print('[握手] 已自动发送 "s"，等板子回一行 CFG ...')
+                print('       ⇒ 有 CFG 回来 = 板子和链路都正常；一直没有 = 板子/链路的问题')
+            except Exception:
+                pass
+
             def settle():
                 """收尾：画"等边界包"的帧；必要时丢到下一个魔数重来。
 
@@ -670,6 +684,9 @@ def run():
 
                 # ★ 收尾：① 把"等边界包"的帧画出来 ② 3 秒没成帧就请求重同步
                 settle()
+                # ★ 数据一直在流时 recv 不会超时 ⇒ 那个分支里的 report 永远不执行
+                #   ⇒ 这里也调一次（内部自己 10 秒节流），保证卡住时控制台一定有话说
+                v.report(len(buf))
     except KeyboardInterrupt:
         pass
     finally:

@@ -37,6 +37,7 @@ static uint8_t  cam_phase     = 0U;      // 0=歇   1=采   2=发
 static uint32_t cam_t_phase   = 0;
 static uint32_t cam_t_p2      = 0;       // ★ 进相 2（开始发这一帧）的时刻：给发送看门狗用
 uint32_t        cam_tx_drop   = 0U;      // ★ 因为发不出去而**主动放弃**的帧数（CFG 里的 DRP）
+uint32_t        cam_self_heal = 0U;      // ★ 连续 2 秒没有完整帧 ⇒ 重启采集的次数（CFG 里的 SELF）
 
 
 static uint8_t cam_tx_tick (uint32_t now)
@@ -65,7 +66,20 @@ static uint8_t cam_tx_tick (uint32_t now)
 
         // `disp_done` 是**锁存**的（收割填满 120 行时置位，并且**同一瞬间已经冻住了画面**）
         //   ⇒ 这里没有任何时序压力：晚一点看到，画面也不会再被改写 ✓
-        if (disp_done) { ready = 1U; }
+        static uint32_t t_done = 0U;            // 上一次看到"完整帧"的时刻
+        if (disp_done) { ready = 1U; t_done = now; }
+        /* ★★★ 2026-11-05 晚2：**2 秒一张完整帧都没有 ⇒ 采集链自愈一次** ★★★
+           用户实测的"上位机收不到图片"：心跳 `f` 还在涨（软件看得见帧首），
+           但 `disp_done` 永远不置位 ⇒ 一张图都发不出去。
+           这种"半死"状态以前只能复位板子；现在每 2 秒重开一次采集
+           （`board_cam_restart()` 内部先 force_stop 再 start，**不死等**）✓
+           正常时 50fps ⇒ 2 秒有 100 帧，绝不会误触发 ✓ */
+        else if ((0U != cam_if_ok) && ((now - t_done) > 2000UL))
+        {
+            t_done = now;
+            cam_self_heal ++;
+            (void)board_cam_restart();
+        }
 
         // ⚠️⚠️ 2026-10-15 修：**超时不再"就这么发出去"**！
         //   旧行为：等不到"采齐"（400ms）就 `ready = 1` ⇒ 把**半新半旧的混合帧**发出去 ✗
@@ -729,7 +743,7 @@ void app_loop (void)
         //     MD  = 当前采集模式（0 = 752 宽 / 1 = 188 宽）
         //     BIN = 188×120 配置是否成功（1 = 已写并回读一致）
         //     R0D/R0E = 两个 Read Mode 寄存器的**回读值**（列 bin 在 R0D[3:2]、行 bin 在 R0E[1:0]）
-        sprintf(buf, "S f=%lu V=%lu VS=%lu LG=%lu TO=%lu F=%u FL=%u P=%u RX=%lu CAM=%u ID=%04X N=%u MD=%u BIN=%u R0D=%04X W=%u E=%u K=%lu R=%04lX IE=%04lX MI=%04lX LW=%lu GP=%lu FW=2060 RST=%02lX PC=%08lX CF=%04lX BA=%08lX\r\n",
+        sprintf(buf, "S f=%lu V=%lu VS=%lu LG=%lu TO=%lu F=%u FL=%u P=%u RX=%lu CAM=%u ID=%04X N=%u MD=%u BIN=%u R0D=%04X W=%u E=%u K=%lu R=%04lX IE=%04lX MI=%04lX LW=%lu GP=%lu FW=2061 RST=%02lX PC=%08lX CF=%04lX BA=%08lX\r\n",
                 (unsigned long)cam_frame_cnt, (unsigned long)cam_vsync_isr_cnt,
                 (unsigned long)cam_vs_cap_cnt,
                 (unsigned long)disp_lag_max,

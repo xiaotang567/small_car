@@ -27,6 +27,7 @@ volatile uint32_t cam_err_cnt     = 0;
 volatile uint32_t cam_vsync_cnt   = 0;
 volatile uint32_t cam_fne_cnt     = 0;
 volatile uint8_t  cam_last_start_err = 0;
+volatile uint32_t cam_dma_stall   = 0;   /* ★ DMA 连续 400ms 一个字节都没搬 ⇒ 重启过几次 */
 
 __attribute__((aligned(4))) uint8_t cam_image[CAM_H][CAM_W];
 void HAL_DCMI_ConvCpltCallback (DCMI_HandleTypeDef *hdcmi_)
@@ -118,6 +119,35 @@ void board_cam_poll (void)
             (void)board_cam_restart();
             nd_last = (uint16_t)(hdma_dcmi.Instance->NDTR & 0xFFFFU);
             nd_tick = HAL_GetTick();
+        }
+    }
+
+    /* ★★★ 2026-11-05 晚2：**DMA 停摆看门狗**（和上面 CROP 那个不是一回事）★★★
+       实测症状（用户报"上位机收不到图片"时的 CAM1 心跳）：
+           ND=22560 一直钉死、f 还在慢慢涨、CR=4021、DEN=1
+       ⇒ DCMI 在收行（LINE 中断有），**DMA 却一个字节都不搬** ⇒ 环形缓冲永远不更新
+       ⇒ `cam_frame_boundary_at()` 算出的帧长恒 0 ⇒ 永远不拷帧 ⇒ 没图，
+         而且**除了复位不会自己好** ✗
+       ⇒ 这里盯 NDTR：连续 400ms 一动不动就重启一次采集
+          （`board_cam_restart()` 内部先 force_stop 再 start，**不会死等**）。
+       ⚠️ 只在"已配置成 188×120"时生效：没配置好之前摄像头本来就没在吐有效数据，
+          重启没意义，还会跟配置流程打架。 */
+    {
+        static uint32_t st_tick = 0U;
+        static uint16_t st_nd   = 0xFFFFU;
+
+        if (nd != st_nd)
+        {
+            st_nd   = nd;
+            st_tick = HAL_GetTick();
+        }
+        else if ((1U == cam_mode) &&
+                 ((HAL_GetTick() - st_tick) > 400U))
+        {
+            cam_dma_stall ++;
+            (void)board_cam_restart();
+            st_nd   = (uint16_t)(hdma_dcmi.Instance->NDTR & 0xFFFFU);
+            st_tick = HAL_GetTick();
         }
     }
 

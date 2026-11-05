@@ -192,6 +192,7 @@ extern volatile uint32_t cam_err_cnt;           // DCMI 报错的次数（同步
 extern volatile uint32_t cam_vsync_cnt;         // 轮询到 **VSYNC 有效** 的次数  ← 最关键
 extern volatile uint32_t cam_fne_cnt;           // 轮询到 **FIFO 非空** 的次数（说明有像素进来）
 extern volatile uint8_t  cam_last_start_err;    // 上一次 HAL_DCMI_Start_DMA 的返回（1=启动就失败）
+extern volatile uint32_t cam_dma_stall;         // ★ DMA 连续 400ms 不动 ⇒ 自动重启过几次（CFG 的 DST）
 
 // 🔥 丈量行宽用：**Δcam_bytes ÷ Δcam_line = 每行字节数**（= 摄像头真实行宽）
 //   —— 有了它就不用再猜 752 / 376 / 188 了。

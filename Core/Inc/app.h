@@ -44,6 +44,10 @@ extern uint8_t           cam_edge_r_cnt;
      一直飙 = 链路/模块有问题 */
 extern uint32_t          cam_tx_drop;
 
+/* ★ 采集自愈：连续 2 秒没有"完整帧"（disp_done）就重启一次 DCMI 的次数（CFG 里的 SELF）
+   ⇒ 正常时恒 0；一直涨 = 采集链真的有问题（配合 board_f4.h 的 cam_dma_stall 看） */
+extern uint32_t          cam_self_heal;
+
 void cam_cmd_poll (void);
 void app_loop     (void);
 
