@@ -26,6 +26,7 @@
 #include <string.h>            /* sprintf */
 #include "wifi_f4.h"          /* 逐飞 WiFi6B21-SPI 模块驱动（F407/HAL 移植版） */
 #include "board_f4.h"         /* 板级：时钟树 168MHz + 总钻风摄像头(DCMI) */
+#include "ctrl_f4.h"          /* 车模控制：电机 / 编码器 / 舵机 / MPU9250 / 速度 PID（从 MSPM0 移植） */
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -135,6 +136,12 @@ int main(void)
   //   MX_DCMI_Init() 已经把 DCMI 外设配好了（8位 / 硬件同步 / VSYNC低有效 / PCLK上升沿），
   //   这里补的是：DMA + 两个中断 + 启动第一帧。
   board_cam_init();
+
+  // ==================== 车模控制（从 MSPM0 工程移植）====================
+  //   电机 TIM2_CH3/4 + DIR、编码器 TIM5 + Z、舵机 UART4、MPU9250 软 I2C、速度 PID / yaw。
+  //   ★ 放在摄像头之后、WiFi 之前：WiFi 初始化最长阻塞 60 秒，电机必须在它之前就已经
+  //     被置成"停"（PWM=0 + DIR=0），否则这 60 秒里车可能会乱动。
+  ctrl_all_init();
 
   // ==================== WiFi 模块：复位 → 连热点 → 连上位机 ====================
   //   ⚠️ 阻塞，最长约 60 秒。⚠️ **上位机（VOFA）要先把 TCP 服务端开着**，否则这一步会失败。

@@ -238,4 +238,20 @@ void TIM6_DAC_IRQHandler(void)
 {
   board_vsync_poll_irq();
 }
+
+/* ★ 2026-11-05：车模控制层（ctrl_f4.c）的两个中断
+   · UART4   = 幻尔总线舵机（PC10=TX / PC11=RX，1Mbps）—— 收/发都走这里，非阻塞
+   · EXTI0   = 编码器 Z 相（PC0）—— 只数圈，不清 CNT（清了会吃掉这一拍的速度增量）*/
+extern void ctrl_uart4_irq(void);
+extern void ctrl_exti0_irq(void);
+
+void UART4_IRQHandler(void)
+{
+  ctrl_uart4_irq();
+}
+
+void EXTI0_IRQHandler(void)
+{
+  ctrl_exti0_irq();
+}
 /* USER CODE END 1 */

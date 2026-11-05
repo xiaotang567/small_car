@@ -11,6 +11,7 @@
 #include "app.h"
 #include "board_f4.h"
 #include "wifi_f4.h"
+#include "ctrl_f4.h"
 #include <stdio.h>
 #include <string.h>
 
@@ -451,6 +452,11 @@ void app_loop (void)
     //      调参时就会"发了半天没反应"，很难判断是命令没到还是参数没作用。
     cam_cmd_poll();
 
+    // ---- ★★ 车模控制节拍（20ms 自己节流）：编码器 / 速度环 / 舵机 / IMU / yaw ★★
+    //   🔑 必须放在主循环里、且**绝不阻塞**：内部所有等待都有上界，
+    //      舵机走中断发送、IMU 一次约 0.3ms、其余都是几次整数运算。
+    board_ctrl_tick();
+
     // ---- ★ 引脚"悬浮/断线"检测（**已关闭**，2026-10-15）----
     //   🔥 遗留问题清理：它会在**开机后 9 秒内**给 DCMI 那 4 根引脚（PCLK/VSYNC/HREF/D0）
     //      轮流加内部上拉/下拉 ⇒ **直接干扰正在进行的采集** ✗
@@ -743,7 +749,7 @@ void app_loop (void)
         //     MD  = 当前采集模式（0 = 752 宽 / 1 = 188 宽）
         //     BIN = 188×120 配置是否成功（1 = 已写并回读一致）
         //     R0D/R0E = 两个 Read Mode 寄存器的**回读值**（列 bin 在 R0D[3:2]、行 bin 在 R0E[1:0]）
-        sprintf(buf, "S f=%lu V=%lu VS=%lu LG=%lu TO=%lu F=%u FL=%u P=%u RX=%lu CAM=%u ID=%04X N=%u MD=%u BIN=%u R0D=%04X W=%u E=%u K=%lu R=%04lX IE=%04lX MI=%04lX LW=%lu GP=%lu FW=2061 RST=%02lX PC=%08lX CF=%04lX BA=%08lX\r\n",
+        sprintf(buf, "S f=%lu V=%lu VS=%lu LG=%lu TO=%lu F=%u FL=%u P=%u RX=%lu CAM=%u ID=%04X N=%u MD=%u BIN=%u R0D=%04X W=%u E=%u K=%lu R=%04lX IE=%04lX MI=%04lX LW=%lu GP=%lu FW=2062 RST=%02lX PC=%08lX CF=%04lX BA=%08lX\r\n",
                 (unsigned long)cam_frame_cnt, (unsigned long)cam_vsync_isr_cnt,
                 (unsigned long)cam_vs_cap_cnt,
                 (unsigned long)disp_lag_max,

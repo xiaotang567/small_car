@@ -12,6 +12,7 @@
 #include "app.h"
 #include "board_f4.h"
 #include "wifi_f4.h"
+#include "ctrl_f4.h"
 #include <stdio.h>
 #include <string.h>
 
@@ -100,6 +101,17 @@ static uint32_t cam_cmd_num (const char *s)
     return v;
 }
 
+// 带符号版本（车模命令要能写 -3000 这种负占空比）
+static int32_t cam_cmd_snum (const char *s)
+{
+    int32_t sign = 1;
+
+    while ((*s == ' ') || (*s == '\t')) { s ++; }
+    if (*s == '-')      { sign = -1; s ++; }
+    else if (*s == '+') { s ++; }
+    return sign * (int32_t)cam_cmd_num(s);
+}
+
 // 跳到第 2 个数字的起点（"c 3 10" 里那个 10）
 static const char * cam_cmd_arg2 (const char *s)
 {
@@ -126,7 +138,7 @@ static void cam_cmd_status (void)
        DRP = 发送看门狗**主动放弃**的帧数（一直飙 ⇒ 链路/模块发不动）✓
        DST = DMA 停摆看门狗重启采集的次数（>0 ⇒ 采集链卡过，但已经自己救回来了）✓
        SELF= 连续 2 秒没有完整帧 ⇒ 重启采集的次数（和 DST 一起看）✓ */
-    sprintf(b, "CFG f=%u g=%u x=%u y=%u (%ux%u) d=%u CST=%u RV=%06lX LINE=%u FW=2061 EDG=%lu EL=%u ER=%u DRP=%lu DST=%lu SELF=%lu\r\n",
+    sprintf(b, "CFG f=%u g=%u x=%u y=%u (%ux%u) d=%u CST=%u RV=%06lX LINE=%u FW=2062 EDG=%lu EL=%u ER=%u DRP=%lu DST=%lu SELF=%lu\r\n",
             (unsigned)cam_cmd_fps, (unsigned)cam_cmd_gap_ms,
             (unsigned)cam_cmd_dx, (unsigned)cam_cmd_dy,
             (unsigned)(CAM_TXW / cam_cmd_dx), (unsigned)(CAM_H / cam_cmd_dy),
@@ -430,8 +442,68 @@ static void cam_cmd_line (char *s)
             cmd_txt(b);
             return;
 
+        /* ==================== ★★ 车模控制（2026-11-05 从 MSPM0 工程移植）★★ ====================
+           q <rpm>          速度环目标（0 = 停；速度环驱动电机 1）
+           w <d1> <d2>      开环直接给两个电机占空比（-10000..+10000，0 0 = 停）
+           r <pos>          舵机位置 0..4095（2048 = 中位；安全限位 1048..3048）
+           l                编码器累计清零
+           h                一行汇总：编码器 / 转速 / 速度环 / 姿态 / 舵机 / IMU
+        =============================================================================== */
+        case 'q':
+            v = (uint32_t)cam_cmd_snum(s + 1);
+            if ((int32_t)v >  6000) { v =  6000U; }
+            ctrl_speed_set_target((int16_t)(int32_t)v);
+            sprintf(b, "ACK q: target=%d state=%s\r\n",
+                    (int)ctrl_speed_get_target(), ctrl_speed_state_name());
+            cmd_txt(b);
+            return;
+
+        case 'w':
+            {
+                int32_t d1 = cam_cmd_snum(s + 1);
+                int32_t d2 = cam_cmd_snum(cam_cmd_arg2(s + 1));
+
+                ctrl_motor_set(1U, (int16_t)d1);
+                ctrl_motor_set(2U, (int16_t)d2);
+                sprintf(b, "ACK w: d1=%d d2=%d\r\n", (int)d1, (int)d2);
+                cmd_txt(b);
+            }
+            return;
+
+        case 'r':
+            v = cam_cmd_num(s + 1);
+            if (v > 4095U) { v = 4095U; }
+            (void)ctrl_servo_set_pos((uint16_t)v);
+            sprintf(b, "ACK r: servo -> %u (now %u)\r\n",
+                    (unsigned)v, (unsigned)ctrl_servo_get_pos());
+            cmd_txt(b);
+            return;
+
+        case 'l':
+            ctrl_encoder_clear();
+            cmd_txt("ACK l: encoder cleared\r\n");
+            return;
+
+        case 'h':
+            {
+                int  yw = (int)ctrl_yaw_deg();
+                int  yf = (int)((ctrl_yaw_deg() - (float)yw) * 10.0f);
+                if (yf < 0) { yf = -yf; }
+                sprintf(b, "ACK h: enc=%ld d=%ld rpm=%d yaw=%d.%d rd=%u st=%s duty=%d srv=%u e=%u who=%02X\r\n",
+                        (long)ctrl_encoder_total(), (long)ctrl_encoder_delta(),
+                        (int)ctrl_speed_get_rpm(),
+                        yw, yf,
+                        (unsigned)ctrl_yaw_ready(),
+                        ctrl_speed_state_name(), (int)ctrl_speed_get_duty(),
+                        (unsigned)ctrl_servo_get_pos(), (unsigned)ctrl_servo_get_err(),
+                        (unsigned)ctrl_imu_whoami());
+                cmd_txt(b);
+            }
+            return;
+
         case '?':
             cmd_txt("CMD f<n> g<ms> x<n> y<n> a s b<n> v c<cmd> <val> i p ?\r\n");
+            cmd_txt("CAR q<rpm> speed-loop  w<d1> <d2> open-loop  r<pos> servo  l clr-enc  h status\r\n");
             return;
 
         default:
