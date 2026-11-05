@@ -145,6 +145,10 @@ void     ctrl_oled_clear (void);
 /* 在 (x, page) 用 5×7 字体写字；scale=1 → 6×8 / scale=2 → 12×16（占两页） */
 void     ctrl_oled_text (uint8_t x, uint8_t page, const char *s, uint8_t scale);
 void     ctrl_oled_hello (void);           /* 开机画面：两行 2 倍字的 hello / world */
+uint8_t  ctrl_oled_ok (void);              /* 1 = 总线上真的有 OLED（初始化时探测到应答）*/
+/* 状态页（4 行 2 倍字）：WiFi 状态 / MPU 状态 / 编码器累计 / 转速
+   ★ 4Hz 更新文字、每 20ms 最多重画一行 ⇒ 不会长时间按住主循环 */
+void     ctrl_oled_status (void);
 
 /* ---------- 按键 / 蜂鸣器 ---------- */
 void     ctrl_io_init (void);

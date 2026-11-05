@@ -10,6 +10,8 @@
 ********************************************************************************************************************/
 
 #include "ctrl_f4.h"
+#include "wifi_f4.h"          /* OLED 状态页要显示 WiFi 连接状态 */
+#include <stdio.h>            /* sprintf */
 #include <string.h>
 
 #define CTRL_APB1_HZ_LOCAL  42000000UL      /* APB1 = 42MHz（板级时钟树，见 board_f4.c） */
@@ -825,6 +827,7 @@ static void speed_tick (void)
 #define OLED_ADDR_B    0x3DU
 
 static uint8_t g_oled_addr = OLED_ADDR_A;
+static uint8_t g_oled_ok   = 0U;        /* 1 = 总线上真有 OLED（初始化时探测的应答）*/
 
 /* 5×7 ASCII 字体（列优先，bit0 = 最上面一行），只放 32~126 共 95 个字符 */
 static const uint8_t oled_font5x7[95][5] =
@@ -898,6 +901,17 @@ static uint8_t i2c2_write (uint8_t b)
     return ack;
 }
 
+/* 探测某个地址有没有应答（0 = 有） */
+static uint8_t i2c2_probe (uint8_t addr)
+{
+    uint8_t ack;
+
+    i2c2_start();
+    ack = i2c2_write((uint8_t)(addr << 1));
+    i2c2_stop();
+    return ack;
+}
+
 /* 发控制字节 + 一串命令/数据 */
 static void oled_send (uint8_t ctrl, const uint8_t *p, uint16_t n)
 {
@@ -927,6 +941,8 @@ void ctrl_oled_clear (void)
 {
     static const uint8_t zero[128] = {0};
     uint8_t page;
+
+    if (0U == g_oled_ok) { return; }
 
     for (page = 0U; page < 8U; page++)
     {
@@ -1033,23 +1049,103 @@ void ctrl_oled_init (void)
     OLED_SCL_H(); OLED_SDA_H();
     ctrl_delay_us(50000U);          /* SSD1306 手册要求上电后等一会儿再发命令（开机只做一次） */
 
-    /* 先试 0x3C；没应答（SDA 一直是高）就换 0x3D */
+    /* 先试 0x3C；不应答再试 0x3D；两个都不应答 ⇒ **没有 OLED**，后面一律不刷（省时间）*/
     g_oled_addr = OLED_ADDR_A;
-    i2c2_start();
-    if (0U != i2c2_write((uint8_t)(g_oled_addr << 1)))
+    if (0U != i2c2_probe(g_oled_addr))
     {
         g_oled_addr = OLED_ADDR_B;
+        if (0U != i2c2_probe(g_oled_addr))
+        {
+            g_oled_ok = 0U;
+            return;
+        }
     }
-    i2c2_stop();
+    g_oled_ok = 1U;
 
     oled_cmds(init_seq, (uint8_t)sizeof(init_seq));
 }
 
+uint8_t ctrl_oled_ok (void) { return g_oled_ok; }
+
 void ctrl_oled_hello (void)
 {
     /* 2 倍字：hello 一行、world 一行，各 5 字符 × 12 = 60 像素，居中 */
+    if (0U == g_oled_ok) { return; }
     ctrl_oled_text((uint8_t)((128U - 60U) / 2U), 2U, "hello", 2U);
     ctrl_oled_text((uint8_t)((128U - 60U) / 2U), 4U, "world", 2U);
+}
+
+//===================================================★ OLED 状态页（WiFi / MPU / 编码器 / 转速）===================================================
+//   布局（2 倍字，每行占两页，共 4 行 = 8 页）：
+//       page 0-1  WiFi OK / ER      page 2-3  MPU OK / NO
+//       page 4-5  ENC 01234         page 6-7  RPM  123
+//   ★ 只在**内容变了**的时候重画，而且**每个 20ms 控制拍只重画一行**：
+//     一行 2 页 ≈ 8.6ms（250kHz 软 I2C）⇒ 摊开后主循环最多被按 8.6ms，
+//     摄像头环形缓冲能存 80ms，不会丢帧。
+static char     g_oled_line[4][20];
+static uint8_t  g_oled_dirty  = 0U;
+static uint32_t g_oled_t_txt  = 0U;
+static uint8_t  g_oled_boot   = 0U;      /* 开机先让 "hello world" 显示 1 秒 */
+
+static void oled_line_set (uint8_t i, const char *s)
+{
+    if (0 != strcmp(s, g_oled_line[i]))
+    {
+        strncpy(g_oled_line[i], s, 19U);
+        g_oled_line[i][19] = 0;
+        g_oled_dirty = (uint8_t)(g_oled_dirty | (uint8_t)(1U << i));
+    }
+}
+
+/* 把一行补空格到 10 个字符（120 像素）：
+   ① 2 倍字 10 字符正好 120 < 128，放得下；
+   ② 长度恒定 ⇒ 上一次长一点的残留（比如 "ENC 12345" 变 "ENC 00042"）
+      一定会被空格覆盖掉，不会留鬼影。 */
+static void oled_pad (char *b)
+{
+    uint8_t n = (uint8_t)strlen(b);
+
+    while (n < 10U) { b[n] = ' '; n ++; }
+    b[n] = 0;
+}
+
+void ctrl_oled_status (void)
+{
+    char b[20];
+    uint32_t now = HAL_GetTick();
+
+    if (0U == g_oled_ok) { return; }
+
+    if (g_oled_boot < 50U) { g_oled_boot ++; return; }      /* 1 秒后再盖掉 hello */
+
+    if ((now - g_oled_t_txt) >= 250U)                        /* 4Hz 更新文字 */
+    {
+        g_oled_t_txt = now;
+
+        if (0U != wifi_f4_is_ready()) { sprintf(b, "WiFi OK"); oled_pad(b); oled_line_set(0U, b); }
+        else { sprintf(b, "WiFi E%u", (unsigned)wifi_f4_last_err()); oled_pad(b); oled_line_set(0U, b); }
+
+        if (0U != g_imu_ok) { sprintf(b, "MPU OK"); }
+        else                { sprintf(b, "MPU %02X", (unsigned)g_imu_who); }
+        oled_pad(b); oled_line_set(1U, b);
+
+        sprintf(b, "ENC %05ld", (long)(g_enc_total % 100000L));
+        oled_pad(b); oled_line_set(2U, b);
+
+        sprintf(b, "RPM %4d", (int)(g_enc_rpm_x10 / 10));
+        oled_pad(b); oled_line_set(3U, b);
+    }
+
+    if (0U != g_oled_dirty)                                  /* 每拍最多重画一行（两页） */
+    {
+        uint8_t i = 0U;
+        while ((i < 4U) && (0U == (g_oled_dirty & (uint8_t)(1U << i)))) { i ++; }
+        if (i < 4U)
+        {
+            g_oled_dirty = (uint8_t)(g_oled_dirty & (uint8_t)~(uint8_t)(1U << i));
+            ctrl_oled_text(0U, (uint8_t)(i * 2U), g_oled_line[i], 2U);
+        }
+    }
 }
 
 //===================================================★ 按键 / 蜂鸣器===================================================
@@ -1151,4 +1247,7 @@ void board_ctrl_tick (void)
     }
 
     servo_poll();
+
+    /* 5) OLED 状态页（没有 OLED 就整个跳过） */
+    ctrl_oled_status();
 }

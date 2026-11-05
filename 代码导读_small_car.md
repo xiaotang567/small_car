@@ -474,3 +474,21 @@ h              一行汇总：enc/d/rpm/yaw/ready/state/duty/servo/err/who
 - API：ctrl_oled_init() / ctrl_oled_clear() / ctrl_oled_text(x, page, "str", scale) / ctrl_oled_hello()
   （scale=1 → 6×8 字体，scale=2 → 12×16 占两页；字体 5×7 ASCII 32~126 已内置）
 - 不亮时先查：模块是不是 4 针 I2C 版（不是 SPI 版）、 x8D 0x14 电荷泵有没有发出去、地址是 0x3C 还是 0x3D
+### 14.8 OLED 状态页（2026-11-05 晚，FW=2064）
+开机先显示 1 秒 "hello world"，然后切成 4 行状态（2 倍字，每行占两页）：
+
+| 页 | 内容 | 说明 |
+|---|---|---|
+| 0-1 | WiFi OK / WiFi E<n> | 
+ = wifi_f4_last_err()（1 模块没应答 / 2 连不上热点 / 3 连不上上位机）|
+| 2-3 | MPU OK / MPU <WHO_AM_I> | 初始化读到的 WHO_AM_I；MPU 00 = 压根没读到（查接线/上拉）|
+| 4-5 | ENC 01234 | 编码器**累计计数**（取模 100000，补零）|
+| 6-7 | RPM  123 | 当前转速（enc_rpm_x10/10，带符号）|
+
+实现要点：
+- ctrl_oled_status() 在 oard_ctrl_tick() 末尾调用；
+- **4Hz（250ms）才重新生成文字**，而且**内容没变就不重画**（strcmp 比较 + dirty 位）；
+- **每个 20ms 控制拍最多重画一行**（2 页 ≈ 8.6ms）⇒ 主循环不会被长时间按住
+  （摄像头环形缓冲能存 80ms，绝不会因此丢帧）；
+- 每行都补空格到 **10 字符 = 120 像素** ⇒ 长度恒定，不会留上一次的"鬼影"；
+- 没有 OLED（0x3C/0x3D 都不应答）⇒ g_oled_ok=0，状态页整个跳过，不浪费任何时间。
