@@ -35,6 +35,8 @@ static uint32_t dcmi_ris = 0U;
 static uint32_t t_vsync_hz = 0U;
 static uint8_t  cam_phase     = 0U;      // 0=歇   1=采   2=发
 static uint32_t cam_t_phase   = 0;
+static uint32_t cam_t_p2      = 0;       // ★ 进相 2（开始发这一帧）的时刻：给发送看门狗用
+uint32_t        cam_tx_drop   = 0U;      // ★ 因为发不出去而**主动放弃**的帧数（CFG 里的 DRP）
 
 
 static uint8_t cam_tx_tick (uint32_t now)
@@ -95,6 +97,12 @@ static uint8_t cam_tx_tick (uint32_t now)
                    ⇒ 板子整个挂住、连心跳都没了（实测 2026-10-19 22:04 那次就是：发了 4 行后 13 分钟无声）✗✗
                    现在只"重开一趟"（不碰硬件）⇒ 即使采集真死了，板子也不会挂，心跳照发 ✓ */
                 board_cam_new_pass();           // 计数/位图清零，重新开始数
+                /* ★★★ 2026-11-05：顺手把"冻结"也解掉 ★★★
+                   如果上一帧在相 2 卡住（发不出去），`disp_hold` 会一直是 1
+                   ⇒ 收割（board_cam_harvest）每一轮都直接返回 ⇒ disp_done 永远不置位
+                   ⇒ 就算链路恢复了，也永远等不到"采齐"⇒ 画面永久定格 ✗
+                   这里无条件解冻：最多是多采一帧，绝不会有坏处 ✓ */
+                disp_hold = 0U;
             }
             t_last_frame = cam_frame_cnt;
 
@@ -128,12 +136,32 @@ static uint8_t cam_tx_tick (uint32_t now)
             disp_hold  = 1U;                     // （正常情况下收割早已自己冻好了，这里是双保险）
             cam_tx_row = 0U;
             cam_t_tx   = now;
+            cam_t_p2   = now;                    // ★ 相 2 的看门狗计时起点（见相 2）
             cam_phase  = 2U;
         }
         return 0U;
     }
 
     // ---------- 相 2：专心发 ----------
+    /* ★★★ 2026-11-05 晚：**发送看门狗**（"运行一段时间卡住"的直接解药）★★★
+       正常一帧：整帧包 2894B ≈ 4~10ms（逐行包 = 行数 × gap）。
+       如果 `wifi_f4_send()` 一直返回"发不出去"（模块卡住 / TCP 窗口满了 / 上位机不收了），
+       旧代码会**永远重试这一帧**，而 `disp_hold` 一直是 1 ⇒ 收割永久停住
+       ⇒ 上位机画面**定格**，只能复位板子 ✗✗
+       ⇒ 现在超过预算就直接**放弃这一帧**：解冻收割、回相 0，下一帧照常开始 ✓
+          （丢一帧没人看得出来，但整条链路不会死）
+       预算 = 300ms + 逐行模式的 2 倍理论发送时间（`g 6` 时 120 行 ≈ 720ms）。*/
+    if ((now - cam_t_p2) > (300UL + (uint32_t)((uint16_t)CAM_H / (uint16_t)cam_cmd_dy)
+                                    * (uint32_t)cam_cmd_gap_ms * 2UL))
+    {
+        cam_tx_row  = 0U;
+        disp_hold   = 0U;                       // 解冻：让收割重新跑起来
+        cam_phase   = 0U;
+        cam_t_phase = now;
+        cam_tx_drop ++;
+        return 0U;
+    }
+
     if ((now - cam_t_tx) >= (uint32_t)cam_cmd_gap_ms)
     {
         cam_t_tx = now;

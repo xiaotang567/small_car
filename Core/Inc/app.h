@@ -39,6 +39,11 @@ extern uint32_t          cam_edge_pkt_cnt;
 extern uint8_t           cam_edge_l_cnt;
 extern uint8_t           cam_edge_r_cnt;
 
+/* ★ 发送看门狗：因为"一帧迟迟发不出去"而主动放弃的帧数（CFG 里的 DRP）
+   ⇒ 板子不会因为某一帧发不动就永久停住；这个数偶尔涨几下是正常的，
+     一直飙 = 链路/模块有问题 */
+extern uint32_t          cam_tx_drop;
+
 void cam_cmd_poll (void);
 void app_loop     (void);
 
