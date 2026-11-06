@@ -134,7 +134,7 @@ class App(object):
         self.root = tk.Tk()
         self.root.title('small_car 控制台')
         self.root.configure(bg=C_BG)
-        self.root.geometry('1180x560')
+        self.root.geometry('1220x880')
         self.build_ui()
         self.refresh_buttons()
         self.update_speed_ui()
@@ -170,9 +170,38 @@ class App(object):
                                  font=('Consolas', 9), anchor='w')
         self.lbl_stat.grid(row=1, column=0, sticky='ew', pady=(6, 0))
 
-        # ---------------- 右：控制台 ----------------
-        right = tk.Frame(root, bg=C_PANEL, padx=10, pady=8)
-        right.grid(row=0, column=1, sticky='nsew')
+        # ---------------- 右：控制台（★ 可滚动）----------------
+        # 右侧面板从"图像源"到"板子回话"一共 6 块，560 高的窗口根本放不下
+        # ⇒ 下面几块（舵机角度 / 其它 / 板子回话）会被挤出屏幕，用户看不到按钮。
+        # 现在套一个 Canvas + Scrollbar，怎么缩放窗口都能滚到。
+        right_outer = tk.Frame(root, bg=C_PANEL)
+        right_outer.grid(row=0, column=1, sticky='nsew')
+        right_outer.rowconfigure(0, weight=1)
+        right_outer.columnconfigure(0, weight=1)
+
+        canvas = tk.Canvas(right_outer, bg=C_PANEL, highlightthickness=0, bd=0)
+        canvas.grid(row=0, column=0, sticky='nsew')
+        sb = tk.Scrollbar(right_outer, orient='vertical', command=canvas.yview)
+        sb.grid(row=0, column=1, sticky='ns')
+        canvas.configure(yscrollcommand=sb.set)
+
+        right = tk.Frame(canvas, bg=C_PANEL, padx=10, pady=8)
+        win = canvas.create_window((0, 0), window=right, anchor='nw')
+
+        def _on_right_conf(e):
+            canvas.configure(scrollregion=canvas.bbox('all'))
+
+        def _on_canvas_conf(e):
+            canvas.itemconfigure(win, width=e.width)
+
+        right.bind('<Configure>', _on_right_conf)
+        canvas.bind('<Configure>', _on_canvas_conf)
+
+        def _on_wheel(e):
+            canvas.yview_scroll(int(-e.delta / 120), 'units')
+
+        canvas.bind_all('<MouseWheel>', _on_wheel)
+
         right.columnconfigure(0, weight=1)
 
         row = 0
