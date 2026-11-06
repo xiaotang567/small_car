@@ -508,19 +508,39 @@ void app_loop (void)
     static uint8_t  cam_max = 0;        // 最近一帧的最亮值
     static uint32_t cam_avg = 0;        // 最近一帧的平均亮度
     static uint32_t t_retry = 0;
+    static uint8_t  relink_n = 0;      /* 连续重连次数，够 3 次就整模块硬复位 */
     static uint32_t t_hb    = 0;
     static uint32_t t_tel   = 0;         // ★ 遥测行节流（10Hz）
     static uint32_t t_camprobe = 0;      // ★ 自动探测摄像头的节流（见下面那段）
     // ---- 还没连上就每 3 秒自动重试一次 ----
     //   ★ 很关键：wifi_f4_init() 只在开机时连一次 socket。如果那一刻上位机没开，
     //     就会永远连不上、一条数据都不发。这里让它自己重连，**上位机后开也能接上**。
+    //   🔥 2026-11-06 二次修复：光重连 socket **救不了"模块数据通路卡死"**——
+    //      现象是上位机控制台反复刷 `[已连接]/[对方断开]`，TCP 连上了但一个字节都不发
+    //      （模块的 INT 一直低 = 一直"忙"，控制命令还能应答，数据通道已经死了）。
+    //      ⇒ 连续重连失败 3 次后**整模块硬复位再连**（wifi_f4_init）。
     if (!wifi_f4_is_ready())
     {
       if ((HAL_GetTick() - t_retry) > 3000)
       {
         t_retry = HAL_GetTick();
-        board_led_show(wifi_f4_retry() ? wifi_f4_last_err() : LED_CODE_READY);
+
+        if (relink_n >= 3U)
+        {
+          relink_n = 0;
+          (void)wifi_f4_init();                 /* 拉 RST + 重新连热点/上位机（阻塞几秒）*/
+          board_led_show(wifi_f4_last_err());
+        }
+        else
+        {
+          relink_n ++;
+          board_led_show(wifi_f4_retry() ? wifi_f4_last_err() : LED_CODE_READY);
+        }
       }
+    }
+    else
+    {
+      relink_n = 0;                             /* 连上了就清计数 */
     }
 
     // ---- 板载 LED 的闪烁节奏（不阻塞）----
@@ -874,7 +894,7 @@ void app_loop (void)
         //     MD  = 当前采集模式（0 = 752 宽 / 1 = 188 宽）
         //     BIN = 188×120 配置是否成功（1 = 已写并回读一致）
         //     R0D/R0E = 两个 Read Mode 寄存器的**回读值**（列 bin 在 R0D[3:2]、行 bin 在 R0E[1:0]）
-        sprintf(buf, "S f=%lu V=%lu VS=%lu LG=%lu TO=%lu F=%u FL=%u P=%u RX=%lu CAM=%u ID=%04X N=%u MD=%u BIN=%u R0D=%04X W=%u E=%u K=%lu R=%04lX IE=%04lX MI=%04lX LW=%lu GP=%lu FW=2081 RST=%02lX PC=%08lX CF=%04lX BA=%08lX\r\n",
+        sprintf(buf, "S f=%lu V=%lu VS=%lu LG=%lu TO=%lu F=%u FL=%u P=%u RX=%lu CAM=%u ID=%04X N=%u MD=%u BIN=%u R0D=%04X W=%u E=%u K=%lu R=%04lX IE=%04lX MI=%04lX LW=%lu GP=%lu FW=2082 RST=%02lX PC=%08lX CF=%04lX BA=%08lX\r\n",
                 (unsigned long)cam_frame_cnt, (unsigned long)cam_vsync_isr_cnt,
                 (unsigned long)cam_vs_cap_cnt,
                 (unsigned long)disp_lag_max,
