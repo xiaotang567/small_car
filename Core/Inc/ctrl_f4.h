@@ -52,7 +52,8 @@
    硬件 4 倍频 ⇒ 每圈计数 = **线数 × 4**。
    ⚠️ 这个数**必须实测**：手动把轮子转整一圈，看 `ctrl_encoder_total()` 涨了多少就填多少。*/
 #define CTRL_ENC_CPR            4096         /* 1024 线 × 4 倍频（先按这个，实测后改） */
-#define CTRL_ENC_DIR_INV        0            /* 1 = 正负反过来 */
+#define CTRL_ENC_DIR_INV        1            /* ★ 2026-11-06：实测"轮子往前转、速度显示负数" ⇒ 置 1 取反
+                                                （A/B 相接反了，改线也行，但软件一行更省事） */
 
 /* ---- 控制周期 ---- */
 #define CTRL_PERIOD_MS          20           /* 速度环 / 姿态积分周期（原工程 ENC_SAMPLE_PERIOD_MS = 20） */

@@ -41,6 +41,12 @@ PORT = int(sys.argv[1]) if len(sys.argv) > 1 else 8086
 
 MAGIC = b'\xAA\x55\xA5\x5A'
 
+# ★ 位打包解包查表：1 字节 → 8 个像素（255/0）。
+#   原来是 120×24×8 = **2.3 万次 Python 循环/帧**，20fps 就把主线程占满
+#   ⇒ 按钮迟钝、收包变慢（TCP 反压 ⇒ 板子那边跟着丢数据）。
+#   查表后每帧只有 2880 次 join，快一个数量级。
+_BIT8 = [bytes(255 if (b >> (7 - k)) & 1 else 0 for k in range(8)) for b in range(256)]
+
 BIN_W, BIN_H = 188, 120        # 二值图
 GRAY_W, GRAY_H = 94, 60        # 灰度缩略图（2×2 抽取）
 VIEW_W, VIEW_H = 752, 480      # 显示尺寸
@@ -113,6 +119,7 @@ class App(object):
         self.dir = +1               # 方向：+1 前进 / -1 后退
         self.ctrl_mode = 'pwm'      # ★ 默认"占空比"方式，滑条默认 30%
         self.presets = PWM_PRESETS
+        self.pending = []           # 等回执的命令（send_ack 用）
         self.warn_zero = False      # 只提示一次"运行但输出 0"
 
         # ---- 窗口 ----
@@ -327,11 +334,47 @@ class App(object):
             self.log('发送失败: %s' % e)
             return False
 
+    # ---------------------------------------------------------------- 命令确认（没回执就重发）
+    def send_ack(self, cmd, pfx, note=None):
+        """发一条**板子会回 ACK** 的命令；0.4s 没回执就重发，最多 3 次。
+        目的是解决"按钮要按很多次才有反应" —— 数据链一忙，命令就可能丢。"""
+        if self.send(cmd, note):
+            self.pending.append({'cmd': cmd, 'pfx': pfx, 't': time.time(), 'n': 2})
+
+    def _ack_seen(self, ln):
+        if not self.pending:
+            return
+        keep = []
+        for p in self.pending:
+            if ln.startswith(p['pfx']):
+                continue
+            keep.append(p)
+        self.pending = keep
+
+    def _check_pending(self):
+        if not self.pending:
+            return
+        now = time.time()
+        for p in list(self.pending):
+            if (now - p['t']) < 0.4:
+                continue
+            if p['n'] > 0:
+                p['n'] -= 1
+                p['t'] = now
+                try:
+                    self.conn.sendall((p['cmd'] + '\n').encode('ascii', 'ignore'))
+                    self.log('… 没等到回执，重发：%s' % p['cmd'])
+                except Exception:
+                    pass
+            else:
+                self.pending.remove(p)
+                self.log('⚠ 命令一直没回执（板子没收到？）：%s' % p['cmd'])
+
     def do_mode(self, binary):
         self.mode_gray = (binary == 0)
         self.shot = None
         self.gray_got = set()
-        self.send('s %d' % binary, '图像 → %s' % ('二值图' if binary else '原图灰度'))
+        self.send_ack('s %d' % binary, 'ACK s', '图像 → %s' % ('二值图' if binary else '原图灰度'))
         self.refresh_buttons()
 
     # ---------------------------------------------------------------- 电机1
@@ -341,9 +384,9 @@ class App(object):
             return
         self.running = False
         if self.ctrl_mode == 'pwm':
-            self.send('w 0 0', '电机1 → PWM 清零')
+            self.send_ack('w 0 0', 'ACK w', '电机1 → PWM 清零')
         else:
-            self.send('q 0', '电机1 → 速度环停止')
+            self.send_ack('q 0', 'ACK q', '电机1 → 速度环停止')
 
         self.ctrl_mode = m
         try:
@@ -371,8 +414,8 @@ class App(object):
         """★ 停止：速度环目标清零 + 两路占空比清零（两种方式都能停）"""
         self.running = False
         self.req_rpm = 0
-        self.send('q 0', '电机1 → 停止')
-        self.send('w 0 0')
+        self.send_ack('q 0', 'ACK q', '电机1 → 停止')
+        self.send_ack('w 0 0', 'ACK w')
         self.update_speed_ui()
 
     def do_dir(self, sign):
@@ -416,10 +459,10 @@ class App(object):
         v = abs(int(self.sld_speed.get()))
         if self.ctrl_mode == 'pwm':
             duty = self.dir * v * 100              # 30% → 3000（固件 w 命令的量纲 ±10000）
-            self.send('w %d 0' % duty, '电机1 → PWM %+d%%' % (self.dir * v))
+            self.send_ack('w %d 0' % duty, 'ACK w', '电机1 → PWM %+d%%' % (self.dir * v))
         else:
             rpm = self.dir * v
-            self.send('q %d' % rpm, '电机1 → %+d RPM' % rpm)
+            self.send_ack('q %d' % rpm, 'ACK q', '电机1 → %+d RPM' % rpm)
         self.update_speed_ui()
 
     def update_speed_ui(self):
@@ -449,13 +492,13 @@ class App(object):
         self.req_servo = pos
         self.sld_servo.set(pos)
         self.lbl_srv.configure(text='目标  %d' % pos)
-        self.send('r %d' % pos, '舵机 → %d' % pos)
+        self.send_ack('r %d' % pos, 'ACK r', '舵机 → %d' % pos)
 
     def do_servo_nudge(self, d):
         self.do_servo(self.req_servo + d)
 
     def do_clr_enc(self):
-        self.send('l', '编码器清零')
+        self.send_ack('l', 'ACK l', '编码器清零')
 
     def do_motor_selftest(self):
         """通道自检：电机1 15% 一秒 → 停 → 电机2 15% 一秒 → 停
@@ -476,8 +519,8 @@ class App(object):
     def do_estop(self):
         self.running = False
         self.req_rpm = 0
-        self.send('q 0', '★ 紧急停止')
-        self.send('w 0 0')
+        self.send_ack('q 0', 'ACK q', '★ 紧急停止')
+        self.send_ack('w 0 0', 'ACK w')
         self.update_speed_ui()
 
     def refresh_buttons(self):
@@ -587,18 +630,13 @@ class App(object):
             del buf[:1]
 
     def on_bin_full(self, pay):
-        buf = self.bin_img
+        out = bytearray()
         for r in range(BIN_H):
             seg = pay[r * 24:(r + 1) * 24]
-            base = r * BIN_W
-            for i, byte in enumerate(seg):
-                for k in range(8):
-                    idx = i * 8 + k
-                    if idx < BIN_W:
-                        buf[base + idx] = 255 if (byte >> (7 - k)) & 1 else 0
+            out += b''.join(_BIT8[b] for b in seg)[:BIN_W]
         self.frames += 1
         if not self.mode_gray:
-            self.shot = (BIN_W, BIN_H, bytes(buf), False)
+            self.shot = (BIN_W, BIN_H, bytes(out), False)
             self.schedule_draw(force=True)
 
     def on_gray_block(self, blk, rows, pay):
@@ -626,6 +664,7 @@ class App(object):
                 self.on_tele(ln[2:])
             elif ln.startswith('ACK') or ln.startswith('CFG') or ln.startswith('CAM'):
                 self.log(ln)
+                self._ack_seen(ln)          # ★ 收到回执 ⇒ 这条命令不用再重发
 
     def on_tele(self, s):
         d = {}
@@ -707,6 +746,8 @@ class App(object):
     # ================================================================ 状态栏
     def tick(self):
         now = time.time()
+        self._check_pending()          # ★ 命令没回执就重发
+
         if (now - self.t_fps) >= 1.0:
             self.fps = (self.frames - self.n_fps) / (now - self.t_fps)
             self.t_fps, self.n_fps = now, self.frames
