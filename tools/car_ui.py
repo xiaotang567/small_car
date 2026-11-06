@@ -63,6 +63,7 @@ C_ON      = '#2e7d4f'          # 选中（图像模式）
 C_STOP    = '#7d2a2a'
 C_ESTOP   = '#b02020'
 C_ACCENT  = '#4aa3ff'
+C_WAIT    = '#b8860b'      # ★ 命令"已发出、等板子回执"时按钮变这个琥珀色
 
 # 快捷档 / 预设
 # 电机控制：两种方式
@@ -274,11 +275,11 @@ class App(object):
                                 font=('Microsoft YaHei', 11, 'bold'))
         self.lbl_srv.grid(row=0, column=0, columnspan=5, sticky='w', padx=6, pady=(4, 2))
 
-        self.btn_sl = self._btn(f, '左', lambda: self.do_servo(SERVO_LEFT), w=4, h=2)
+        self.btn_sl = self._btn(f, '左', lambda: self.do_servo(SERVO_LEFT, self.btn_sl), w=4, h=2)
         self.btn_sl.grid(row=1, column=0, padx=3, pady=3, sticky='ew')
-        self.btn_sm = self._btn(f, '中', lambda: self.do_servo(SERVO_MID), bg=C_ON, w=4, h=2)
+        self.btn_sm = self._btn(f, '中', lambda: self.do_servo(SERVO_MID, self.btn_sm), bg=C_ON, w=4, h=2)
         self.btn_sm.grid(row=1, column=2, padx=3, pady=3, sticky='ew')
-        self.btn_sr = self._btn(f, '右', lambda: self.do_servo(SERVO_RIGHT), w=4, h=2)
+        self.btn_sr = self._btn(f, '右', lambda: self.do_servo(SERVO_RIGHT, self.btn_sr), w=4, h=2)
         self.btn_sr.grid(row=1, column=4, padx=3, pady=3, sticky='ew')
 
         self.btn_sd = self._btn(f, '−20', lambda: self.do_servo_nudge(-20), w=4, h=1)
@@ -340,15 +341,46 @@ class App(object):
             self.log('发送失败: %s' % e)
             return False
 
-    # ---------------------------------------------------------------- 命令确认（没回执就重发）
-    def send_ack(self, cmd, pfx, note=None):
-        """发一条**板子会回 ACK** 的命令；0.4s 没回执就重发，最多 2 次。
-        目的是解决"按钮要按很多次才有反应" —— 数据链一忙，命令就可能丢。
-        ⚠️ 新命令要**顶掉**同类的旧待确认项：否则"停止"的 `w 0 0` 可能在"启动"之后
-           才被重发出去，把刚转起来的电机又停掉。"""
-        if self.send(cmd, note):
-            self.pending = [p for p in self.pending if p['pfx'] != pfx]
-            self.pending.append({'cmd': cmd, 'pfx': pfx, 't': time.time(), 'n': 2})
+    # ---------------------------------------------------------------- 命令确认（按钮变黄 → 收到 ACK 才变回）
+    WAIT_MS = 250          # 没回执多久重发一次
+    WAIT_MAX = 80          # 最多重发多少次（80 × 250ms ≈ 20 秒，够板子慢半拍）
+
+    def send_ack(self, cmd, pfx, note=None, btn=None):
+        """发一条**板子会回 ACK** 的命令。
+        ★ 交互（用户要求）：点下去按钮立刻变**黄色**，然后每 250ms 一直重发，
+          直到板子回 `ACK ...` 才把按钮颜色**恢复**（恢复后按当前状态重新上色）。
+        ⚠️ 同前缀的新命令会顶掉旧的（否则"停止"的重发会晚到，把刚启动的电机又停掉）。"""
+        if not self.send(cmd, note):
+            return False
+
+        # 顶掉同类旧命令，并把它的按钮颜色恢复
+        keep = []
+        for p in self.pending:
+            if p['pfx'] == pfx:
+                self._btn_restore(p)
+            else:
+                keep.append(p)
+        self.pending = keep
+
+        p = {'cmd': cmd, 'pfx': pfx, 't': time.time(), 'n': 0, 'btn': btn,
+             'base': None, 'wait': False}
+        if btn is not None:
+            try:
+                p['base'] = btn.cget('bg')
+                btn.configure(bg=C_WAIT)
+                p['wait'] = True
+            except Exception:
+                pass
+        self.pending.append(p)
+        return True
+
+    def _btn_restore(self, p):
+        if p.get('wait') and (p.get('btn') is not None) and (p.get('base') is not None):
+            try:
+                p['btn'].configure(bg=p['base'])
+            except Exception:
+                pass
+            p['wait'] = False
 
     def _ack_seen(self, ln):
         if not self.pending:
@@ -356,34 +388,49 @@ class App(object):
         keep = []
         for p in self.pending:
             if ln.startswith(p['pfx']):
-                continue
-            keep.append(p)
+                self._btn_restore(p)          # 板子收到了 ⇒ 按钮颜色恢复
+            else:
+                keep.append(p)
         self.pending = keep
+        # 恢复后再按"当前真实状态"重新上色（启动/前进/后退/模式按钮颜色跟着状态走）
+        self.update_speed_ui()
+        self.refresh_buttons()
 
     def _check_pending(self):
         if not self.pending:
             return
         now = time.time()
         for p in list(self.pending):
-            if (now - p['t']) < 0.4:
+            if (now - p['t']) * 1000.0 < self.WAIT_MS:
                 continue
-            if p['n'] > 0:
-                p['n'] -= 1
+            if p['n'] < self.WAIT_MAX:
+                p['n'] += 1
                 p['t'] = now
                 try:
                     self.conn.sendall((p['cmd'] + '\n').encode('ascii', 'ignore'))
-                    self.log('… 没等到回执，重发：%s' % p['cmd'])
+                    if p['n'] in (1, 5, 20):
+                        self.log('… 板子还没回执，重发 %d 次：%s' % (p['n'], p['cmd']))
                 except Exception:
                     pass
             else:
                 self.pending.remove(p)
-                self.log('⚠ 命令一直没回执（板子没收到？）：%s' % p['cmd'])
+                self._btn_restore(p)
+                self.log('✗ 命令一直没回执（板子没收到 / 没连上）：%s' % p['cmd'])
+                self.update_speed_ui()
+                self.refresh_buttons()
+
+    def _clear_pending(self):
+        """断线时把所有待确认的命令扔掉，按钮颜色恢复"""
+        for p in self.pending:
+            self._btn_restore(p)
+        self.pending = []
 
     def do_mode(self, binary):
         self.mode_gray = (binary == 0)
         self.shot = None
         self.gray_got = set()
-        self.send_ack('s %d' % binary, 'ACK s', '图像 → %s' % ('二值图' if binary else '原图灰度'))
+        self.send_ack('s %d' % binary, 'ACK s', '图像 → %s' % ('二值图' if binary else '原图灰度'),
+                        self.btn_bin if binary else self.btn_gray)
         self.refresh_buttons()
 
     # ---------------------------------------------------------------- 电机1
@@ -393,9 +440,9 @@ class App(object):
             return
         self.running = False
         if self.ctrl_mode == 'pwm':
-            self.send_ack('w 0 0', 'ACK w', '电机1 → PWM 清零')
+            self.send_ack('w 0 0', 'ACK w', '电机1 → PWM 清零', self.btn_mode_rpm)
         else:
-            self.send_ack('q 0', 'ACK q', '电机1 → 速度环停止')
+            self.send_ack('q 0', 'ACK q', '电机1 → 速度环停止', self.btn_mode_pwm)
 
         self.ctrl_mode = m
         try:
@@ -417,21 +464,21 @@ class App(object):
     def do_start(self):
         """★ 启动：按当前的"方式 × 方向 × 滑条值"驱动电机1"""
         self.running = True
-        self.apply_speed()
+        self.apply_speed(self.btn_start)
 
     def do_stop_cmd(self):
         """★ 停止：速度环目标清零 + 两路占空比清零（两种方式都能停）"""
         self.running = False
         self.req_rpm = 0
         self.send_ack('q 0', 'ACK q', '电机1 → 停止')
-        self.send_ack('w 0 0', 'ACK w')
+        self.send_ack('w 0 0', 'ACK w', None, self.btn_stop)
         self.update_speed_ui()
 
     def do_dir(self, sign):
         """只选方向，不启动；已经在转的话立刻按新方向重发"""
         self.dir = +1 if sign >= 0 else -1
         if self.running:
-            self.apply_speed()
+            self.apply_speed(self.btn_fwd if sign >= 0 else self.btn_back)
         else:
             self.update_speed_ui()
 
@@ -442,7 +489,7 @@ class App(object):
             return
         self.sld_speed.set(v)
         if self.running:
-            self.apply_speed()
+            self.apply_speed(self.preset_btns[i])
         else:
             self.update_speed_ui()
 
@@ -464,15 +511,22 @@ class App(object):
         else:
             self.update_speed_ui()
 
-    def apply_speed(self):
+    def apply_speed(self, btn=None):
         v = abs(int(self.sld_speed.get()))
         if self.ctrl_mode == 'pwm':
             duty = self.dir * v * 100              # 30% → 3000（固件 w 命令的量纲 ±10000）
-            self.send_ack('w %d 0' % duty, 'ACK w', '电机1 → PWM %+d%%' % (self.dir * v))
+            self.send_ack('w %d 0' % duty, 'ACK w', '电机1 → PWM %+d%%' % (self.dir * v), btn)
         else:
             rpm = self.dir * v
-            self.send_ack('q %d' % rpm, 'ACK q', '电机1 → %+d RPM' % rpm)
+            self.send_ack('q %d' % rpm, 'ACK q', '电机1 → %+d RPM' % rpm, btn)
         self.update_speed_ui()
+
+    def _is_waiting(self, btn):
+        """这个按钮是不是还在"等板子回执"（等的时候别被状态刷新覆盖掉琥珀色）"""
+        for p in self.pending:
+            if (p.get('btn') is btn) and p.get('wait'):
+                return True
+        return False
 
     def update_speed_ui(self):
         v = abs(int(self.sld_speed.get()))
@@ -488,26 +542,31 @@ class App(object):
             state_bg = C_BTN
         try:
             self.lbl_rpm.configure(text=txt)
-            self.btn_start.configure(bg=state_bg)
-            self.btn_fwd.configure(bg=C_ON if self.dir > 0 else C_BTN)
-            self.btn_back.configure(bg=C_ON if self.dir < 0 else C_BTN)
-            self.btn_mode_pwm.configure(bg=C_ON if self.ctrl_mode == 'pwm' else C_BTN)
-            self.btn_mode_rpm.configure(bg=C_ON if self.ctrl_mode == 'rpm' else C_BTN)
+            if not self._is_waiting(self.btn_start):
+                self.btn_start.configure(bg=state_bg)
+            if not self._is_waiting(self.btn_fwd):
+                self.btn_fwd.configure(bg=C_ON if self.dir > 0 else C_BTN)
+            if not self._is_waiting(self.btn_back):
+                self.btn_back.configure(bg=C_ON if self.dir < 0 else C_BTN)
+            if not self._is_waiting(self.btn_mode_pwm):
+                self.btn_mode_pwm.configure(bg=C_ON if self.ctrl_mode == 'pwm' else C_BTN)
+            if not self._is_waiting(self.btn_mode_rpm):
+                self.btn_mode_rpm.configure(bg=C_ON if self.ctrl_mode == 'rpm' else C_BTN)
         except Exception:
             pass
 
-    def do_servo(self, pos):
+    def do_servo(self, pos, btn=None):
         pos = max(SERVO_MIN, min(SERVO_MAX, int(pos)))
         self.req_servo = pos
         self.sld_servo.set(pos)
         self.lbl_srv.configure(text='目标  %d' % pos)
-        self.send_ack('r %d' % pos, 'ACK r', '舵机 → %d' % pos)
+        self.send_ack('r %d' % pos, 'ACK r', '舵机 → %d' % pos, btn)
 
     def do_servo_nudge(self, d):
-        self.do_servo(self.req_servo + d)
+        self.do_servo(self.req_servo + d, self.btn_su if d > 0 else self.btn_sd)
 
     def do_clr_enc(self):
-        self.send_ack('l', 'ACK l', '编码器清零')
+        self.send_ack('l', 'ACK l', '编码器清零', self.btn_enc)
 
     def do_motor_selftest(self):
         """通道自检：电机1 15% 一秒 → 停 → 电机2 15% 一秒 → 停
@@ -529,13 +588,15 @@ class App(object):
         self.running = False
         self.req_rpm = 0
         self.send_ack('q 0', 'ACK q', '★ 紧急停止')
-        self.send_ack('w 0 0', 'ACK w')
+        self.send_ack('w 0 0', 'ACK w', None, self.btn_estop)
         self.update_speed_ui()
 
     def refresh_buttons(self):
         try:
-            self.btn_bin.configure(bg=C_ON if not self.mode_gray else C_BTN)
-            self.btn_gray.configure(bg=C_ON if self.mode_gray else C_BTN)
+            if not self._is_waiting(self.btn_bin):
+                self.btn_bin.configure(bg=C_ON if not self.mode_gray else C_BTN)
+            if not self._is_waiting(self.btn_gray):
+                self.btn_gray.configure(bg=C_ON if self.mode_gray else C_BTN)
             self.lbl_mode.configure(
                 text='当前：%s' % ('原图灰度 94×60' if self.mode_gray else '二值图 188×120'))
         except Exception:
@@ -862,6 +923,7 @@ def run():
                 return
 
         app.conn = None
+        app._clear_pending()
         try:
             conn.close()
         except Exception:
