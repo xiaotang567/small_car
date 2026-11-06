@@ -286,6 +286,12 @@ static uint8_t servo_queue (const uint8_t *frame, uint8_t n)
     memcpy(g_last_tx, frame, n);
     g_last_tx_len = n;
 
+    /* ★ 软件半双工：发之前把 PC10 切回**推挽 AF**（发完 TC 中断会把它放成高阻）*/
+    if (0U != g_servo_half)
+    {
+        GPIOC->MODER = (GPIOC->MODER & ~(3UL << 20)) | (2UL << 20);
+    }
+
     UART4->CR1 |= USART_CR1_TXEIE;
     g_servo_tx_cnt ++;
     return 0U;
@@ -385,25 +391,30 @@ uint32_t ctrl_servo_rx_bad  (void) { return g_servo_rx_bad; }
 uint32_t ctrl_servo_baud    (void) { return g_servo_baud; }
 uint8_t  ctrl_servo_is_half (void) { return g_servo_half; }
 
-/* ★ 全双工 ⇄ 单线半双工 切换（运行时，不用重新烧）
-   半双工：HDSEL=1，数据都走 **TX 脚(PC10)**；这个脚必须配成**开漏(AF_OD)+上拉**，
-           否则推挽输出会把舵机/调试板的回包顶死。
-   全双工：HDSEL=0，TX=PC10 / RX=PC11（原来的接法）。*/
+/* ★ 全双工 ⇄ 「单线」切换（运行时，不用重烧）
+   ⚠️ 2026-11-06 改过实现：**不再用硬件 HDSEL**。
+      实测 HDSEL 下 PC10 是开漏、靠内部 40k 上拉，1Mbps（1 位 = 1µs）根本拉不高
+      ⇒ 舵机收到的是垃圾电平，表现是"发多少收多少"（只有自己的回显）。
+   现在「单线」= **软件半双工**：
+      · PC10 = 推挽 AF（发的时候有力气）
+      · 发完最后一个位（TC 中断）立刻把 PC10 改成高阻输入，把总线让给舵机
+      · PC11 始终是 UART4_RX
+      ⇒ **接线：PC10 和 PC11 一起接到总线那一根线上**（两根线并一根），GND 共地。*/
 void ctrl_servo_set_half (uint8_t half)
 {
     GPIO_InitTypeDef gi;
 
     UART4->CR1 &= (uint16_t)(~(USART_CR1_UE | USART_CR1_TE | USART_CR1_RE));
+    UART4->CR3 &= (uint16_t)(~USART_CR3_HDSEL);     /* 永远不用硬件 HDSEL */
 
-    gi.Pin       = GPIO_PIN_10;
-    gi.Mode      = (0U != half) ? GPIO_MODE_AF_OD : GPIO_MODE_AF_PP;
+    gi.Pin       = GPIO_PIN_10 | GPIO_PIN_11;
+    gi.Mode      = GPIO_MODE_AF_PP;
     gi.Pull      = GPIO_PULLUP;
     gi.Speed     = GPIO_SPEED_FREQ_VERY_HIGH;
     gi.Alternate = GPIO_AF8_UART4;
     HAL_GPIO_Init(GPIOC, &gi);
 
-    if (0U != half) { UART4->CR3 |=  USART_CR3_HDSEL; g_servo_half = 1U; }
-    else            { UART4->CR3 &= ~USART_CR3_HDSEL; g_servo_half = 0U; }
+    g_servo_half = (0U != half) ? 1U : 0U;
 
     UART4->CR1 |= USART_CR1_UE;
     UART4->CR1 |= (uint16_t)(USART_CR1_TE | USART_CR1_RE);
@@ -415,9 +426,8 @@ void ctrl_servo_set_half (uint8_t half)
 }
 uint8_t  ctrl_servo_rx_pin  (void)
 {
-    /* 单线半双工时数据走 PC10；全双工时才是 PC11 */
-    return (0U != g_servo_half) ? ((0U != (GPIOC->IDR & GPIO_PIN_10)) ? 1U : 0U)
-                                : ((0U != (GPIOC->IDR & GPIO_PIN_11)) ? 1U : 0U);
+    /* 两种模式接收都走 PC11（单线模式是 PC10/PC11 并在同一根总线上）*/
+    return (0U != (GPIOC->IDR & GPIO_PIN_11)) ? 1U : 0U;
 }
 uint32_t ctrl_servo_tx_cnt  (void) { return g_servo_tx_cnt; }
 uint32_t ctrl_servo_rx_cnt  (void) { return g_servo_rx_cnt; }
@@ -637,6 +647,22 @@ void ctrl_uart4_irq (void)
         else
         {
             UART4->CR1 &= (uint16_t)(~USART_CR1_TXEIE);
+            /* ★ 发完了：打开 TC 中断，等最后一个位真的移出去好释放总线 */
+            UART4->CR1 |= USART_CR1_TCIE;
+        }
+    }
+
+    /* ★★ 软件半双工：最后一个位发完 ⇒ **立刻把 PC10 放开（改成高阻输入）**，
+       总线交给舵机说话。再发下一帧前 `servo_queue()` 会把它切回推挽 AF。
+       🔥 为什么不用硬件 HDSEL：HDSEL 下 PC10 是开漏，靠内部 40k 上拉在 1Mbps
+          根本拉不高（一个位才 1µs，上升沿要 2µs）⇒ 舵机看到的是垃圾电平，
+          现象就是"发多少收多少"（只有自己回显）。推挽 + 主动释放才靠谱。*/
+    if (0U != (sr & USART_SR_TC))
+    {
+        UART4->CR1 &= (uint16_t)(~USART_CR1_TCIE);
+        if (0U != g_servo_half)
+        {
+            GPIOC->MODER &= ~(3UL << 20);          /* PC10 -> 输入（高阻），总线让给舵机 */
         }
     }
 }
