@@ -769,8 +769,15 @@ class App(object):
         if 'y' in d:
             self.v_yaw.set('%+.1f °' % d['y'])
         if 's' in d:
-            p = int(d['s'])
-            self.v_srv.set('---' if p >= 0xFFFF else '%d' % p)
+            p  = int(d['s'])
+            sid = int(d.get('si', 0))
+            rx  = int(d.get('sr', 0))
+            sb  = int(d.get('sb', 0))
+            if p < 0xFFFF:
+                self.v_srv.set('%d   (ID %d)' % (p, sid))
+            else:
+                # 读不到时把诊断也带上：到底是一个字节都没收到，还是收到了但校验不过
+                self.v_srv.set('---  (ID %d, 收到 %d B, 校验错 %d)' % (sid, rx, sb))
         if 'd1' in d:
             d1 = d.get('d1', 0.0) / 100.0
             d2 = d.get('d2', 0.0) / 100.0

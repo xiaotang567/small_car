@@ -241,12 +241,18 @@ static uint16_t g_servo_pos     = 0xFFFFU;
 static uint8_t  g_servo_err     = 0U;
 static uint32_t g_servo_tx_cnt  = 0U;
 static uint32_t g_servo_rx_cnt  = 0U;
+static uint32_t g_servo_rx_bytes = 0U;   /* 一共收到多少字节（0 = 舵机根本没回过话）*/
+static uint32_t g_servo_rx_bad   = 0U;   /* 校验失败的帧数（>0 = 波特率/格式不对）*/
+static uint8_t  g_servo_id      = CTRL_SERVO_ID;   /* ★ 开机自动扫描出来的舵机 ID */
+static uint8_t  g_servo_last_id = 0xFFU;           /* 最近一帧合法应答的 ID（扫描用）*/
 static uint16_t g_servo_target  = CTRL_SERVO_POS_CENTER;
 static uint16_t g_servo_last_set = 0xFFFFU;     /* 0xFFFF = 还没发过 ⇒ 第一拍就把舵机摆到中位 */
 static uint8_t  g_servo_speed_ok = 0U;          /* 目标速度（0x2E）是保持型寄存器，上电写一次 */
 static uint8_t  g_servo_boot     = 0U;          /* 上电等 1 秒再跟舵机说话（它自己要初始化） */
 static uint8_t  g_last_tx[16];          /* 最近一次发出去的帧（用来丢"自己的回显"）*/
 static uint8_t  g_last_tx_len = 0U;
+
+static void servo_poll (void);              /* 前置声明：servo_probe_id() 扫描时要调它 */
 
 static uint8_t servo_checksum (const uint8_t *p, uint8_t n)
 {
@@ -305,6 +311,11 @@ void ctrl_servo_init (void)
     g_stx_head = g_stx_tail = 0U;
     g_srx_head = g_srx_tail = 0U;
     g_servo_pos = 0xFFFFU;
+
+    /* ★ 等舵机自己初始化完（它上电要 ~1 秒），再扫 ID。总耗时最多 ~1.2 秒，
+       全在 `ctrl_all_init()` 里、WiFi 初始化之前 ⇒ 不影响主循环。*/
+    HAL_Delay(1000);
+    ctrl_servo_scan();
 }
 
 uint8_t ctrl_servo_set_pos (uint16_t pos)
@@ -315,7 +326,7 @@ uint8_t ctrl_servo_set_pos (uint16_t pos)
     if (pos > CTRL_SERVO_POS_MAX) { pos = CTRL_SERVO_POS_MAX; }
 
     f[0] = 0xFFU; f[1] = 0xFFU;
-    f[2] = (uint8_t)CTRL_SERVO_ID;
+    f[2] = g_servo_id;
     f[3] = 5U;                                      /* Length = 参数 2 + 3 */
     f[4] = SERVO_INSTR_WRITE;
     f[5] = SERVO_REG_POS;
@@ -344,7 +355,7 @@ static uint8_t servo_set_speed (int16_t speed)
     v = (speed < 0) ? (uint16_t)((uint16_t)(-speed) | 0x8000U) : (uint16_t)speed;
 
     f[0] = 0xFFU; f[1] = 0xFFU;
-    f[2] = (uint8_t)CTRL_SERVO_ID;
+    f[2] = g_servo_id;
     f[3] = 5U;
     f[4] = SERVO_INSTR_WRITE;
     f[5] = SERVO_REG_SPEED;
@@ -356,6 +367,9 @@ static uint8_t servo_set_speed (int16_t speed)
 
 uint16_t ctrl_servo_get_pos (void) { return g_servo_pos; }
 uint8_t  ctrl_servo_get_err (void) { return g_servo_err; }
+uint8_t  ctrl_servo_id      (void) { return g_servo_id; }
+uint32_t ctrl_servo_rx_bytes (void) { return g_servo_rx_bytes; }
+uint32_t ctrl_servo_rx_bad  (void) { return g_servo_rx_bad; }
 uint32_t ctrl_servo_tx_cnt  (void) { return g_servo_tx_cnt; }
 uint32_t ctrl_servo_rx_cnt  (void) { return g_servo_rx_cnt; }
 
@@ -365,13 +379,57 @@ static void servo_read_pos (void)
     uint8_t f[8];
 
     f[0] = 0xFFU; f[1] = 0xFFU;
-    f[2] = (uint8_t)CTRL_SERVO_ID;
+    f[2] = g_servo_id;
     f[3] = 4U;
     f[4] = SERVO_INSTR_READ;
     f[5] = SERVO_REG_CURPOS;
     f[6] = 2U;
     f[7] = servo_checksum(&f[2], 5U);
     (void)servo_queue(f, 8U);
+}
+
+/* ★★★ 2026-11-06：**开机自动扫舵机 ID** ★★★
+   原来的 ID 是宏写死的（默认 1）。舵机出厂 ID 不是 1、或者被改过，
+   就永远收不到应答 ⇒ 上位机"舵机"那行一直是 `---`。
+   做法：0~20 挨个发一条"读当前位置"，10ms 内谁回应就用谁（一只舵机最多 ~200ms）。*/
+static uint8_t servo_probe_id (uint8_t id)
+{
+    uint8_t  f[8];
+    uint32_t t0;
+
+    g_srx_head = g_srx_tail = 0U;               /* 清掉 rx 环里上一条的残留 */
+    g_servo_last_id = 0xFFU;
+
+    f[0] = 0xFFU; f[1] = 0xFFU;
+    f[2] = id;
+    f[3] = 4U;
+    f[4] = SERVO_INSTR_READ;
+    f[5] = SERVO_REG_CURPOS;
+    f[6] = 2U;
+    f[7] = servo_checksum(&f[2], 5U);
+    if (0U != servo_queue(f, 8U)) { return 0U; }
+
+    t0 = HAL_GetTick();
+    while ((HAL_GetTick() - t0) < 10U)
+    {
+        servo_poll();
+        if (id == g_servo_last_id) { return 1U; }
+    }
+    return 0U;
+}
+
+void ctrl_servo_scan (void)
+{
+    uint8_t id;
+
+    for (id = 0U; id <= 20U; id++)
+    {
+        if (0U != servo_probe_id(id))
+        {
+            g_servo_id = id;
+            return;
+        }
+    }
 }
 
 /* 收包解析：在 20ms 节拍里跑，**绝不 while 等** */
@@ -399,7 +457,13 @@ static void servo_poll (void)
         if (n < (uint8_t)(len + 4U)) { continue; }   /* 还没收全 */
 
         cs = servo_checksum(&buf[2], (uint8_t)(len + 1U));   /* ID..最后一个数据字节 */
-        if (cs != buf[len + 3U]) { memmove(buf, buf + 1, (size_t)(n - 1U)); n --; continue; }
+        if (cs != buf[len + 3U])
+        {
+            g_servo_rx_bad ++;                    /* 校验错 ⇒ 波特率/噪声/格式不对 */
+            memmove(buf, buf + 1, (size_t)(n - 1U));
+            n --;
+            continue;
+        }
 
         /* ★ 丢掉自己的回显：和刚发出去的帧一模一样就跳过 */
         if ((n >= g_last_tx_len) && (0 == memcmp(buf, g_last_tx, g_last_tx_len)))
@@ -409,17 +473,18 @@ static void servo_poll (void)
             continue;
         }
 
-        g_servo_err = buf[4];
-        /* 应答 = FF FF ID LEN ERROR P1..PN CS，**不带寄存器地址**（幻尔协议）
-           我们只读 0x38 当前位置 2 字节 ⇒ LEN=4，P1/P2 = 位置低/高 */
-        if ((buf[4] == 0U) && (len >= 4U))
+        g_servo_err     = buf[4];
+        g_servo_last_id = buf[2];                  /* 扫描/诊断用：这一帧是谁回的 */
+        g_servo_rx_cnt ++;
+
+        /* 读位置应答有两种固件格式，都认：
+             A) FF FF ID 04 ERR P_lo P_hi CS             ← 幻尔标准（LEN=4，不带地址）
+             B) FF FF ID 05 ERR 38 P_lo P_hi CS          ← 有的固件把寄存器地址也回了（LEN=5）
+           ⇒ 判据：LEN>=4 且 ERR==0；LEN==5 时跳过 buf[5] 那个地址字节 */
+        if (buf[4] == 0U)
         {
-            g_servo_pos = (uint16_t)((uint16_t)buf[5] | ((uint16_t)buf[6] << 8));
-            g_servo_rx_cnt ++;
-        }
-        else if (buf[4] == 0U)
-        {
-            g_servo_rx_cnt ++;
+            if (5U == len)      { g_servo_pos = (uint16_t)((uint16_t)buf[6] | ((uint16_t)buf[7] << 8)); }
+            else if (len >= 4U) { g_servo_pos = (uint16_t)((uint16_t)buf[5] | ((uint16_t)buf[6] << 8)); }
         }
 
         memmove(buf, buf + (len + 4U), (size_t)(n - (len + 4U)));
@@ -437,6 +502,7 @@ void ctrl_uart4_irq (void)
         uint8_t  b    = (uint8_t)(UART4->DR & 0xFFU);
         uint16_t next = (uint16_t)((g_srx_head + 1U) % SERVO_RX_SIZE);
 
+        g_servo_rx_bytes ++;                       /* ★ 诊断：舵机到底回没回字节 */
         if (next != g_srx_tail) { g_srx[g_srx_head] = b; g_srx_head = next; }
     }
 
@@ -1227,7 +1293,6 @@ void ctrl_all_init (void)
     ctrl_io_init();          /* 蜂鸣器/按键最先，上电不叫 */
     ctrl_motor_init();       /* 电机 PWM=0、DIR=0，不会突然转 */
     ctrl_encoder_init();
-    ctrl_servo_init();
     ctrl_imu_init();
 
     /* OLED：清屏 + **立刻画状态页**（约 40ms，只在开机做一次）
@@ -1236,6 +1301,10 @@ void ctrl_all_init (void)
     ctrl_oled_init();
     ctrl_oled_clear();
     ctrl_oled_first_page();
+
+    /* ★ 舵机放最后：它上电要 ~1 秒才肯说话，`ctrl_servo_init()` 里会等 1 秒再扫 ID
+       ⇒ 先把屏幕点亮，别让这一秒黑着。 */
+    ctrl_servo_init();
 
     ctrl_speed_init();
 }
