@@ -1,4 +1,5 @@
 @echo off
+chcp 65001 >nul
 cd /d %~dp0
 title small_car console
 echo ==============================================
@@ -13,6 +14,8 @@ set PY=C:\Users\SHUIGUI\.workbuddy\binaries\python\versions\3.13.12\python.exe
 if exist "%PY%" goto run
 set PY=python
 :run
+set PYTHONIOENCODING=utf-8
+set PYTHONUTF8=1
 "%PY%" car_ui.py 8086
 echo.
 echo [console exited] press any key to close
