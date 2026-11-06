@@ -56,7 +56,7 @@ static void cmd_txt (const char *s)
        ⇒ 这时 f=0 是安全的，相 0 只等 5ms。
    ⇒ 一帧 = 打包 ~1ms + 发送 ~4.4ms + 歇 5ms ≈ 10ms，上限由传感器 50fps 决定。
    ⚠️ 只有**切回助手模式**（SEND_MODE_VOFA=1）时才需要把它调回 20~30，否则会重演 0.9fps。*/
-uint16_t cam_cmd_fps    = 20U;      // ★ 2026-11-06：按用户要求"图传 20 帧就够了" ⇒ 默认限到 20fps
+uint16_t cam_cmd_fps    = 10U;      // ★ 2026-11-06：模块被 20fps 压满（下行命令收不到）⇒ 先降到 10fps 验证
                                     //   （原 0 = 不限速；限速后给遥测/命令留出余量）
 uint16_t cam_cmd_gap_ms = 0U;      // ★★ 默认 **0 = 不等**（开机即最快）；若坏行增多用 `g 1`/`g 2` 回退 ✓
 uint8_t  cam_cmd_dx     = 1U;      // 横向抽点（1 = 188 列）
@@ -149,7 +149,7 @@ static void cam_cmd_status (void)
        DRP = 发送看门狗**主动放弃**的帧数（一直飙 ⇒ 链路/模块发不动）✓
        DST = DMA 停摆看门狗重启采集的次数（>0 ⇒ 采集链卡过，但已经自己救回来了）✓
        SELF= 连续 2 秒没有完整帧 ⇒ 重启采集的次数（和 DST 一起看）✓ */
-    sprintf(b, "CFG f=%u g=%u x=%u y=%u (%ux%u) d=%u CST=%u RV=%06lX LINE=%u FW=2082 EDG=%lu EL=%u ER=%u DRP=%lu DST=%lu SELF=%lu\r\n",
+    sprintf(b, "CFG f=%u g=%u x=%u y=%u (%ux%u) d=%u CST=%u RV=%06lX LINE=%u FW=2083 EDG=%lu EL=%u ER=%u DRP=%lu DST=%lu SELF=%lu\r\n",
             (unsigned)cam_cmd_fps, (unsigned)cam_cmd_gap_ms,
             (unsigned)cam_cmd_dx, (unsigned)cam_cmd_dy,
             (unsigned)(CAM_TXW / cam_cmd_dx), (unsigned)(CAM_H / cam_cmd_dy),

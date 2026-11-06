@@ -321,11 +321,16 @@ uint32_t wifi_f4_read (uint8_t *buf, uint32_t len)
 
     if ((0U == wf_ready) || (NULL == buf) || (0U == len)) { return 0U; }
 
-    // ★ 先重试等一个"空闲窗口"：模块忙就等一会儿再问（最多 8 次 × 200µs ≈ 1.6ms）
-    for (retry = 0U; retry < 8U; retry++)
+    // ★ 先重试等一个"空闲窗口"。
+    //   🔥 2026-11-06：原来是 8 次 × 200µs = **1.6ms**，而 `cam_cmd_poll()` 在主循环里
+    //      **每轮都调**这个函数 ⇒ 模块一忙，主循环绝大部分时间都耗在这段等待里
+    //      （图像收割被拖慢），而且等满了照样读不到 ⇒ 上位机按键永远收不到回执
+    //      （"按钮要按很多次才有反应"）。
+    //   现在只等 300µs：等不到就放过这一轮，主循环转得很快，下一轮立刻再来。
+    for (retry = 0U; retry < 3U; retry++)
     {
         if (HAL_GPIO_ReadPin(WIFI_INT_PORT, WIFI_INT_PIN) != GPIO_PIN_RESET) { break; }
-        wf_delay_us(200);
+        wf_delay_us(100);
     }
 
     wifi_rd_int = (HAL_GPIO_ReadPin(WIFI_INT_PORT, WIFI_INT_PIN) != GPIO_PIN_RESET) ? 1U : 0U;
