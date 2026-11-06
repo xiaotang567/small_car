@@ -7,7 +7,8 @@ small_car 控制台  ——  图像 + 仪表 + 按钮控制
   ① 图像：二值图 188×120 / 原图灰度 94×60 两个按钮切换，叠加左右边界红线
   ② 仪表：转速 / 三轴加速度 / 三轴角速度 / 偏航角 / 舵机位置（板子 10Hz 遥测）
   ③ 控制：
-       速度：停止 / 前进 / 后退 / 快捷档 300 600 1000 1500 / 滑条
+       电机1：**[启动] [停止]**（上电默认停，必须点"启动"才转）、[前进]/[后退] 选方向、
+              快捷档 300 600 1000 1500、滑条（松手才发）
        舵机：左 / 中 / 右 / −20 / +20 / 滑条
        其它：编码器清零 / 紧急停止
   ④ 事件：右上角一行提示"最后做了什么"，底部日志显示板子的回执
@@ -104,6 +105,8 @@ class App(object):
         # ---- 目标值（界面状态）----
         self.req_rpm = 0            # 想跑多少（带方向）
         self.req_servo = SERVO_MID
+        self.running = False        # ★ 电机1 是否"启动"状态：上电默认停
+        self.dir = +1               # 方向：+1 前进 / -1 后退
 
         # ---- 窗口 ----
         self.root = tk.Tk()
@@ -112,6 +115,7 @@ class App(object):
         self.root.geometry('1180x560')
         self.build_ui()
         self.refresh_buttons()
+        self.update_speed_ui()
         self.root.update()
 
     # ================================================================ 控件小工具
@@ -183,38 +187,49 @@ class App(object):
             tk.Label(f, textvariable=v, bg=C_PANEL, fg=C_FG,
                      font=('Consolas', 11), anchor='w').grid(row=i, column=1, sticky='w')
 
-        # ---- 速度 ----
-        f = tk.LabelFrame(right, text=' 速度控制 ', bg=C_PANEL, fg=C_ACCENT,
+        # ---- 速度（电机1）----
+        f = tk.LabelFrame(right, text=' 电机1 转速 ', bg=C_PANEL, fg=C_ACCENT,
                           font=('Microsoft YaHei', 10, 'bold'), bd=1, relief='groove')
         f.grid(row=row, column=0, sticky='ew', pady=(0, 8)); row += 1
         for c in range(4):
             f.columnconfigure(c, weight=1)
 
         self.var_rpm = tk.IntVar(value=500)
-        self.lbl_rpm = tk.Label(f, text='目标  0 RPM', bg=C_PANEL, fg=C_FG,
+        self.lbl_rpm = tk.Label(f, text='电机1：停止', bg=C_PANEL, fg='#ffcc66',
                                 font=('Microsoft YaHei', 11, 'bold'))
         self.lbl_rpm.grid(row=0, column=0, columnspan=4, sticky='w', padx=6, pady=(4, 2))
 
-        self.btn_stop = self._btn(f, '停止', self.do_stop, bg=C_STOP, w=7, h=2)
-        self.btn_stop.grid(row=1, column=0, padx=3, pady=3, sticky='ew')
-        self.btn_fwd = self._btn(f, '前进', lambda: self.do_speed(+1), bg=C_ON, w=7, h=2)
-        self.btn_fwd.grid(row=1, column=1, padx=3, pady=3, sticky='ew')
-        self.btn_back = self._btn(f, '后退', lambda: self.do_speed(-1), bg='#5a4a20', w=7, h=2)
-        self.btn_back.grid(row=1, column=2, padx=3, pady=3, sticky='ew')
-        self.btn_zero = self._btn(f, '归零', self.do_zero, w=5, h=2)
-        self.btn_zero.grid(row=1, column=3, padx=3, pady=3, sticky='ew')
+        # ★ 第一排只有"启动 / 停止"两个大按钮 —— 上电默认就是停止，必须按"启动"电机才会转
+        self.btn_start = self._btn(f, '启 动', self.do_start, bg=C_BTN, w=8, h=2,
+                                   font=('Microsoft YaHei', 12, 'bold'))
+        self.btn_start.grid(row=1, column=0, columnspan=2, padx=3, pady=3, sticky='ew')
+        self.btn_stop = self._btn(f, '停 止', self.do_stop_cmd, bg=C_STOP, fg='white', w=8, h=2,
+                                  font=('Microsoft YaHei', 12, 'bold'))
+        self.btn_stop.grid(row=1, column=2, columnspan=2, padx=3, pady=3, sticky='ew')
+
+        # ★ 第二排：方向（只是选方向，本身不启动电机）
+        self.btn_fwd = self._btn(f, '前进', lambda: self.do_dir(+1), bg=C_ON, w=7, h=1)
+        self.btn_fwd.grid(row=2, column=0, padx=3, pady=(2, 2), sticky='ew')
+        self.btn_back = self._btn(f, '后退', lambda: self.do_dir(-1), bg=C_BTN, w=7, h=1)
+        self.btn_back.grid(row=2, column=1, padx=3, pady=(2, 2), sticky='ew')
+        self.btn_zero = self._btn(f, '归零', self.do_zero, w=5, h=1)
+        self.btn_zero.grid(row=2, column=2, padx=3, pady=(2, 2), sticky='ew')
+        self.btn_speedq = self._btn(f, '500', (lambda: self.do_preset(500)), w=5, h=1,
+                                    font=('Consolas', 10))
+        self.btn_speedq.grid(row=2, column=3, padx=3, pady=(2, 2), sticky='ew')
 
         for i, p in enumerate(SPEED_PRESETS):
-            b = self._btn(f, '%d' % p, (lambda v=p: self.do_speed_val(v)), w=6, h=1,
+            b = self._btn(f, '%d' % p, (lambda v=p: self.do_preset(v)), w=6, h=1,
                           font=('Consolas', 10))
-            b.grid(row=2, column=i, padx=3, pady=(2, 4), sticky='ew')
+            b.grid(row=3, column=i, padx=3, pady=(2, 4), sticky='ew')
 
         self.sld_speed = tk.Scale(f, from_=0, to=3000, orient='horizontal',
                                   bg=C_PANEL, fg=C_FG, troughcolor='#3c3c4c',
-                                  highlightbackground=C_PANEL, showvalue=False, length=250)
+                                  highlightbackground=C_PANEL, showvalue=False, length=250,
+                                  command=lambda v: self.on_speed_slide())
         self.sld_speed.set(500)
-        self.sld_speed.grid(row=3, column=0, columnspan=4, sticky='ew', padx=6)
-        self.sld_speed.bind('<ButtonRelease-1>', lambda e: self.do_speed(+1))
+        self.sld_speed.grid(row=4, column=0, columnspan=4, sticky='ew', padx=6)
+        self.sld_speed.bind('<ButtonRelease-1>', lambda e: self.on_speed_release())
 
         # ---- 舵机 ----
         f = tk.LabelFrame(right, text=' 舵机角度 ', bg=C_PANEL, fg=C_ACCENT,
@@ -294,30 +309,75 @@ class App(object):
         self.send('s %d' % binary, '图像 → %s' % ('二值图' if binary else '原图灰度'))
         self.refresh_buttons()
 
-    def do_speed(self, sign):
-        """前进/后退：用滑条上的绝对值，只改方向"""
-        v = abs(int(self.sld_speed.get()))
-        self.set_speed(sign * v)
+    # ---------------------------------------------------------------- 电机1
+    def do_start(self):
+        """★ 启动：按当前的"方向 × 滑条速度"给电机1 发目标转速"""
+        self.running = True
+        self.apply_speed()
 
-    def do_speed_val(self, v):
-        self.sld_speed.set(v)
-        self.set_speed(+v)
-
-    def set_speed(self, rpm):
-        self.req_rpm = int(rpm)
-        self.lbl_rpm.configure(text='目标  %d RPM' % self.req_rpm)
-        self.send('q %d' % self.req_rpm, '速度 → %d RPM' % self.req_rpm)
-
-    def do_stop(self):
+    def do_stop_cmd(self):
+        """★ 停止：目标清零 + 直接把两路占空比清零（双保险）"""
+        self.running = False
         self.req_rpm = 0
-        self.lbl_rpm.configure(text='目标  0 RPM')
-        self.send('q 0', '速度 → 停止')
+        self.send('q 0', '电机1 → 停止')
         self.send('w 0 0')
+        self.update_speed_ui()
+
+    def do_dir(self, sign):
+        """只选方向，不启动；已经在转的话立刻按新方向重发"""
+        self.dir = +1 if sign >= 0 else -1
+        if self.running:
+            self.apply_speed()
+        else:
+            self.update_speed_ui()
+
+    def do_preset(self, v):
+        self.sld_speed.set(v)
+        if self.running:
+            self.apply_speed()
+        else:
+            self.update_speed_ui()
 
     def do_zero(self):
-        """滑条归零（不动电机）"""
         self.sld_speed.set(0)
-        self.lbl_rpm.configure(text='目标  0 RPM')
+        if self.running:
+            self.apply_speed()
+        else:
+            self.update_speed_ui()
+
+    def on_speed_slide(self):
+        """拖动时只更新显示，**不发命令**（不然滑条一动就刷一串）"""
+        if not self.running:
+            self.update_speed_ui()
+
+    def on_speed_release(self):
+        if self.running:
+            self.apply_speed()
+        else:
+            self.update_speed_ui()
+
+    def apply_speed(self):
+        v = abs(int(self.sld_speed.get()))
+        self.req_rpm = self.dir * v
+        self.send('q %d' % self.req_rpm, '电机1 → %+d RPM' % self.req_rpm)
+        self.update_speed_ui()
+
+    def update_speed_ui(self):
+        v = abs(int(self.sld_speed.get()))
+        tgt = self.dir * v
+        if self.running and v > 0:
+            txt = '电机1：运行 %+d RPM' % tgt
+            state_bg = C_ON
+        else:
+            txt = '电机1：停止   (目标 %+d RPM)' % tgt
+            state_bg = C_BTN
+        try:
+            self.lbl_rpm.configure(text=txt)
+            self.btn_start.configure(bg=state_bg)
+            self.btn_fwd.configure(bg=C_ON if self.dir > 0 else C_BTN)
+            self.btn_back.configure(bg=C_ON if self.dir < 0 else C_BTN)
+        except Exception:
+            pass
 
     def do_servo(self, pos):
         pos = max(SERVO_MIN, min(SERVO_MAX, int(pos)))
@@ -333,10 +393,11 @@ class App(object):
         self.send('l', '编码器清零')
 
     def do_estop(self):
+        self.running = False
         self.req_rpm = 0
-        self.lbl_rpm.configure(text='目标  0 RPM')
         self.send('q 0', '★ 紧急停止')
         self.send('w 0 0')
+        self.update_speed_ui()
 
     def refresh_buttons(self):
         try:
