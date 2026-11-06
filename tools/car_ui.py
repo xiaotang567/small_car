@@ -183,12 +183,14 @@ class App(object):
         self.v_gyr = tk.StringVar(value='---')
         self.v_yaw = tk.StringVar(value='---')
         self.v_srv = tk.StringVar(value='---')
+        self.v_duty = tk.StringVar(value='---')
 
         self._lbl(f, '转速').grid(row=0, column=0, sticky='w', padx=6)
         tk.Label(f, textvariable=self.v_rpm, bg=C_PANEL, fg='#66e08a',
                  font=('Consolas', 16, 'bold'), anchor='w').grid(row=0, column=1, sticky='w')
         for i, (k, v) in enumerate((('加速度', self.v_acc), ('角速度', self.v_gyr),
-                                     ('偏航角', self.v_yaw), ('舵机', self.v_srv)), start=1):
+                                     ('偏航角', self.v_yaw), ('舵机', self.v_srv),
+                                     ('输出占空比', self.v_duty)), start=1):
             self._lbl(f, k).grid(row=i, column=0, sticky='w', padx=6)
             tk.Label(f, textvariable=v, bg=C_PANEL, fg=C_FG,
                      font=('Consolas', 11), anchor='w').grid(row=i, column=1, sticky='w')
@@ -649,6 +651,10 @@ class App(object):
         if 's' in d:
             p = int(d['s'])
             self.v_srv.set('---' if p >= 0xFFFF else '%d' % p)
+        if 'd1' in d:
+            d1 = d.get('d1', 0.0) / 100.0
+            d2 = d.get('d2', 0.0) / 100.0
+            self.v_duty.set('电机1 %+.0f%%   电机2 %+.0f%%' % (d1, d2))
         if 'm' in d:
             self.mode_gray = (int(d['m']) == 0)
             self.refresh_buttons()
@@ -706,7 +712,7 @@ class App(object):
                  % (conn, '原图' if self.mode_gray else '二值', self.fps, self.bps, age))
 
         if age > 2.0:
-            for v in (self.v_rpm, self.v_acc, self.v_gyr, self.v_yaw):
+            for v in (self.v_rpm, self.v_acc, self.v_gyr, self.v_yaw, self.v_duty):
                 if v.get() != '---':
                     v.set('---')
 
