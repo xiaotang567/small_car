@@ -1,22 +1,22 @@
 # -*- coding: utf-8 -*-
 """
-small_car 综合上位机  ——  图像 + 仪表 + 控制
+small_car 控制台  ——  图像 + 仪表 + 按钮控制
 ================================================================
-和 cam_view.py 的区别：这个不只看图，还是"驾驶台"。
+全部靠按钮和滑条操作，**不用敲任何命令**（后台仍然走文本协议，但界面上看不到）。
 
-  ① 图像：二值图（188×120，位打包）或 **原图灰度**（94×60，8bit）——
-          板子上的 `s 0` / `s 1` 命令切换，界面上的单选按钮直接发；
-          两种模式下都会把板子发来的**左右边界数组**画成红线。
-  ② 仪表：转速 / 三轴加速度 / 三轴角速度 / 偏航角 / 舵机位置 / 编码器
-          数据来自板子 10Hz 发的**遥测行** `T r=.. ax=.. ay=.. az=.. gx=.. gy=.. gz=.. y=.. s=.. m=..`
-  ③ 控制：速度环目标（q <rpm>）、舵机位置（r <pos>）、图像模式（s 0/1）、
-          开环占空比（w <d1> <d2>）、编码器清零（l）
+  ① 图像：二值图 188×120 / 原图灰度 94×60 两个按钮切换，叠加左右边界红线
+  ② 仪表：转速 / 三轴加速度 / 三轴角速度 / 偏航角 / 舵机位置（板子 10Hz 遥测）
+  ③ 控制：
+       速度：停止 / 前进 / 后退 / 快捷档 300 600 1000 1500 / 滑条
+       舵机：左 / 中 / 右 / −20 / +20 / 滑条
+       其它：编码器清零 / 紧急停止
+  ④ 事件：右上角一行提示"最后做了什么"，底部日志显示板子的回执
 
-协议（和固件 app.c / cam_f4.c 一致，同一个 TCP 流里混着三种二进制包 + 文本行）：
-    AA 55 A5 5A | 0xFF | txh | pol|0x80 | CAM_H | lenH lenL | 2B 预留 | 数据 | ckH ckL   ← 二值整帧
-    AA 55 A5 5A | 0xFC | blk | 0     | rows  | lenH lenL | 2B 预留 | 数据 | ckH ckL   ← 灰度缩略图（8 块）
-    AA 55 A5 5A | 0xFD | rows| 0     | CAM_H | lenH lenL | 2B 预留 | 数据 | ckH ckL   ← 左右边界算法
-    文本行：`T ...` 遥测 / `ACK ...` / `CFG ...`
+协议见固件 app.c / cam_f4.c：
+    AA 55 A5 5A | 0xFF ...   二值整帧（188×120，位打包 24B/行）
+    AA 55 A5 5A | 0xFC ...   灰度缩略图（94×60，8 块，每块 752B）
+    AA 55 A5 5A | 0xFD ...   左右边界数组（每行 2 字节）
+    文本：`T ...` 遥测 / `ACK ...` / `CFG ...`
 
 用法：
     python car_ui.py [端口]        默认 8086
@@ -40,13 +40,27 @@ PORT = int(sys.argv[1]) if len(sys.argv) > 1 else 8086
 
 MAGIC = b'\xAA\x55\xA5\x5A'
 
-# 板子侧的两套分辨率（和固件宏一一对应）
 BIN_W, BIN_H = 188, 120        # 二值图
-GRAY_W, GRAY_H = 94, 60        # 灰度缩略图（188×120 的 2×2 抽取）
-EDGE_ROWS = 120
+GRAY_W, GRAY_H = 94, 60        # 灰度缩略图（2×2 抽取）
+VIEW_W, VIEW_H = 752, 480      # 显示尺寸
+SCALE_EDGE = 4                 # 边界坐标 → 显示坐标
 
-VIEW_W, VIEW_H = 752, 480      # 屏幕显示尺寸（两种模式都放大到这么大）
-SCALE_EDGE = 4                 # 边界坐标 → 显示坐标的倍率（188→752 / 120→480）
+# 界面配色
+C_BG      = '#1e1e26'
+C_PANEL   = '#26262f'
+C_FG      = '#e6e6ea'
+C_DIM     = '#9aa0aa'
+C_BTN     = '#3a3a48'
+C_BTN_ACT = '#4c4c60'
+C_ON      = '#2e7d4f'          # 选中（图像模式）
+C_STOP    = '#7d2a2a'
+C_ESTOP   = '#b02020'
+C_ACCENT  = '#4aa3ff'
+
+# 快捷档 / 预设
+SPEED_PRESETS = (300, 600, 1000, 1500)
+SERVO_LEFT, SERVO_MID, SERVO_RIGHT = 1300, 2048, 2800
+SERVO_MIN, SERVO_MAX = 1048, 3048
 
 
 def local_ip():
@@ -65,173 +79,282 @@ class App(object):
         self.conn = None
         self.buf = bytearray()
 
-        # ---- 图像数据 ----
-        self.bin_img = bytearray(BIN_W * BIN_H)          # 二值图缓冲
-        self.gray_img = bytearray(GRAY_W * GRAY_H)       # 灰度缓冲
-        self.gray_got = set()                            # 已收到的灰度块
-        self.edges = None                                # [(左x, 右x)]，None = 该行没找到
-        self.mode_gray = False                           # 当前显示模式（跟随板子上报的 m=）
-        self.shot = None                                 # 最近一张完整图 (w, h, bytes, gray?)
+        # ---- 图像 ----
+        self.bin_img = bytearray(BIN_W * BIN_H)
+        self.gray_img = bytearray(GRAY_W * GRAY_H)
+        self.gray_got = set()
+        self.edges = None
+        self.mode_gray = False
+        self.shot = None
         self.photo = None
-        self.ev_img = None
 
         # ---- 遥测 ----
         self.tele = {}
         self.t_tele = 0.0
         self.frames = 0
+        self.fps = 0.0
         self.t_fps = time.time()
         self.n_fps = 0
-        self.fps = 0.0
         self.nbytes = 0
         self.bps = 0.0
         self.t_bps = time.time()
         self.n_bps = 0
         self.t_draw = 0.0
-        self.log_lines = []
 
-        # ---- 界面 ----
+        # ---- 目标值（界面状态）----
+        self.req_rpm = 0            # 想跑多少（带方向）
+        self.req_servo = SERVO_MID
+
+        # ---- 窗口 ----
         self.root = tk.Tk()
-        self.root.title('small_car 驾驶台')
-        self.root.configure(bg='#202028')
+        self.root.title('small_car 控制台')
+        self.root.configure(bg=C_BG)
+        self.root.geometry('1180x560')
         self.build_ui()
+        self.refresh_buttons()
         self.root.update()
+
+    # ================================================================ 控件小工具
+    def _btn(self, parent, text, cmd, bg=C_BTN, fg=C_FG, w=10, h=2, font=('Microsoft YaHei', 10)):
+        b = tk.Button(parent, text=text, command=cmd, bg=bg, fg=fg,
+                      activebackground=C_BTN_ACT, activeforeground='white',
+                      relief='raised', bd=2, width=w, height=h, font=font,
+                      cursor='hand2', disabledforeground='#6a6a72')
+        return b
+
+    def _lbl(self, parent, text, font=('Microsoft YaHei', 10), fg=C_FG, **kw):
+        return tk.Label(parent, text=text, bg=C_PANEL, fg=fg, font=font, **kw)
 
     # ================================================================ 界面
     def build_ui(self):
-        st = ttk.Style()
-        try:
-            st.theme_use('clam')
-        except Exception:
-            pass
-        st.configure('TLabel', background='#202028', foreground='#e0e0e0')
-        st.configure('TLabelframe', background='#202028', foreground='#9fd0ff')
-        st.configure('TLabelframe.Label', background='#202028', foreground='#9fd0ff')
-        st.configure('TCheckbutton', background='#202028', foreground='#e0e0e0')
-        st.configure('TRadiobutton', background='#202028', foreground='#e0e0e0')
-        st.configure('TButton', padding=4)
-
         root = self.root
         root.columnconfigure(0, weight=1)
         root.rowconfigure(0, weight=1)
 
-        # ---------------- 左边：图像 ----------------
-        left = ttk.Frame(root, padding=6)
+        # ---------------- 左：图像 ----------------
+        left = tk.Frame(root, bg=C_BG, padx=8, pady=8)
         left.grid(row=0, column=0, sticky='nsew')
-        self.img_lbl = tk.Label(left, bg='black', bd=1, relief='sunken')
-        self.img_lbl.pack(fill='both', expand=True)
-        self.lbl_stat = ttk.Label(left, text='未连接…', font=('Consolas', 9))
-        self.lbl_stat.pack(fill='x', pady=(4, 0))
+        left.rowconfigure(0, weight=1)
+        left.columnconfigure(0, weight=1)
 
-        # ---------------- 右边：仪表 + 控制 ----------------
-        right = ttk.Frame(root, padding=6)
+        self.img_lbl = tk.Label(left, bg='black', bd=2, relief='sunken')
+        self.img_lbl.grid(row=0, column=0, sticky='nsew')
+
+        self.lbl_stat = tk.Label(left, text='未连接', bg=C_BG, fg=C_DIM,
+                                 font=('Consolas', 9), anchor='w')
+        self.lbl_stat.grid(row=1, column=0, sticky='ew', pady=(6, 0))
+
+        # ---------------- 右：控制台 ----------------
+        right = tk.Frame(root, bg=C_PANEL, padx=10, pady=8)
         right.grid(row=0, column=1, sticky='nsew')
+        right.columnconfigure(0, weight=1)
 
-        # ---- 图像模式 ----
-        f1 = ttk.LabelFrame(right, text='图像', padding=6)
-        f1.pack(fill='x', pady=(0, 6))
-        self.var_mode = tk.IntVar(value=1)          # 1 = 二值图
-        ttk.Radiobutton(f1, text='二值图 188×120', value=1, variable=self.var_mode,
-                        command=lambda: self.set_mode(1)).grid(row=0, column=0, sticky='w')
-        ttk.Radiobutton(f1, text='原图灰度 94×60', value=0, variable=self.var_mode,
-                        command=lambda: self.set_mode(0)).grid(row=0, column=1, sticky='w')
+        row = 0
+
+        # ---- 图像源 ----
+        f = tk.LabelFrame(right, text=' 图像源 ', bg=C_PANEL, fg=C_ACCENT,
+                          font=('Microsoft YaHei', 10, 'bold'), bd=1, relief='groove')
+        f.grid(row=row, column=0, sticky='ew', pady=(0, 8)); row += 1
+        self.btn_bin = self._btn(f, '二值图', lambda: self.do_mode(1), w=10)
+        self.btn_bin.grid(row=0, column=0, padx=6, pady=6)
+        self.btn_gray = self._btn(f, '原图灰度', lambda: self.do_mode(0), w=10)
+        self.btn_gray.grid(row=0, column=1, padx=6, pady=6)
+        self.lbl_mode = self._lbl(f, '当前：二值图 188×120', fg=C_DIM, font=('Microsoft YaHei', 9))
+        self.lbl_mode.grid(row=1, column=0, columnspan=2, sticky='w', padx=6, pady=(0, 6))
 
         # ---- 仪表 ----
-        f2 = ttk.LabelFrame(right, text='仪表', padding=6)
-        f2.pack(fill='x', pady=(0, 6))
+        f = tk.LabelFrame(right, text=' 实时数据 ', bg=C_PANEL, fg=C_ACCENT,
+                          font=('Microsoft YaHei', 10, 'bold'), bd=1, relief='groove')
+        f.grid(row=row, column=0, sticky='ew', pady=(0, 8)); row += 1
+        f.columnconfigure(1, weight=1)
+
         self.v_rpm = tk.StringVar(value='---')
         self.v_acc = tk.StringVar(value='---')
         self.v_gyr = tk.StringVar(value='---')
         self.v_yaw = tk.StringVar(value='---')
         self.v_srv = tk.StringVar(value='---')
-        rows = [('转速', self.v_rpm), ('加速度 ax,ay,az', self.v_acc),
-                ('角速度 gx,gy,gz', self.v_gyr), ('偏航角 yaw', self.v_yaw),
-                ('舵机位置', self.v_srv)]
-        for i, (k, v) in enumerate(rows):
-            ttk.Label(f2, text=k, width=15).grid(row=i, column=0, sticky='w')
-            ttk.Label(f2, textvariable=v, font=('Consolas', 10)).grid(row=i, column=1, sticky='w')
 
-        # ---- 速度环 ----
-        f3 = ttk.LabelFrame(right, text='速度环  q <rpm>', padding=6)
-        f3.pack(fill='x', pady=(0, 6))
-        self.var_rpm = tk.IntVar(value=0)
-        self.lbl_rpm = ttk.Label(f3, text='目标: 0', width=12)
-        sc = tk.Scale(f3, from_=-3000, to=3000, orient='horizontal', variable=self.var_rpm,
-                      command=lambda v: self.lbl_rpm.configure(text='目标: %d' % int(float(v))),
-                      bg='#202028', fg='#e0e0e0', troughcolor='#404050',
-                      highlightbackground='#202028', length=210, showvalue=False)
-        sc.grid(row=0, column=0, columnspan=3, sticky='we')
-        self.lbl_rpm.grid(row=1, column=0, sticky='w')
-        ttk.Button(f3, text='下发', command=lambda: self.send('q %d' % self.var_rpm.get())).grid(row=1, column=1)
-        ttk.Button(f3, text='停', command=self.cmd_stop).grid(row=1, column=2)
+        self._lbl(f, '转速').grid(row=0, column=0, sticky='w', padx=6)
+        tk.Label(f, textvariable=self.v_rpm, bg=C_PANEL, fg='#66e08a',
+                 font=('Consolas', 16, 'bold'), anchor='w').grid(row=0, column=1, sticky='w')
+        for i, (k, v) in enumerate((('加速度', self.v_acc), ('角速度', self.v_gyr),
+                                     ('偏航角', self.v_yaw), ('舵机', self.v_srv)), start=1):
+            self._lbl(f, k).grid(row=i, column=0, sticky='w', padx=6)
+            tk.Label(f, textvariable=v, bg=C_PANEL, fg=C_FG,
+                     font=('Consolas', 11), anchor='w').grid(row=i, column=1, sticky='w')
+
+        # ---- 速度 ----
+        f = tk.LabelFrame(right, text=' 速度控制 ', bg=C_PANEL, fg=C_ACCENT,
+                          font=('Microsoft YaHei', 10, 'bold'), bd=1, relief='groove')
+        f.grid(row=row, column=0, sticky='ew', pady=(0, 8)); row += 1
+        for c in range(4):
+            f.columnconfigure(c, weight=1)
+
+        self.var_rpm = tk.IntVar(value=500)
+        self.lbl_rpm = tk.Label(f, text='目标  0 RPM', bg=C_PANEL, fg=C_FG,
+                                font=('Microsoft YaHei', 11, 'bold'))
+        self.lbl_rpm.grid(row=0, column=0, columnspan=4, sticky='w', padx=6, pady=(4, 2))
+
+        self.btn_stop = self._btn(f, '停止', self.do_stop, bg=C_STOP, w=7, h=2)
+        self.btn_stop.grid(row=1, column=0, padx=3, pady=3, sticky='ew')
+        self.btn_fwd = self._btn(f, '前进', lambda: self.do_speed(+1), bg=C_ON, w=7, h=2)
+        self.btn_fwd.grid(row=1, column=1, padx=3, pady=3, sticky='ew')
+        self.btn_back = self._btn(f, '后退', lambda: self.do_speed(-1), bg='#5a4a20', w=7, h=2)
+        self.btn_back.grid(row=1, column=2, padx=3, pady=3, sticky='ew')
+        self.btn_zero = self._btn(f, '归零', self.do_zero, w=5, h=2)
+        self.btn_zero.grid(row=1, column=3, padx=3, pady=3, sticky='ew')
+
+        for i, p in enumerate(SPEED_PRESETS):
+            b = self._btn(f, '%d' % p, (lambda v=p: self.do_speed_val(v)), w=6, h=1,
+                          font=('Consolas', 10))
+            b.grid(row=2, column=i, padx=3, pady=(2, 4), sticky='ew')
+
+        self.sld_speed = tk.Scale(f, from_=0, to=3000, orient='horizontal',
+                                  bg=C_PANEL, fg=C_FG, troughcolor='#3c3c4c',
+                                  highlightbackground=C_PANEL, showvalue=False, length=250)
+        self.sld_speed.set(500)
+        self.sld_speed.grid(row=3, column=0, columnspan=4, sticky='ew', padx=6)
+        self.sld_speed.bind('<ButtonRelease-1>', lambda e: self.do_speed(+1))
 
         # ---- 舵机 ----
-        f4 = ttk.LabelFrame(right, text='舵机  r <pos>  (4096 = 360°, 中位 2048)', padding=6)
-        f4.pack(fill='x', pady=(0, 6))
-        self.var_srv = tk.IntVar(value=2048)
-        self.lbl_srv = ttk.Label(f4, text='目标: 2048', width=12)
-        sc2 = tk.Scale(f4, from_=1048, to=3048, orient='horizontal', variable=self.var_srv,
-                       command=lambda v: self.lbl_srv.configure(text='目标: %d' % int(float(v))),
-                       bg='#202028', fg='#e0e0e0', troughcolor='#404050',
-                       highlightbackground='#202028', length=210, showvalue=False)
-        sc2.grid(row=0, column=0, columnspan=3, sticky='we')
-        self.lbl_srv.grid(row=1, column=0, sticky='w')
-        ttk.Button(f4, text='下发', command=lambda: self.send('r %d' % self.var_srv.get())).grid(row=1, column=1)
-        ttk.Button(f4, text='中位', command=lambda: self.set_servo(2048)).grid(row=1, column=2)
+        f = tk.LabelFrame(right, text=' 舵机角度 ', bg=C_PANEL, fg=C_ACCENT,
+                          font=('Microsoft YaHei', 10, 'bold'), bd=1, relief='groove')
+        f.grid(row=row, column=0, sticky='ew', pady=(0, 8)); row += 1
+        for c in range(5):
+            f.columnconfigure(c, weight=1)
+
+        self.lbl_srv = tk.Label(f, text='目标  2048', bg=C_PANEL, fg=C_FG,
+                                font=('Microsoft YaHei', 11, 'bold'))
+        self.lbl_srv.grid(row=0, column=0, columnspan=5, sticky='w', padx=6, pady=(4, 2))
+
+        self.btn_sl = self._btn(f, '左', lambda: self.do_servo(SERVO_LEFT), w=4, h=2)
+        self.btn_sl.grid(row=1, column=0, padx=3, pady=3, sticky='ew')
+        self.btn_sm = self._btn(f, '中', lambda: self.do_servo(SERVO_MID), bg=C_ON, w=4, h=2)
+        self.btn_sm.grid(row=1, column=2, padx=3, pady=3, sticky='ew')
+        self.btn_sr = self._btn(f, '右', lambda: self.do_servo(SERVO_RIGHT), w=4, h=2)
+        self.btn_sr.grid(row=1, column=4, padx=3, pady=3, sticky='ew')
+
+        self.btn_sd = self._btn(f, '−20', lambda: self.do_servo_nudge(-20), w=4, h=1)
+        self.btn_sd.grid(row=2, column=0, padx=3, pady=(0, 4), sticky='ew')
+        self.btn_su = self._btn(f, '+20', lambda: self.do_servo_nudge(+20), w=4, h=1)
+        self.btn_su.grid(row=2, column=4, padx=3, pady=(0, 4), sticky='ew')
+
+        self.sld_servo = tk.Scale(f, from_=SERVO_MIN, to=SERVO_MAX, orient='horizontal',
+                                  bg=C_PANEL, fg=C_FG, troughcolor='#3c3c4c',
+                                  highlightbackground=C_PANEL, showvalue=False, length=250)
+        self.sld_servo.set(SERVO_MID)
+        self.sld_servo.grid(row=3, column=0, columnspan=5, sticky='ew', padx=6)
+        self.sld_servo.bind('<ButtonRelease-1>', lambda e: self.do_servo(int(self.sld_servo.get())))
 
         # ---- 其它 ----
-        f5 = ttk.LabelFrame(right, text='其它', padding=6)
-        f5.pack(fill='x', pady=(0, 6))
-        ttk.Button(f5, text='编码器清零 (l)', command=lambda: self.send('l')).grid(row=0, column=0, sticky='w')
-        ttk.Button(f5, text='板子状态 (s)', command=lambda: self.send('s')).grid(row=0, column=1, sticky='w')
-        ttk.Button(f5, text='开环停 (w 0 0)', command=lambda: self.send('w 0 0')).grid(row=0, column=2, sticky='w')
+        f = tk.LabelFrame(right, text=' 其它 ', bg=C_PANEL, fg=C_ACCENT,
+                          font=('Microsoft YaHei', 10, 'bold'), bd=1, relief='groove')
+        f.grid(row=row, column=0, sticky='ew', pady=(0, 8)); row += 1
+        f.columnconfigure(0, weight=1)
+        f.columnconfigure(1, weight=1)
+
+        self.btn_enc = self._btn(f, '编码器清零', self.do_clr_enc, w=12)
+        self.btn_enc.grid(row=0, column=0, padx=6, pady=4, sticky='ew')
+        self.btn_estop = self._btn(f, '紧急停止', self.do_estop, bg=C_ESTOP, fg='white',
+                                   w=12, font=('Microsoft YaHei', 10, 'bold'))
+        self.btn_estop.grid(row=0, column=1, padx=6, pady=4, sticky='ew')
 
         # ---- 日志 ----
-        f6 = ttk.LabelFrame(right, text='板子回话', padding=4)
-        f6.pack(fill='both', expand=True)
-        self.txt_log = tk.Text(f6, height=7, width=44, bg='#101014', fg='#9fd0ff',
-                               font=('Consolas', 8), bd=0)
-        self.txt_log.pack(fill='both', expand=True)
+        f = tk.LabelFrame(right, text=' 板子回话 ', bg=C_PANEL, fg=C_ACCENT,
+                          font=('Microsoft YaHei', 10, 'bold'), bd=1, relief='groove')
+        f.grid(row=row, column=0, sticky='nsew'); row += 1
+        right.rowconfigure(row - 1, weight=1)
+
+        self.txt_log = tk.Text(f, height=5, bg='#12121a', fg='#8fc8ff', bd=0,
+                               font=('Consolas', 8), wrap='none')
+        self.txt_log.pack(fill='both', expand=True, padx=4, pady=4)
         self.txt_log.configure(state='disabled')
 
-    # ================================================================ 发送
-    def send(self, cmd):
+        right.rowconfigure(row, weight=0)
+
+    # ================================================================ 动作（全部由按钮触发）
+    def send(self, cmd, note=None):
         c = self.conn
         if c is None:
-            self.log('> %s   （还没连上板子）' % cmd)
-            return
+            self.log('（未连接，没发出去）%s' % (note or ''))
+            return False
         try:
             c.sendall((cmd + '\n').encode('ascii', 'ignore'))
-            self.log('> ' + cmd)
+            if note:
+                self.log(note)
+            return True
         except Exception as e:
             self.log('发送失败: %s' % e)
+            return False
 
-    def set_mode(self, binary):
-        """用户在界面上切"二值图/原图"：先立刻切显示，再通知板子。
-        不等遥测回来，否则切换后要等 100ms 才会变。"""
+    def do_mode(self, binary):
         self.mode_gray = (binary == 0)
-        self.var_mode.set(binary)
-        self.send('s %d' % binary)
-        self.shot = None            # 丢掉上一模式的图，等新模式的帧
+        self.shot = None
         self.gray_got = set()
+        self.send('s %d' % binary, '图像 → %s' % ('二值图' if binary else '原图灰度'))
+        self.refresh_buttons()
 
-    def cmd_stop(self):
-        self.var_rpm.set(0)
-        self.lbl_rpm.configure(text='目标: 0')
-        self.send('q 0')
+    def do_speed(self, sign):
+        """前进/后退：用滑条上的绝对值，只改方向"""
+        v = abs(int(self.sld_speed.get()))
+        self.set_speed(sign * v)
+
+    def do_speed_val(self, v):
+        self.sld_speed.set(v)
+        self.set_speed(+v)
+
+    def set_speed(self, rpm):
+        self.req_rpm = int(rpm)
+        self.lbl_rpm.configure(text='目标  %d RPM' % self.req_rpm)
+        self.send('q %d' % self.req_rpm, '速度 → %d RPM' % self.req_rpm)
+
+    def do_stop(self):
+        self.req_rpm = 0
+        self.lbl_rpm.configure(text='目标  0 RPM')
+        self.send('q 0', '速度 → 停止')
         self.send('w 0 0')
 
-    def set_servo(self, pos):
-        self.var_srv.set(pos)
-        self.lbl_srv.configure(text='目标: %d' % pos)
-        self.send('r %d' % pos)
+    def do_zero(self):
+        """滑条归零（不动电机）"""
+        self.sld_speed.set(0)
+        self.lbl_rpm.configure(text='目标  0 RPM')
 
+    def do_servo(self, pos):
+        pos = max(SERVO_MIN, min(SERVO_MAX, int(pos)))
+        self.req_servo = pos
+        self.sld_servo.set(pos)
+        self.lbl_srv.configure(text='目标  %d' % pos)
+        self.send('r %d' % pos, '舵机 → %d' % pos)
+
+    def do_servo_nudge(self, d):
+        self.do_servo(self.req_servo + d)
+
+    def do_clr_enc(self):
+        self.send('l', '编码器清零')
+
+    def do_estop(self):
+        self.req_rpm = 0
+        self.lbl_rpm.configure(text='目标  0 RPM')
+        self.send('q 0', '★ 紧急停止')
+        self.send('w 0 0')
+
+    def refresh_buttons(self):
+        try:
+            self.btn_bin.configure(bg=C_ON if not self.mode_gray else C_BTN)
+            self.btn_gray.configure(bg=C_ON if self.mode_gray else C_BTN)
+            self.lbl_mode.configure(
+                text='当前：%s' % ('原图灰度 94×60' if self.mode_gray else '二值图 188×120'))
+        except Exception:
+            pass
+
+    # ================================================================ 日志
     def log(self, s):
-        self.log_lines.append(s)
-        if len(self.log_lines) > 200:
-            self.log_lines = self.log_lines[-200:]
         try:
             self.txt_log.configure(state='normal')
             self.txt_log.insert('end', s + '\n')
+            n = int(self.txt_log.index('end-1c').split('.')[0])
+            if n > 300:
+                self.txt_log.delete('1.0', '50.0')
             self.txt_log.see('end')
             self.txt_log.configure(state='disabled')
         except Exception:
@@ -271,7 +394,6 @@ class App(object):
                 return
             typ = buf[4]
 
-            # ---------- 二值整帧 ----------
             if typ == 0xFF:
                 flen = (buf[8] << 8) | buf[9]
                 if not (24 <= flen <= 480 * 24 and flen % 24 == 0):
@@ -286,7 +408,6 @@ class App(object):
                 del buf[:need]
                 continue
 
-            # ---------- 灰度缩略图（8 块）----------
             if typ == 0xFC:
                 flen = (buf[8] << 8) | buf[9]
                 if not (1 <= flen <= 8 * GRAY_W):
@@ -301,7 +422,6 @@ class App(object):
                 del buf[:need]
                 continue
 
-            # ---------- 左右边界数组 ----------
             if typ == 0xFD:
                 flen = (buf[8] << 8) | buf[9]
                 if not (2 <= flen <= 480 * 2 and flen % 2 == 0):
@@ -322,7 +442,7 @@ class App(object):
                 del buf[:need]
                 continue
 
-            del buf[:1]        # 不认识的类型 ⇒ 挪 1 字节重找
+            del buf[:1]
 
     def on_bin_full(self, pay):
         buf = self.bin_img
@@ -360,11 +480,9 @@ class App(object):
             ln = ln.rstrip('\r')
             if not ln.strip() or not all(32 <= ord(c) < 127 for c in ln):
                 continue
-
             if ln.startswith('T '):
                 self.on_tele(ln[2:])
-                continue
-            if ln.startswith('ACK') or ln.startswith('CFG') or ln.startswith('CAM'):
+            elif ln.startswith('ACK') or ln.startswith('CFG') or ln.startswith('CAM'):
                 self.log(ln)
 
     def on_tele(self, s):
@@ -394,9 +512,7 @@ class App(object):
             self.v_srv.set('---' if p >= 0xFFFF else '%d' % p)
         if 'm' in d:
             self.mode_gray = (int(d['m']) == 0)
-            want = 0 if self.mode_gray else 1
-            if self.var_mode.get() != want:
-                self.var_mode.set(want)
+            self.refresh_buttons()
 
     # ================================================================ 画图
     def schedule_draw(self, force=False):
@@ -413,7 +529,6 @@ class App(object):
         im = Image.frombytes('L', (w, h), data)
         im = im.resize((VIEW_W, VIEW_H), Image.NEAREST).convert('RGB')
 
-        # ---- 左右边界：板子算好的点，这里只画红线 ----
         if self.edges:
             d = ImageDraw.Draw(im)
             s = SCALE_EDGE
@@ -447,15 +562,13 @@ class App(object):
 
         age = (now - self.t_tele) if self.t_tele else 99.0
         conn = '已连接' if self.conn else '未连接'
-        mode = '原图' if self.mode_gray else '二值'
         self.lbl_stat.configure(
-            text='%s | %s | 帧率 %.1f | 收 %.0f B/s | 遥测 %.1fs 前'
-                 % (conn, mode, self.fps, self.bps, age))
+            text='%s    %s    帧率 %.1f    收 %.0f B/s    遥测 %.1fs 前'
+                 % (conn, '原图' if self.mode_gray else '二值', self.fps, self.bps, age))
 
-        # 遥测断了就把仪表标成 ---
         if age > 2.0:
             for v in (self.v_rpm, self.v_acc, self.v_gyr, self.v_yaw):
-                if v.get() not in ('---',):
+                if v.get() != '---':
                     v.set('---')
 
     def close(self):
@@ -476,15 +589,14 @@ def run():
     srv.settimeout(0.2)
 
     print('=' * 62)
-    print(' small_car 驾驶台')
-    print(' 本机 IP   = %s' % local_ip())
-    print(' 监听端口  = %d' % PORT)
+    print(' small_car 控制台   （全部用按钮操作）')
+    print(' 本机 IP  = %s' % local_ip())
+    print(' 监听端口 = %d' % PORT)
     print(' ⇒ wifi_f4.h 里的 WIFI_PC_IP / WIFI_PC_PORT 要和上面一致')
     print(' ⇒ 然后给板子上电（模块会主动连过来）')
     print('=' * 62)
 
     while True:
-        # ---- 等连接（期间保持界面响应）----
         try:
             conn, addr = srv.accept()
         except socket.timeout:
@@ -502,9 +614,8 @@ def run():
         conn.settimeout(0.1)
         app.log('--- 板子已连接 ---')
 
-        # 连上自动问一句状态（顺便确认下行通）
         try:
-            conn.sendall(b's\n')
+            conn.sendall(b's\n')          # 问一下状态（顺便确认下行通）
         except Exception:
             pass
 
@@ -523,7 +634,7 @@ def run():
 
             app.tick()
             try:
-                app.root.update()       # ★ 在收数线程里驱动 Tk（按钮/滑条才响应）
+                app.root.update()
             except tk.TclError:
                 app.conn = None
                 app.close()
