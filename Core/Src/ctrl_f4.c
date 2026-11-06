@@ -518,18 +518,32 @@ static void servo_set_baud (uint32_t bps)
 
 void ctrl_servo_scan (void)
 {
-    /* 用户已确认舵机是 **1 Mbps**（幻尔 HX 磁编码舵机），所以只在这一个波特率上扫 ID。
-       ⚠️ 以前这里会挨个试 11 档波特率，舵机没接时开机要多花 1~2 秒，而且最后还可能
-          停在错的波特率上（截图里的 `4k` 就是这样来的）。*/
-    uint8_t id;
+    /* ★★★ 2026-11-06 按官方文档恢复**多波特率扫描** ★★★
+       幻尔文档自己就矛盾：
+         · 《HX-10HM 使用手册》第 1 页：「串口波特率为 **115200**」
+         · 同手册第 4 页规格表 ：「通信波特率 **1000000**」
+         · 《HX-10HM 通信协议文档》 ：「通信速度为 **1 Mbps**」
+       官方 STM32 例程用的是 1M + `rx_timeout = 10ms`。
+       既然文档不一致，就别猜了 —— 开机把两档都试一遍，收到谁的回包就用谁的。
+       顺序：1M（最可能）→ 115200（手册第 1 页说的）→ 其余常见档。
+       每档扫 ID 0~20；等待时间按波特率自动放大（servo_wait_ms）。*/
+    static const uint32_t bauds[] = { 1000000UL, 115200UL, 500000UL, 250000UL,
+                                      57600UL, 38400UL, 19200UL, 9600UL, 10000UL, 4800UL };
+    uint8_t bi, id;
 
-    servo_set_baud(CTRL_SERVO_BAUD);
-    HAL_Delay(2);
-
-    for (id = 0U; id <= 20U; id++)
+    for (bi = 0U; bi < (uint8_t)(sizeof(bauds) / sizeof(bauds[0])); bi++)
     {
-        if (0U != servo_probe_id(id)) { g_servo_id = id; return; }
+        servo_set_baud(bauds[bi]);
+        HAL_Delay(2);
+
+        for (id = 0U; id <= 20U; id++)
+        {
+            if (0U != servo_probe_id(id)) { g_servo_id = id; return; }
+        }
     }
+
+    /* 一个都没找到 ⇒ 恢复默认波特率（别停在最后一档）*/
+    servo_set_baud(CTRL_SERVO_BAUD);
 }
 
 /* 收包解析：在 20ms 节拍里跑，**绝不 while 等** */
