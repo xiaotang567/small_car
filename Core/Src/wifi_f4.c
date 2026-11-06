@@ -626,17 +626,30 @@ uint32_t wifi_f4_send (const uint8_t *buf, uint32_t len)
         buf  += chunk;
     }
 
-    /* ★★ 自动重连（2026-10-19）：连续"发了但进度为 0" ⇒ 认为链路已断
-       （**上位机重启**后 TCP 会话就死了，而 wf_ready 还一直是 1 ⇒ 板子往死连接里发，不会重连 ✗）
-       ⇒ 清 wf_ready ⇒ 主循环的 3 秒重连逻辑会重新 init + 连 WiFi + 连 TCP ✓✓ */
+    /* ★★ 自动重连（2026-10-19 加，2026-11-06 改成**按时间**判）
+       原来：连续 150 次"发了没进展"就判链路断。
+       🔥 实测这个判据太敏感：每次发送最多等 300µs，150 次 ≈ **45ms**。
+          模块只要有一小会儿忙（图像 + 遥测一起压过去就是），45ms 没进展就被判成断链
+          ⇒ `wf_ready=0` ⇒ 3 秒后重连 ⇒ 新的 TCP 连接（本机端口 6666→6667→6668…）
+          ⇒ 上位机看到的就是"已连接 / 对方断开"**反复刷屏**（用户 2026-11-06 截图）。
+       ✅ 现在：**连续 2 秒一个字节都没发出去**才判断链 —— 短暂拥塞不会再拆连接，
+          而"上位机重启导致会话死掉"这种情况 2 秒内也一定能发现 ✓ */
     {
-        static uint16_t wf_stall = 0U;
-        if (0U == (s0 - len)) { if (wf_stall < 60000U) { wf_stall ++; } }
-        else                  { wf_stall = 0U; }
-        if (wf_stall >= 150U)          /* 连续 150 次没有进展（≈0.1~1 秒）⇒ 判链路断 */
+        static uint32_t wf_stall_t = 0U;
+        uint32_t now = HAL_GetTick();
+
+        if (0U != (s0 - len))              /* 这次有进展 */
         {
-            wf_stall = 0U;
-            wf_ready = 0U;
+            wf_stall_t = now;
+        }
+        else if (0U == wf_stall_t)          /* 第一次调用 */
+        {
+            wf_stall_t = now;
+        }
+        else if ((now - wf_stall_t) >= 2000U)
+        {
+            wf_stall_t = now;
+            wf_ready   = 0U;               /* 2 秒完全发不出去 ⇒ 判链路断，交给主循环重连 */
         }
     }
     return len;
