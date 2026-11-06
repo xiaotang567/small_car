@@ -464,69 +464,18 @@ static void servo_set_baud (uint32_t bps)
 
 void ctrl_servo_scan (void)
 {
-    /* ★ 先找波特率：舵机波特率可配（用户这块是 **1M**）。
-       每档给 0~5 号发一遍 READ，等待时间按波特率放大（低波特率下一帧就要 8ms）。*/
-    static const uint32_t bauds[] = { 1000000UL, 115200UL, 57600UL, 38400UL,
-                                      19200UL, 14400UL, 9600UL, 10000UL,
-                                      500000UL, 250000UL, 4800UL };
-    uint8_t  bi, id, tries;
+    /* 用户已确认舵机是 **1 Mbps**（幻尔 HX 磁编码舵机），所以只在这一个波特率上扫 ID。
+       ⚠️ 以前这里会挨个试 11 档波特率，舵机没接时开机要多花 1~2 秒，而且最后还可能
+          停在错的波特率上（截图里的 `4k` 就是这样来的）。*/
+    uint8_t id;
 
-    /* ★★★ 第 1 步：先按**默认波特率**把 ID 0~20 完整扫一遍 ★★★
-       （旧版在每档波特率上只喊 0~5 号；如果舵机 ID 是 7，就会一路"没回音"扫到底，
-         最后停在 4800bps，屏幕上就显示 `4k` —— 这就是上一版截图里的现象。）*/
     servo_set_baud(CTRL_SERVO_BAUD);
     HAL_Delay(2);
+
     for (id = 0U; id <= 20U; id++)
     {
         if (0U != servo_probe_id(id)) { g_servo_id = id; return; }
     }
-
-    /* ★★★ 第 2 步：默认波特率不行，再换档试（每档只喊 0~5 号看有没有回音）★★★ */
-    for (bi = 0U; bi < (uint8_t)(sizeof(bauds) / sizeof(bauds[0])); bi++)
-    {
-        uint32_t t0, rx0, wait;
-
-        if (bauds[bi] == CTRL_SERVO_BAUD) { continue; }    /* 刚试过 */
-
-        servo_set_baud(bauds[bi]);
-        HAL_Delay(2);
-
-        g_srx_head = g_srx_tail = 0U;
-        rx0 = g_servo_rx_bytes;
-
-        for (id = 0U; id <= 5U; id++)                  /* 先把常见 ID 都喊一遍 */
-        {
-            uint8_t f[8];
-
-            f[0] = 0xFFU; f[1] = 0xFFU;
-            f[2] = id; f[3] = 4U;
-            f[4] = SERVO_INSTR_READ; f[5] = SERVO_REG_CURPOS; f[6] = 2U;
-            f[7] = servo_checksum(&f[2], 5U);
-            (void)servo_queue(f, 8U);
-        }
-
-        wait = servo_wait_ms(56U, 8U);                 /* 6 帧*8 字节 + 回包 + 余量 */
-
-        t0 = HAL_GetTick();
-        while ((HAL_GetTick() - t0) < wait) { servo_poll(); }
-
-        if (g_servo_rx_bytes == rx0) { continue; }      /* 这档没动静，下一档 */
-
-        /* 波特率对了 ⇒ 在这一档上扫 ID（最多两轮，覆盖 0~20）*/
-        for (tries = 0U; tries < 2U; tries++)
-        {
-            for (id = 0U; id <= 20U; id++)
-            {
-                if (0U != servo_probe_id(id)) { g_servo_id = id; return; }
-            }
-        }
-        return;
-    }
-
-    /* ★★★ 第 3 步：一个都没找到 ⇒ **恢复默认波特率** ★★★
-       （旧版会把波特率停在最后试的那一档，比如 4800 —— 之后所有读写都用错波特率，
-         就算后来接线好了也永远通不了。）*/
-    servo_set_baud(CTRL_SERVO_BAUD);
 }
 
 /* 收包解析：在 20ms 节拍里跑，**绝不 while 等** */
@@ -572,6 +521,7 @@ static void servo_poll (void)
 
         g_servo_err     = buf[4];
         g_servo_last_id = buf[2];                  /* 扫描/诊断用：这一帧是谁回的 */
+        g_servo_id      = buf[2];                  /* ★ 自动锁定：谁回应就用谁的 ID */
         g_servo_rx_cnt ++;
 
         /* 读位置应答有两种固件格式，都认：
@@ -1433,6 +1383,9 @@ void board_ctrl_tick (void)
     /* 4) 舵机
           · 上电先等 1 秒（50 拍）—— 总线舵机自己也要初始化，太早说话它不理
           · 然后先写一次目标速度（0x2E 是保持型寄存器），再把舵机摆到中位
+          · **还没找到舵机（位置一直是 0xFFFF）时：每拍换一个 ID 发“读位置”**
+            ⇒ 不用重启板子，你把线接好/换好，最多 420ms 它就会自己发现并锁定 ID
+            （`servo_poll()` 收到谁的回包就把 g_servo_id 改成谁的）
           · 之后：目标变了才发；空闲时每 10 拍（200ms）读一次位置
           ⚠️ 读写不要挤在同一拍：总线是半双工的，一问一答挨太近会打架 */
     if (g_servo_boot < 50U)
@@ -1442,6 +1395,18 @@ void board_ctrl_tick (void)
     else if (0U == g_servo_speed_ok)
     {
         if (0U == servo_set_speed((int16_t)CTRL_SERVO_SPEED)) { g_servo_speed_ok = 1U; }
+    }
+    else if (0xFFFFU == g_servo_pos)
+    {
+        static uint8_t sid = 0U;
+        uint8_t f[8];
+
+        f[0] = 0xFFU; f[1] = 0xFFU;
+        f[2] = sid; f[3] = 4U;
+        f[4] = SERVO_INSTR_READ; f[5] = SERVO_REG_CURPOS; f[6] = 2U;
+        f[7] = servo_checksum(&f[2], 5U);
+        (void)servo_queue(f, 8U);
+        sid = (uint8_t)((sid + 1U) % 21U);          /* 0~20 轮着问 */
     }
     else if (g_servo_target != g_servo_last_set)
     {
