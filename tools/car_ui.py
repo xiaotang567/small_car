@@ -127,6 +127,7 @@ class App(object):
         self.ctrl_mode = 'pwm'      # ★ 默认"占空比"方式，滑条默认 30%
         self.presets = PWM_PRESETS
         self.pending = []           # 等回执的命令（send_ack 用）
+        self.txt_pend = ''          # 文本行缓冲（TCP 分包时半行先攒着）
         self.warn_zero = False      # 只提示一次"运行但输出 0"
 
         # ---- 窗口 ----
@@ -742,8 +743,17 @@ class App(object):
 
     # ================================================================ 文本
     def on_text(self, txt):
-        for ln in txt.split('\n'):
-            ln = ln.rstrip('\r')
+        # ★ 文本可能被 TCP 分包切在两半（遥测行现在有 150 字节，很容易被切开）：
+        #   先攒起来，只处理**完整的行**，否则半行会被当成整行丢掉或解析出乱七八糟的值。
+        self.txt_pend += txt
+        while True:
+            k = self.txt_pend.find('\n')
+            if k < 0:
+                if len(self.txt_pend) > 4096:      # 防跑飞
+                    self.txt_pend = ''
+                return
+            ln = self.txt_pend[:k].rstrip('\r')
+            self.txt_pend = self.txt_pend[k + 1:]
             if not ln.strip() or not all(32 <= ord(c) < 127 for c in ln):
                 continue
             if ln.startswith('T '):

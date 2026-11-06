@@ -817,7 +817,7 @@ void app_loop (void)
     //   格式（故意短，别超过 130 字符 —— 上位机的文本行有长度上限）：
     //     T r=<转速RPM> ax ay az gx gy gz <原始LSB> y=<偏航角, 单位 0.1°> s=<舵机位置> m=<图像模式>
     //   上位机只按 = 取数，顺序/字段名可以随意加（加新字段要同步改 car_ui.py）
-    if (wifi_f4_is_ready() && ((HAL_GetTick() - t_tel) >= 100U))
+    if (wifi_f4_is_ready() && ((HAL_GetTick() - t_tel) >= 200U))
     {
       static char tb[192];
       static uint16_t tel_seq = 0U;
@@ -874,7 +874,7 @@ void app_loop (void)
         //     MD  = 当前采集模式（0 = 752 宽 / 1 = 188 宽）
         //     BIN = 188×120 配置是否成功（1 = 已写并回读一致）
         //     R0D/R0E = 两个 Read Mode 寄存器的**回读值**（列 bin 在 R0D[3:2]、行 bin 在 R0E[1:0]）
-        sprintf(buf, "S f=%lu V=%lu VS=%lu LG=%lu TO=%lu F=%u FL=%u P=%u RX=%lu CAM=%u ID=%04X N=%u MD=%u BIN=%u R0D=%04X W=%u E=%u K=%lu R=%04lX IE=%04lX MI=%04lX LW=%lu GP=%lu FW=2080 RST=%02lX PC=%08lX CF=%04lX BA=%08lX\r\n",
+        sprintf(buf, "S f=%lu V=%lu VS=%lu LG=%lu TO=%lu F=%u FL=%u P=%u RX=%lu CAM=%u ID=%04X N=%u MD=%u BIN=%u R0D=%04X W=%u E=%u K=%lu R=%04lX IE=%04lX MI=%04lX LW=%lu GP=%lu FW=2081 RST=%02lX PC=%08lX CF=%04lX BA=%08lX\r\n",
                 (unsigned long)cam_frame_cnt, (unsigned long)cam_vsync_isr_cnt,
                 (unsigned long)cam_vs_cap_cnt,
                 (unsigned long)disp_lag_max,
