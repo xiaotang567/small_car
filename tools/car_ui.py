@@ -111,6 +111,12 @@ class App(object):
         self.t_bps = time.time()
         self.n_bps = 0
         self.t_draw = 0.0
+        # 遥测质量（用板子发的序号 n= 算"收到几条 / 丢几条"）
+        self.tel_seq = None
+        self.tel_rx = 0
+        self.tel_lost = 0
+        self.tel_rate = 0.0
+        self.tel_loss = 0.0
 
         # ---- 目标值（界面状态）----
         self.req_rpm = 0            # 想跑多少（带方向）
@@ -683,6 +689,16 @@ class App(object):
         self.tele.update(d)
         self.t_tele = time.time()
 
+        # ★ 遥测序号：算丢包率，区分"板子没发"和"链路丢了"
+        if 'n' in d:
+            nn = int(d['n']) & 0xFFFF
+            if self.tel_seq is not None:
+                gap = (nn - self.tel_seq) & 0xFFFF
+                if 0 < gap < 100:
+                    self.tel_lost += gap - 1
+            self.tel_seq = nn
+            self.tel_rx += 1
+
         if 'r' in d:
             self.v_rpm.set('%d RPM' % int(d['r']))
         if all(k in d for k in ('ax', 'ay', 'az')):
@@ -752,16 +768,24 @@ class App(object):
         self._check_pending()          # ★ 命令没回执就重发
 
         if (now - self.t_fps) >= 1.0:
-            self.fps = (self.frames - self.n_fps) / (now - self.t_fps)
+            dt = max(now - self.t_fps, 0.001)
+            self.fps = (self.frames - self.n_fps) / dt
             self.t_fps, self.n_fps = now, self.frames
             self.bps = (self.nbytes - self.n_bps) / max(now - self.t_bps, 0.001)
             self.t_bps, self.n_bps = now, self.nbytes
+            # 遥测质量：本秒收到几条 / 丢几条
+            tot = self.tel_rx + self.tel_lost
+            self.tel_rate = self.tel_rx / dt
+            self.tel_loss = (100.0 * self.tel_lost / tot) if tot > 0 else 0.0
+            self.tel_rx = 0
+            self.tel_lost = 0
 
         age = (now - self.t_tele) if self.t_tele else 99.0
         conn = '已连接' if self.conn else '未连接'
         self.lbl_stat.configure(
-            text='%s    %s    帧率 %.1f    收 %.0f B/s    遥测 %.1fs 前'
-                 % (conn, '原图' if self.mode_gray else '二值', self.fps, self.bps, age))
+            text='%s    %s    帧率 %.1f    收 %.0f B/s    遥测 %.1f/s 丢%.0f%% (%.1fs 前)'
+                 % (conn, '原图' if self.mode_gray else '二值', self.fps, self.bps,
+                    self.tel_rate, self.tel_loss, age))
 
         if age > 3.0:
             for v in (self.v_rpm, self.v_acc, self.v_gyr, self.v_yaw, self.v_duty):

@@ -680,13 +680,20 @@ void wifi_f4_send_string (const char *s)
     }
 }
 
-// ★ 遥测专用：**只试一次**，发不出去就丢掉。
-//   为什么单独加一个：`wifi_f4_send_string()` 会重试 10 次（最坏 ~7ms），
-//   10Hz 遥测用它就等于每 100ms 按主循环最多 7ms（严重时 70ms/s），
-//   而遥测丢一条无所谓（100ms 后又是新的一条）⇒ 绝不为它等。
+// ★ 遥测专用：**最多试 3 次**（最坏约 1ms），发不出去就丢掉。
+//   为什么不复用 `wifi_f4_send_string()`：那个会重试 10 次（最坏 7ms），10Hz 遥测用它
+//   等于每 100ms 按主循环 7ms，实测把摄像头收割都拖慢了；
+//   而只试 1 次又会丢太多（"数据一会有一会没有"）⇒ 折中 **3 次 ≈ 1ms**。
 void wifi_f4_send_string_nb (const char *s)
 {
+    uint8_t i;
+
     if (NULL == s) { return; }
-    (void)wifi_f4_send((const uint8_t *)s, (uint32_t)strlen(s));
+
+    for (i = 0U; i < 3U; i++)
+    {
+        if (0U == wifi_f4_send((const uint8_t *)s, (uint32_t)strlen(s))) { return; }
+        wf_delay_us(200);
+    }
 }
 //===================================================对外接口===================================================
