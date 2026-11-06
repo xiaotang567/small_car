@@ -605,6 +605,40 @@ static uint8_t wf_wait_idle_us (uint32_t us)
     return 1U;
 }
 
+/* ★★★ 2026-11-06：**文本发送队列**（遥测 / 命令回执）★★★
+   现场故障：图像能刷，但遥测和 ACK 全都没有。
+   原因：图像路径在 cam_tx_tick() 里**每轮主循环都重试**，而文本只给 10 次机会
+        （wifi_f4_send_string），模块一忙文本就被饿死 —— 它抢不过图像。
+   现在文本进队列，由主循环每轮 pump 一次，和图像**平权**竞争空闲窗口。
+   pri：1 = 回执/状态（重要，不会被覆盖）   0 = 遥测（可被覆盖，丢一条无所谓）*/
+static char    wf_txt_buf[192];
+static uint8_t wf_txt_has = 0U;
+static uint8_t wf_txt_pri = 0U;
+
+void wifi_f4_text (const char *s, uint8_t pri)
+{
+    if (NULL == s) { return; }
+    if ((0U != wf_txt_has) && (wf_txt_pri > pri)) { return; }   /* 已有更重要的，不覆盖 */
+    strncpy(wf_txt_buf, s, sizeof(wf_txt_buf) - 1U);
+    wf_txt_buf[sizeof(wf_txt_buf) - 1U] = '\0';
+    wf_txt_pri = pri;
+    wf_txt_has = 1U;
+}
+
+void wifi_f4_text_pump (void)
+{
+    uint32_t left;
+
+    if ((0U == wf_txt_has) || (0U == wf_ready)) { return; }
+
+    left = wifi_f4_send((const uint8_t *)wf_txt_buf, (uint32_t)strlen(wf_txt_buf));
+    if (0U == left)
+    {
+        wf_txt_has = 0U;
+        wf_txt_pri = 0U;
+    }
+}
+
 uint32_t wifi_f4_send (const uint8_t *buf, uint32_t len)
 {
     uint16_t chunk;

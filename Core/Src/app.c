@@ -22,7 +22,7 @@
    ⇒ SEND_MODE_VOFA=1（发图像）时，**所有文本输出一律丢弃**；只有发自定义协议时才放行。 */
 static void dbg_txt (const char *s)
 {
-    if ((0U == SEND_MODE_VOFA) && (NULL != s)) { wifi_f4_send_string(s); }
+    if ((0U == SEND_MODE_VOFA) && (NULL != s)) { wifi_f4_text(s, 1U); }
 }
 volatile uint32_t cam_rx_bytes = 0U;
 static uint32_t t_last_frame = 0U;    // ★ 上次自检时的帧计数（判"有没有新帧"）      // ★ 最近一次量到的 PB7(VSYNC) 边沿率(Hz)
@@ -543,6 +543,9 @@ void app_loop (void)
       relink_n = 0;                             /* 连上了就清计数 */
     }
 
+    // ---- ★ 文本队列（遥测/回执）：每轮试一次，和图像平权抢空闲窗口 ----
+    wifi_f4_text_pump();
+
     // ---- 板载 LED 的闪烁节奏（不阻塞）----
     board_led_task();
 
@@ -868,7 +871,7 @@ void app_loop (void)
       /* ★ 遥测走**不重试**的发送：10Hz × 每次重试最多 7ms 会按住主循环，
          把摄像头收割和图像发送都拖慢（实测就是"数据一会有一会没有"）。
          丢一条遥测没关系，下一条 100ms 后就来。 */
-      if (0U == SEND_MODE_VOFA) { wifi_f4_send_string_nb(tb); }
+      if (0U == SEND_MODE_VOFA) { wifi_f4_text(tb, 0U); }
     }
 
     // ==================== ★ 心跳：每 500ms **无条件**发一条 ★ ====================
@@ -894,7 +897,7 @@ void app_loop (void)
         //     MD  = 当前采集模式（0 = 752 宽 / 1 = 188 宽）
         //     BIN = 188×120 配置是否成功（1 = 已写并回读一致）
         //     R0D/R0E = 两个 Read Mode 寄存器的**回读值**（列 bin 在 R0D[3:2]、行 bin 在 R0E[1:0]）
-        sprintf(buf, "S f=%lu V=%lu VS=%lu LG=%lu TO=%lu F=%u FL=%u P=%u RX=%lu CAM=%u ID=%04X N=%u MD=%u BIN=%u R0D=%04X W=%u E=%u K=%lu R=%04lX IE=%04lX MI=%04lX LW=%lu GP=%lu FW=2084 RST=%02lX PC=%08lX CF=%04lX BA=%08lX\r\n",
+        sprintf(buf, "S f=%lu V=%lu VS=%lu LG=%lu TO=%lu F=%u FL=%u P=%u RX=%lu CAM=%u ID=%04X N=%u MD=%u BIN=%u R0D=%04X W=%u E=%u K=%lu R=%04lX IE=%04lX MI=%04lX LW=%lu GP=%lu FW=2085 RST=%02lX PC=%08lX CF=%04lX BA=%08lX\r\n",
                 (unsigned long)cam_frame_cnt, (unsigned long)cam_vsync_isr_cnt,
                 (unsigned long)cam_vs_cap_cnt,
                 (unsigned long)disp_lag_max,
