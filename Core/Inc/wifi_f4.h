@@ -97,7 +97,8 @@ uint8_t  wifi_f4_last_err(void);
 uint32_t wifi_f4_send(const uint8_t *buf, uint32_t len);
 // 发字符串
 void     wifi_f4_send_string(const char *s);
-/* 文本队列：pri 1=回执/状态（重要）  0=遥测（可丢）*/
+/* 文本队列：pri 2=回执/CFG（最高）  1=遥测 T（新鲜度优先）  0=心跳 S（可丢，不挡遥测）
+   ⚠️ 每一条都会**补齐 \r\n**（哪怕太长被截断），上位机按行解析不会被粘行。*/
 void     wifi_f4_text(const char *s, uint8_t pri);
 void     wifi_f4_text_pump(void);
 uint32_t wifi_f4_txt_ok(void);

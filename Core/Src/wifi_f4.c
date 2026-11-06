@@ -605,15 +605,31 @@ static uint8_t wf_wait_idle_us (uint32_t us)
     return 1U;
 }
 
-/* ★★★ 2026-11-06：**文本发送队列**（遥测 / 命令回执）★★★
-   现场故障：图像能刷，但遥测和 ACK 全都没有。
-   原因：图像路径在 cam_tx_tick() 里**每轮主循环都重试**，而文本只给 10 次机会
-        （wifi_f4_send_string），模块一忙文本就被饿死 —— 它抢不过图像。
-   现在文本进队列，由主循环每轮 pump 一次，和图像**平权**竞争空闲窗口。
-   pri：1 = 回执/状态（重要，不会被覆盖）   0 = 遥测（可被覆盖，丢一条无所谓）*/
-static char    wf_txt_buf[192];
+/* ★★★ 2026-11-06（FW=2096）：**文本发送队列**（遥测 / 命令回执）★★★
+   现场故障：图像 10fps 正常刷，但上位机的遥测数值**一直是 `---`**、按键也没回执。
+   真凶**不是"发不出去"，是"半行文本"**（①），再加上排队规则把遥测顶掉了（②）：
+
+   ① 缓冲区原来只有 192 字节，而 `S` 心跳一行就有 **203 字节**（字段多）
+      ⇒ `strncpy` 把它截成 191 字节 ⇒ **行尾的 `\r\n` 被截掉了**。
+      上位机是按 `\n` 切行的 ⇒ 这半行会跟**下一条文本粘成一行**：
+          `S f=...GP=0T n=1234 r=0 ...\r\n`
+      粘出来的行既不是 `T` 也不是 `ACK`/`CFG`/`CAM` ⇒ 上位机**整行丢掉**。
+      要命的是：心跳（500ms）和遥测（200ms）每次都在**同一轮主循环**里到期，
+      代码顺序是"先遥测入队、后心跳入队"⇒ 心跳顶掉遥测、并且紧跟着被发出去
+      ⇒ 从此**每一条遥测都粘在那半行心跳后面被丢**，上位机就永远显示 `---`。
+   ② 队列原来"后到的覆盖先到的"（同级也覆盖）⇒ 心跳会顶掉刚排队的遥测。
+      现在：**同是低优先级时保留已经排队的那条**（先排先发；丢掉的是心跳，无所谓）。
+   ③ 模块被图像压满时文本可能永远排不出去，而"链路卡死"的判断只在
+      wifi_f4_send() 里，pump 提前 return 时**永远走不到** ⇒ 只能手动复位。
+      现在这里加 3 秒看门狗：排不出去就判链路死，交给主循环重连 / 整模块复位。
+
+   pri：2 = 命令回执/CFG（最重要，可顶掉任何一条）
+        1 = 遥测 `T`（新鲜度最重要：新的一定要顶掉旧的）
+        0 = 心跳/诊断 `S`（可有可无，绝不能顶掉遥测）*/
+static char    wf_txt_buf[320];       /* ★ 必须 > 最长的一行（S 心跳 203，最坏 271）*/
 static uint8_t wf_txt_has = 0U;
 static uint8_t wf_txt_pri = 0U;
+static uint32_t wf_txt_t  = 0U;       /* 入队时刻：判超时 / 判内容是不是已经过期 */
 static uint32_t wf_txt_ok  = 0U;      /* 文本发出去几条 */
 static uint32_t wf_txt_fail = 0U;     /* 文本没抢到窗口的次数 */
 
@@ -621,14 +637,39 @@ uint32_t wifi_f4_txt_ok   (void) { return wf_txt_ok; }
 uint32_t wifi_f4_txt_fail (void) { return wf_txt_fail; }
 uint8_t  wifi_f4_text_pending (void) { return wf_txt_has; }
 
+/* 拷进队列：**无论多长，永远以 \r\n 结尾**。
+   （截断时必须补上，否则上位机会把这一行和下一行粘在一起 —— 就是上面 ① 那个坑）*/
+static void wf_txt_store (const char *s)
+{
+    uint32_t n = (uint32_t)strlen(s);
+
+    if (n > (uint32_t)(sizeof(wf_txt_buf) - 2U)) { n = (uint32_t)(sizeof(wf_txt_buf) - 2U); }
+    memcpy(wf_txt_buf, s, n);
+
+    while ((n > 0U) && ((wf_txt_buf[n - 1U] == '\r') || (wf_txt_buf[n - 1U] == '\n'))) { n --; }
+    wf_txt_buf[n] = '\r'; n ++;
+    wf_txt_buf[n] = '\n'; n ++;
+    wf_txt_buf[n] = '\0';
+}
+
 void wifi_f4_text (const char *s, uint8_t pri)
 {
     if (NULL == s) { return; }
-    if ((0U != wf_txt_has) && (wf_txt_pri > pri)) { return; }   /* 已有更重要的，不覆盖 */
-    strncpy(wf_txt_buf, s, sizeof(wf_txt_buf) - 1U);
-    wf_txt_buf[sizeof(wf_txt_buf) - 1U] = '\0';
+
+    if (0U != wf_txt_has)
+    {
+        if (wf_txt_pri > pri) { return; }       /* 已有更重要的 ⇒ 丢本条（例如：别用心跳顶掉遥测）*/
+
+        /* ★ 同级 0（心跳/诊断）：排着的就让它发完，新的直接丢（省得两条 S 互相打架）。
+           排了 1.5 秒还发不出去 ⇒ 内容已经过期，允许新的顶掉。*/
+        if ((wf_txt_pri == pri) && (0U == pri) &&
+            ((HAL_GetTick() - wf_txt_t) < 1500U)) { return; }
+    }
+
+    wf_txt_store(s);
     wf_txt_pri = pri;
     wf_txt_has = 1U;
+    wf_txt_t   = HAL_GetTick();
 }
 
 void wifi_f4_text_pump (void)
@@ -636,7 +677,28 @@ void wifi_f4_text_pump (void)
     uint32_t left;
     uint8_t  i;
 
-    if ((0U == wf_txt_has) || (0U == wf_ready)) { return; }
+    if (0U == wf_txt_has) { return; }
+
+    if (0U == wf_ready)
+    {
+        /* 链路断了：这条已经过期，直接丢掉（重连后自然会有新的遥测/心跳）*/
+        wf_txt_has = 0U;
+        wf_txt_pri = 0U;
+        return;
+    }
+
+    /* ★ 排了 3 秒还出不去 ⇒ 模块/链路已经死了（INT 一直低）。
+       不能一直挂着：原来"链路卡死"的判断只在 wifi_f4_send() 里，而模块忙的时候
+       pump 在下面几行就 return 了，**永远走不到** ⇒ 只能手动复位。
+       现在：丢掉这条，并把 wf_ready 清 0，交给主循环 wifi_f4_retry()/wifi_f4_init()。*/
+    if ((HAL_GetTick() - wf_txt_t) >= 3000U)
+    {
+        wf_txt_has = 0U;
+        wf_txt_pri = 0U;
+        wf_txt_fail ++;
+        wf_ready   = 0U;
+        return;
+    }
 
     /* ★★ 文本抢窗口要比图像**更有耐心** ★★
        图像每轮主循环都重试（机会无数），文本只有 5Hz 的节奏；

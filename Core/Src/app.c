@@ -556,29 +556,36 @@ void app_loop (void)
       relink_n = 0;                             /* 连上了就清计数 */
     }
 
-    // ---- ★★ 文本专用时间窗：每秒 30ms **不发图像**，让模块彻底空闲，把文本挤出去 ★★ ----
+    // ---- ★★ 文本优先时间窗：有文本待发就**让图像让路**，直到发出去（最长 250ms）★★ ----
     //   🔥 为什么必须这么干：模块被图像占满时，文本（遥测/ACK）怎么等都抢不到窗口，
-    //      实测就是"图像流畅、实时数据和按键全死"。与其跟图像抢，不如**每秒让图像停 30ms**
-    //      给文本一条专用通道 —— 3% 的帧率损失，换来遥测和命令 100% 可靠，值得。
+    //      实测就是"图像流畅、实时数据和按键全死"。与其跟图像抢，不如让图像**停一下**，
+    //      给文本一条专用通道 —— 少量帧率换遥测/命令可靠，值得。
     {
-      static uint32_t t_txtwin     = 0;
-      static uint32_t t_txtwin_end = 0;
-      static uint8_t  txt_win      = 0;
+      static uint32_t t_win_end   = 0;     /* 上一次关窗的时刻（两次窗口之间留一点图像时间）*/
+      static uint32_t t_win_start = 0;
+      static uint8_t  txt_win     = 0;
+      uint32_t now = HAL_GetTick();
 
-      if ((HAL_GetTick() - t_txtwin) >= 1000U)
+      /* ★ 2026-11-06（FW=2096）：**一有待发文本就开窗**，不再"每秒只开一次、固定 30ms"。
+         原来那版实测不够：停下图像后模块还要把上一帧（2.9KB）排空才肯收新数据，
+         时间到就把窗关了 ⇒ 文本继续排队、继续饿死。
+         现在：图像一直让路，直到文本真的发出去（发完立刻恢复，代价只有排空那一小段）。
+         上限 250ms 是止损：真发不出去就放图像走，链路复位交给驱动里 3 秒看门狗。*/
+      if ((0U == txt_win) && (0U != wifi_f4_is_ready()) &&
+          (0U != wifi_f4_text_pending()) && ((now - t_win_end) >= 40U))
       {
-        t_txtwin     = HAL_GetTick();
-        t_txtwin_end = HAL_GetTick();
-        txt_win      = 1U;
+        txt_win     = 1U;
+        t_win_start = now;
       }
 
       if (0U != txt_win)
       {
         wifi_f4_text_pump();                       /* 窗口里拼命发文本 */
 
-        if ((0U == wifi_f4_text_pending()) || ((HAL_GetTick() - t_txtwin_end) > 30U))
+        if ((0U == wifi_f4_text_pending()) || ((now - t_win_start) > 250U))
         {
-          txt_win = 0U;                            /* 发完 / 超时 ⇒ 关窗，图像继续 */
+          txt_win    = 0U;                         /* 发完 / 超时 ⇒ 关窗，图像继续 */
+          t_win_end  = now;
         }
       }
 
@@ -919,7 +926,7 @@ void app_loop (void)
       /* ★ 遥测走**不重试**的发送：10Hz × 每次重试最多 7ms 会按住主循环，
          把摄像头收割和图像发送都拖慢（实测就是"数据一会有一会没有"）。
          丢一条遥测没关系，下一条 100ms 后就来。 */
-      if (0U == SEND_MODE_VOFA) { wifi_f4_text(tb, 0U); }
+      if (0U == SEND_MODE_VOFA) { wifi_f4_text(tb, 1U); }   /* pri 1 = 遥测：比心跳优先 */
     }
 
     // ==================== ★ 心跳：每 500ms **无条件**发一条 ★ ====================
@@ -928,7 +935,7 @@ void app_loop (void)
     //      ⇒ 输出绝不能挂在另一个可能坏掉的外设上。心跳永远发，摄像头状态放在内容里。
     if (wifi_f4_is_ready() && ((HAL_GetTick() - t_hb) >= 500))
     {
-      static char buf[448];   /* ★ static：进 .bss，不吃栈 */
+      static char buf[320];   /* ★ static：进 .bss，不吃栈（最长的一行 S 约 203B，最坏 271B）*/
       t_hb = HAL_GetTick();
       board_cam_dbg();                            // 抓一份 DCMI/DMA 寄存器快照
 
@@ -945,7 +952,7 @@ void app_loop (void)
         //     MD  = 当前采集模式（0 = 752 宽 / 1 = 188 宽）
         //     BIN = 188×120 配置是否成功（1 = 已写并回读一致）
         //     R0D/R0E = 两个 Read Mode 寄存器的**回读值**（列 bin 在 R0D[3:2]、行 bin 在 R0E[1:0]）
-        sprintf(buf, "S f=%lu V=%lu VS=%lu LG=%lu TO=%lu F=%u FL=%u P=%u RX=%lu CAM=%u ID=%04X N=%u MD=%u BIN=%u R0D=%04X W=%u E=%u K=%lu R=%04lX IE=%04lX MI=%04lX LW=%lu GP=%lu FW=2095 RST=%02lX PC=%08lX CF=%04lX BA=%08lX\r\n",
+        sprintf(buf, "S f=%lu V=%lu VS=%lu LG=%lu TO=%lu F=%u FL=%u P=%u RX=%lu CAM=%u ID=%04X N=%u MD=%u BIN=%u R0D=%04X W=%u E=%u K=%lu R=%04lX IE=%04lX MI=%04lX LW=%lu GP=%lu FW=2096 RST=%02lX PC=%08lX CF=%04lX BA=%08lX\r\n",
                 (unsigned long)cam_frame_cnt, (unsigned long)cam_vsync_isr_cnt,
                 (unsigned long)cam_vs_cap_cnt,
                 (unsigned long)disp_lag_max,
