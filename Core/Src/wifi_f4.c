@@ -335,7 +335,13 @@ uint32_t wifi_f4_read (uint8_t *buf, uint32_t len)
 
     wifi_rd_int = (HAL_GPIO_ReadPin(WIFI_INT_PORT, WIFI_INT_PIN) != GPIO_PIN_RESET) ? 1U : 0U;
 
-    if (0U == wifi_rd_int) { wifi_rd_busy ++; return 0U; }        // 一直忙 ⇒ 这一次先不读
+    // ★★ 2026-11-06：**不再因为"忙"就整轮跳过读取** ★★
+    //   现场故障：上行图像正常，但上位机所有命令都收不到（`r -1` 重发 20 次无 ACK）。
+    //   原因就是这里：模块被 20fps 图像压得 INT 长期为低 ⇒ 这个函数永远在这一行 return 0
+    //   ⇒ 下行数据（PC 发来的命令）**从来没被取走**。
+    //   现在：忙的时候只让 100µs，然后**照样去读**；模块要是真没数据，
+    //   读回来包头不是 0x90/0x91，got 自然是 0，没有任何副作用。
+    if (0U == wifi_rd_int) { wifi_rd_busy ++; wf_delay_us(100); }
 
     do
     {
