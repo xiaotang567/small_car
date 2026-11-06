@@ -294,6 +294,15 @@ class App(object):
         self.sld_servo.grid(row=3, column=0, columnspan=5, sticky='ew', padx=6)
         self.sld_servo.bind('<ButtonRelease-1>', lambda e: self.do_servo(int(self.sld_servo.get())))
 
+        # ★ 物理层切换：全双工（PC10=TX / PC11=RX） ⇄ 单线半双工（只接 PC10）
+        #   调试板/BusLinker 到底该用哪种，点一下就能试，不用重烧固件
+        self.btn_full = self._btn(f, '全双工(TX+RX)', lambda: self.do_duplex(0), w=13, h=1,
+                                  font=('Microsoft YaHei', 9))
+        self.btn_full.grid(row=4, column=0, columnspan=3, padx=3, pady=(2, 4), sticky='ew')
+        self.btn_half = self._btn(f, '单线半双工(只接PC10)', lambda: self.do_duplex(1), w=18, h=1,
+                                  font=('Microsoft YaHei', 9))
+        self.btn_half.grid(row=4, column=3, columnspan=2, padx=3, pady=(2, 4), sticky='ew')
+
         # ---- 其它 ----
         f = tk.LabelFrame(right, text=' 其它 ', bg=C_PANEL, fg=C_ACCENT,
                           font=('Microsoft YaHei', 10, 'bold'), bd=1, relief='groove')
@@ -564,6 +573,13 @@ class App(object):
 
     def do_servo_nudge(self, d):
         self.do_servo(self.req_servo + d, self.btn_su if d > 0 else self.btn_sd)
+
+    def do_duplex(self, half):
+        """切换舵机物理层：0=全双工(PC10=TX/PC11=RX)，1=单线半双工(只接PC10)"""
+        if half:
+            self.send_ack('r -1', 'ACK r', '舵机 → 单线半双工（只接 PC10 一根线）', self.btn_half)
+        else:
+            self.send_ack('r -2', 'ACK r', '舵机 → 全双工（PC10=TX, PC11=RX）', self.btn_full)
 
     def do_clr_enc(self):
         self.send_ack('l', 'ACK l', '编码器清零', self.btn_enc)

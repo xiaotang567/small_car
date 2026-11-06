@@ -129,6 +129,9 @@ const char * ctrl_speed_state_name (void);
 /* ---------- 舵机（非阻塞：只把帧塞进发送缓冲，TXE 中断自己发）---------- */
 void     ctrl_servo_init (void);
 void     ctrl_servo_scan (void);           /* 扫 0~20 号，谁应答就用谁（init 里自动调）*/
+/* 运行时切换：half=1 单线半双工（只接 PC10）；half=0 全双工（PC10=TX / PC11=RX）*/
+void     ctrl_servo_set_half (uint8_t half);
+uint8_t  ctrl_servo_is_half (void);
 /* pos = 0..4095（4096 步 = 360°）。返回 0 = 已排进发送队列 */
 uint8_t  ctrl_servo_set_pos (uint16_t pos);
 uint16_t ctrl_servo_get_pos (void);        /* 最近一次**读到**的位置（没读到过 = 0xFFFF） */

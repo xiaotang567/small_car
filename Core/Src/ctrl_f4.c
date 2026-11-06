@@ -246,6 +246,7 @@ static uint32_t g_servo_tx_bytes = 0U;   /* 一共**真正发出去**多少字�
 static uint32_t g_servo_rx_bad   = 0U;   /* 校验失败的帧数（>0 = 波特率/格式不对）*/
 static uint32_t g_servo_baud     = CTRL_SERVO_BAUD;   /* 当前使用的波特率（开机自动试）*/
 static uint8_t  g_servo_id      = CTRL_SERVO_ID;   /* ★ 开机自动扫描出来的舵机 ID */
+static uint8_t  g_servo_half    = 0U;              /* 1 = 单线半双工（数据走 PC10）*/
 static uint8_t  g_servo_last_id = 0xFFU;           /* 最近一帧合法应答的 ID（扫描用）*/
 static uint16_t g_servo_target  = CTRL_SERVO_POS_CENTER;
 static uint16_t g_servo_last_set = 0xFFFFU;     /* 0xFFFF = 还没发过 ⇒ 第一拍就把舵机摆到中位 */
@@ -374,6 +375,36 @@ uint32_t ctrl_servo_rx_bytes (void) { return g_servo_rx_bytes; }
 uint32_t ctrl_servo_tx_bytes (void) { return g_servo_tx_bytes; }
 uint32_t ctrl_servo_rx_bad  (void) { return g_servo_rx_bad; }
 uint32_t ctrl_servo_baud    (void) { return g_servo_baud; }
+uint8_t  ctrl_servo_is_half (void) { return g_servo_half; }
+
+/* ★ 全双工 ⇄ 单线半双工 切换（运行时，不用重新烧）
+   半双工：HDSEL=1，数据都走 **TX 脚(PC10)**；这个脚必须配成**开漏(AF_OD)+上拉**，
+           否则推挽输出会把舵机/调试板的回包顶死。
+   全双工：HDSEL=0，TX=PC10 / RX=PC11（原来的接法）。*/
+void ctrl_servo_set_half (uint8_t half)
+{
+    GPIO_InitTypeDef gi;
+
+    UART4->CR1 &= (uint16_t)(~(USART_CR1_UE | USART_CR1_TE | USART_CR1_RE));
+
+    gi.Pin       = GPIO_PIN_10;
+    gi.Mode      = (0U != half) ? GPIO_MODE_AF_OD : GPIO_MODE_AF_PP;
+    gi.Pull      = GPIO_PULLUP;
+    gi.Speed     = GPIO_SPEED_FREQ_VERY_HIGH;
+    gi.Alternate = GPIO_AF8_UART4;
+    HAL_GPIO_Init(GPIOC, &gi);
+
+    if (0U != half) { UART4->CR3 |=  USART_CR3_HDSEL; g_servo_half = 1U; }
+    else            { UART4->CR3 &= ~USART_CR3_HDSEL; g_servo_half = 0U; }
+
+    UART4->CR1 |= USART_CR1_UE;
+    UART4->CR1 |= (uint16_t)(USART_CR1_TE | USART_CR1_RE);
+    UART4->CR1 |= USART_CR1_RXNEIE;
+
+    g_srx_head = g_srx_tail = 0U;
+    g_stx_head = g_stx_tail = 0U;
+    g_servo_pos = 0xFFFFU;                  /* 重新开始找舵机 */
+}
 uint8_t  ctrl_servo_rx_pin  (void) { return (0U != (GPIOC->IDR & GPIO_PIN_11)) ? 1U : 0U; }
 uint32_t ctrl_servo_tx_cnt  (void) { return g_servo_tx_cnt; }
 uint32_t ctrl_servo_rx_cnt  (void) { return g_servo_rx_cnt; }

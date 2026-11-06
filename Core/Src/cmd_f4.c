@@ -149,7 +149,7 @@ static void cam_cmd_status (void)
        DRP = 发送看门狗**主动放弃**的帧数（一直飙 ⇒ 链路/模块发不动）✓
        DST = DMA 停摆看门狗重启采集的次数（>0 ⇒ 采集链卡过，但已经自己救回来了）✓
        SELF= 连续 2 秒没有完整帧 ⇒ 重启采集的次数（和 DST 一起看）✓ */
-    sprintf(b, "CFG f=%u g=%u x=%u y=%u (%ux%u) d=%u CST=%u RV=%06lX LINE=%u FW=2079 EDG=%lu EL=%u ER=%u DRP=%lu DST=%lu SELF=%lu\r\n",
+    sprintf(b, "CFG f=%u g=%u x=%u y=%u (%ux%u) d=%u CST=%u RV=%06lX LINE=%u FW=2080 EDG=%lu EL=%u ER=%u DRP=%lu DST=%lu SELF=%lu\r\n",
             (unsigned)cam_cmd_fps, (unsigned)cam_cmd_gap_ms,
             (unsigned)cam_cmd_dx, (unsigned)cam_cmd_dy,
             (unsigned)(CAM_TXW / cam_cmd_dx), (unsigned)(CAM_H / cam_cmd_dy),
@@ -485,12 +485,28 @@ static void cam_cmd_line (char *s)
             return;
 
         case 'r':
-            v = cam_cmd_num(s + 1);
-            if (v > 4095U) { v = 4095U; }
-            (void)ctrl_servo_set_pos((uint16_t)v);
-            sprintf(b, "ACK r: servo -> %u (now %u)\r\n",
-                    (unsigned)v, (unsigned)ctrl_servo_get_pos());
-            cmd_txt(b);
+            {
+                int32_t p = cam_cmd_snum(s + 1);
+
+                if (-1 == p)                        /* r -1 = 切单线半双工 */
+                {
+                    ctrl_servo_set_half(1U);
+                    cmd_txt("ACK r: duplex=half(1wire on PC10)\r\n");
+                    return;
+                }
+                if (-2 == p)                        /* r -2 = 切回全双工 */
+                {
+                    ctrl_servo_set_half(0U);
+                    cmd_txt("ACK r: duplex=full(PC10=TX PC11=RX)\r\n");
+                    return;
+                }
+                if (p < 0)      { p = 0; }
+                if (p > 4095)   { p = 4095; }
+                (void)ctrl_servo_set_pos((uint16_t)p);
+                sprintf(b, "ACK r: servo -> %u (now %u)\r\n",
+                        (unsigned)p, (unsigned)ctrl_servo_get_pos());
+                cmd_txt(b);
+            }
             return;
 
         case 'l':
