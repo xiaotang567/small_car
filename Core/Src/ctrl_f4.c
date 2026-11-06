@@ -255,6 +255,8 @@ static uint8_t  g_last_tx[16];          /* 最近一次发出去的帧（用来�
 static uint8_t  g_last_tx_len = 0U;
 
 static void servo_poll (void);              /* 前置声明：servo_probe_id() 扫描时要调它 */
+static void servo_set_baud (uint32_t bps);  /* 前置声明：init 里要设初始波特率 */
+static uint32_t servo_wait_ms (uint32_t nbytes, uint32_t margin);   /* 前置声明 */
 
 static uint8_t servo_checksum (const uint8_t *p, uint8_t n)
 {
@@ -301,10 +303,8 @@ void ctrl_servo_init (void)
     HAL_GPIO_Init(GPIOC, &gi);
 
     UART4->CR1 = 0U;
-    /* 1Mbps：APB1=42MHz，42e6/1e6 = 42 ⇒ mantissa=42, fraction=0 ⇒ BRR=0x2A0（正好整除）*/
-    UART4->BRR = (uint16_t)((CTRL_APB1_HZ_LOCAL / CTRL_SERVO_BAUD) << 4);
-    UART4->CR1 = USART_CR1_UE;
-    UART4->CR1 = (uint16_t)(USART_CR1_UE | USART_CR1_TE | USART_CR1_RE);
+    UART4->CR1 = USART_CR1_UE;          /* 先开 UE（F4 要求 UE 先于 BRR/TE/RE 才能配）*/
+    servo_set_baud(CTRL_SERVO_BAUD);    /* BRR 由它算，内部会处理 OVER8（低速必须 8 倍过采样）*/
     UART4->CR1 |= USART_CR1_RXNEIE;
 
     HAL_NVIC_SetPriority(UART4_IRQn, 6U, 0U);
@@ -415,7 +415,7 @@ static uint8_t servo_probe_id (uint8_t id)
     if (0U != servo_queue(f, 8U)) { return 0U; }
 
     t0 = HAL_GetTick();
-    while ((HAL_GetTick() - t0) < 10U)
+    while ((HAL_GetTick() - t0) < servo_wait_ms(16U, 5U))
     {
         servo_poll();
         if (id == g_servo_last_id) { return 1U; }
@@ -423,15 +423,40 @@ static uint8_t servo_probe_id (uint8_t id)
     return 0U;
 }
 
-/* 改波特率（F4 的 BRR：整数部分 <<4 | 小数，OVER8=0 时 1/16 位）*/
+/* 发 nbytes 个字节大概要多少毫秒（10 位/字节），再加 margin。
+   低波特率下一帧就要几十毫秒，超时不放大根本等不到回包（10000bps 时 8 字节约 8ms）。*/
+static uint32_t servo_wait_ms (uint32_t nbytes, uint32_t margin)
+{
+    uint32_t us = (nbytes * 10000000UL) / g_servo_baud;   /* 10bit * 1e6 */
+
+    return (us / 1000UL) + margin;
+}
+
+/* 改波特率：F4 的 BRR = 整数分频<<4 | 小数。
+   ⚠️ 深坑：**16 倍过采样（OVER8=0）下 USARTDIV 最大 4095**（BRR 只有 16 位），
+      APB1=42MHz 时最低只能到 42000000/4095 ≈ **10255 bps** —— 用户这块舵机是 **10000 bps**，
+      正好掉在下面 ⇒ 必须切 **OVER8=1（8 倍过采样）**，此时 USARTDIV = fCK/(8×bps) = 525 ✓ */
 static void servo_set_baud (uint32_t bps)
 {
     uint32_t div;
 
     if (0U == bps) { return; }
-    div = (CTRL_APB1_HZ_LOCAL + (bps / 2U)) / bps;      /* 四舍五入到整数分频 */
+    div = (CTRL_APB1_HZ_LOCAL + (bps / 2U)) / bps;      /* OVER8=0 时的 USARTDIV */
+
     UART4->CR1 &= (uint16_t)(~USART_CR1_UE);
-    UART4->BRR  = (uint16_t)(div << 4);
+
+    if (div <= 4095U)
+    {
+        UART4->CR1 &= (uint16_t)(~USART_CR1_OVER8);
+        UART4->BRR  = (uint16_t)(div << 4);             /* 整分频，小数=0 */
+    }
+    else
+    {
+        uint32_t d8 = (CTRL_APB1_HZ_LOCAL + (4U * bps)) / (8U * bps);   /* OVER8=1 的 USARTDIV */
+        UART4->CR1 |= USART_CR1_OVER8;
+        UART4->BRR  = (uint16_t)((d8 & 0x0FFFU) << 4);
+    }
+
     UART4->CR1 |= USART_CR1_UE;
     UART4->CR1 |= (uint16_t)(USART_CR1_TE | USART_CR1_RE);
     g_servo_baud = bps;
@@ -439,16 +464,16 @@ static void servo_set_baud (uint32_t bps)
 
 void ctrl_servo_scan (void)
 {
-    /* ★ 先找波特率：舵机的波特率档位是可配的（出厂 1M 居多，但改过就不知道了）。
-       每档先给 0~5 号发一遍 READ，15ms 内**只要收到任何字节**就认定这档波特率是对的，
-       然后再在这一档上扫 ID 0~20。*/
-    static const uint32_t bauds[] = { 1000000UL, 500000UL, 250000UL, 115200UL,
-                                      57600UL, 19200UL, 9600UL };
+    /* ★ 先找波特率：舵机波特率可配（出厂 1M 居多，用户这块是 **10000**）。
+       每档给 0~5 号发一遍 READ，等待时间按波特率放大（低波特率下一帧就要 8ms）。*/
+    static const uint32_t bauds[] = { 10000UL, 1000000UL, 115200UL, 57600UL,
+                                      38400UL, 19200UL, 14400UL, 9600UL,
+                                      500000UL, 250000UL, 4800UL };
     uint8_t  bi, id, tries;
 
     for (bi = 0U; bi < (uint8_t)(sizeof(bauds) / sizeof(bauds[0])); bi++)
     {
-        uint32_t t0, rx0;
+        uint32_t t0, rx0, wait;
 
         servo_set_baud(bauds[bi]);
         HAL_Delay(2);
@@ -467,8 +492,10 @@ void ctrl_servo_scan (void)
             (void)servo_queue(f, 8U);
         }
 
+        wait = servo_wait_ms(56U, 8U);                 /* 6 帧*8 字节 + 回包 + 余量 */
+
         t0 = HAL_GetTick();
-        while ((HAL_GetTick() - t0) < 15U) { servo_poll(); }
+        while ((HAL_GetTick() - t0) < wait) { servo_poll(); }
 
         if (g_servo_rx_bytes == rx0) { continue; }      /* 这档没动静，下一档 */
 
