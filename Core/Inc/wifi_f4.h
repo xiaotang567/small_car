@@ -102,6 +102,7 @@ void     wifi_f4_text(const char *s, uint8_t pri);
 void     wifi_f4_text_pump(void);
 uint32_t wifi_f4_txt_ok(void);
 uint32_t wifi_f4_txt_fail(void);
+uint8_t  wifi_f4_text_pending(void);   /* 还有文本没发出去 */
 // ★ 遥测专用：只试一次，发不出去就丢（不重试、不阻塞）
 void     wifi_f4_send_string_nb(const char *s);
 

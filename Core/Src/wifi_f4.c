@@ -619,6 +619,7 @@ static uint32_t wf_txt_fail = 0U;     /* 文本没抢到窗口的次数 */
 
 uint32_t wifi_f4_txt_ok   (void) { return wf_txt_ok; }
 uint32_t wifi_f4_txt_fail (void) { return wf_txt_fail; }
+uint8_t  wifi_f4_text_pending (void) { return wf_txt_has; }
 
 void wifi_f4_text (const char *s, uint8_t pri)
 {

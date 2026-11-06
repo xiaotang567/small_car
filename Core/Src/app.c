@@ -35,6 +35,7 @@ static uint32_t t_pclk   = 0U;
 static uint32_t dcmi_ris = 0U;
 static uint32_t t_vsync_hz = 0U;
 static uint8_t  cam_phase     = 0U;      // 0=歇   1=采   2=发
+static uint8_t  g_txt_win_active = 0U;   // 1 = 文本专用窗口正在开（图像让路）
 static uint32_t cam_t_phase   = 0;
 static uint32_t cam_t_p2      = 0;       // ★ 进相 2（开始发这一帧）的时刻：给发送看门狗用
 uint32_t        cam_tx_drop   = 0U;      // ★ 因为发不出去而**主动放弃**的帧数（CFG 里的 DRP）
@@ -543,6 +544,36 @@ void app_loop (void)
       relink_n = 0;                             /* 连上了就清计数 */
     }
 
+    // ---- ★★ 文本专用时间窗：每秒 30ms **不发图像**，让模块彻底空闲，把文本挤出去 ★★ ----
+    //   🔥 为什么必须这么干：模块被图像占满时，文本（遥测/ACK）怎么等都抢不到窗口，
+    //      实测就是"图像流畅、实时数据和按键全死"。与其跟图像抢，不如**每秒让图像停 30ms**
+    //      给文本一条专用通道 —— 3% 的帧率损失，换来遥测和命令 100% 可靠，值得。
+    {
+      static uint32_t t_txtwin     = 0;
+      static uint32_t t_txtwin_end = 0;
+      static uint8_t  txt_win      = 0;
+
+      if ((HAL_GetTick() - t_txtwin) >= 1000U)
+      {
+        t_txtwin     = HAL_GetTick();
+        t_txtwin_end = HAL_GetTick();
+        txt_win      = 1U;
+      }
+
+      if (0U != txt_win)
+      {
+        wifi_f4_text_pump();                       /* 窗口里拼命发文本 */
+
+        if ((0U == wifi_f4_text_pending()) || ((HAL_GetTick() - t_txtwin_end) > 30U))
+        {
+          txt_win = 0U;                            /* 发完 / 超时 ⇒ 关窗，图像继续 */
+        }
+      }
+
+      /* 窗口期间图像让路（下面的 cam_tx_tick 会被跳过）*/
+      g_txt_win_active = txt_win;
+    }
+
     // ---- ★ 文本队列（遥测/回执）：每轮试一次，和图像平权抢空闲窗口 ----
     wifi_f4_text_pump();
 
@@ -649,7 +680,7 @@ void app_loop (void)
       uint32_t now = HAL_GetTick();
 
       // ★★★ 相位机问一句："这一刻该不该发一行？"（采集/冻结/节流全在它里面）★★★
-      if (cam_tx_tick(now))
+      if ((0U == g_txt_win_active) && cam_tx_tick(now))
       {
         // ★★ 拼成"10 字节包头 + txw 字节载荷 + 2 字节校验"，**一次 SPI 事务发完** ★★
         //   包头第 8/9 字节带 ER / PIN，上位机显示在窗口标题上 ⇒ 不依赖会被截断的文本心跳。
@@ -902,7 +933,7 @@ void app_loop (void)
         //     MD  = 当前采集模式（0 = 752 宽 / 1 = 188 宽）
         //     BIN = 188×120 配置是否成功（1 = 已写并回读一致）
         //     R0D/R0E = 两个 Read Mode 寄存器的**回读值**（列 bin 在 R0D[3:2]、行 bin 在 R0E[1:0]）
-        sprintf(buf, "S f=%lu V=%lu VS=%lu LG=%lu TO=%lu F=%u FL=%u P=%u RX=%lu CAM=%u ID=%04X N=%u MD=%u BIN=%u R0D=%04X W=%u E=%u K=%lu R=%04lX IE=%04lX MI=%04lX LW=%lu GP=%lu FW=2087 RST=%02lX PC=%08lX CF=%04lX BA=%08lX\r\n",
+        sprintf(buf, "S f=%lu V=%lu VS=%lu LG=%lu TO=%lu F=%u FL=%u P=%u RX=%lu CAM=%u ID=%04X N=%u MD=%u BIN=%u R0D=%04X W=%u E=%u K=%lu R=%04lX IE=%04lX MI=%04lX LW=%lu GP=%lu FW=2088 RST=%02lX PC=%08lX CF=%04lX BA=%08lX\r\n",
                 (unsigned long)cam_frame_cnt, (unsigned long)cam_vsync_isr_cnt,
                 (unsigned long)cam_vs_cap_cnt,
                 (unsigned long)disp_lag_max,
