@@ -251,8 +251,8 @@ class App(object):
         # 快捷档（文字/数值随模式变）
         self.preset_btns = []
         for i in range(4):
-            b = self._btn(f, '--', (lambda idx=i: self.do_preset_idx(idx)), w=6, h=1,
-                          font=('Consolas', 10))
+            b = self._btn(f, '%d' % self.presets[i], (lambda idx=i: self.do_preset_idx(idx)),
+                          w=6, h=1, font=('Consolas', 10))
             b.grid(row=4, column=i, padx=3, pady=(2, 4), sticky='ew')
             self.preset_btns.append(b)
 
