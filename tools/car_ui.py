@@ -128,6 +128,8 @@ class App(object):
         self.presets = PWM_PRESETS
         self.pending = []           # 等回执的命令（send_ack 用）
         self.txt_pend = ''          # 文本行缓冲（TCP 分包时半行先攒着）
+        self.txt_ok = 0             # 板子报的文本发送成功次数（包头第10字节）
+        self.txt_fail = 0           # 板子报的文本抢不到窗口的次数（包头第11字节）
         self.warn_zero = False      # 只提示一次"运行但输出 0"
 
         # ---- 窗口 ----
@@ -694,6 +696,11 @@ class App(object):
             if len(buf) < 12:
                 return
             typ = buf[4]
+            # ★ 板子把"文本发包 成功/失败次数"塞在包头第 10/11 字节（FW=2087+）
+            #   ⇒ 就算遥测一条都收不到，这里也能看出板子到底有没有把文本发出去
+            if typ in (0xFF, 0xFC, 0xFD):
+                self.txt_ok = buf[10]
+                self.txt_fail = buf[11]
 
             if typ == 0xFF:
                 flen = (buf[8] << 8) | buf[9]
@@ -912,9 +919,9 @@ class App(object):
         age = (now - self.t_tele) if self.t_tele else 99.0
         conn = '已连接' if self.conn else '未连接'
         self.lbl_stat.configure(
-            text='%s    %s    帧率 %.1f    收 %.0f B/s    遥测 %.1f/s 丢%.0f%% (%.1fs 前)'
+            text='%s    %s    帧率 %.1f    收 %.0f B/s    遥测 %.1f/s 丢%.0f%% (%.1fs 前)    板子文本 ok=%d fail=%d'
                  % (conn, '原图' if self.mode_gray else '二值', self.fps, self.bps,
-                    self.tel_rate, self.tel_loss, age))
+                    self.tel_rate, self.tel_loss, age, self.txt_ok, self.txt_fail))
 
         if age > 3.0:
             for v in (self.v_rpm, self.v_acc, self.v_gyr, self.v_yaw, self.v_duty):

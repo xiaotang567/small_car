@@ -100,6 +100,8 @@ void     wifi_f4_send_string(const char *s);
 /* 文本队列：pri 1=回执/状态（重要）  0=遥测（可丢）*/
 void     wifi_f4_text(const char *s, uint8_t pri);
 void     wifi_f4_text_pump(void);
+uint32_t wifi_f4_txt_ok(void);
+uint32_t wifi_f4_txt_fail(void);
 // ★ 遥测专用：只试一次，发不出去就丢（不重试、不阻塞）
 void     wifi_f4_send_string_nb(const char *s);
 

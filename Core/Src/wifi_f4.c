@@ -614,6 +614,11 @@ static uint8_t wf_wait_idle_us (uint32_t us)
 static char    wf_txt_buf[192];
 static uint8_t wf_txt_has = 0U;
 static uint8_t wf_txt_pri = 0U;
+static uint32_t wf_txt_ok  = 0U;      /* 文本发出去几条 */
+static uint32_t wf_txt_fail = 0U;     /* 文本没抢到窗口的次数 */
+
+uint32_t wifi_f4_txt_ok   (void) { return wf_txt_ok; }
+uint32_t wifi_f4_txt_fail (void) { return wf_txt_fail; }
 
 void wifi_f4_text (const char *s, uint8_t pri)
 {
@@ -628,14 +633,32 @@ void wifi_f4_text (const char *s, uint8_t pri)
 void wifi_f4_text_pump (void)
 {
     uint32_t left;
+    uint8_t  i;
 
     if ((0U == wf_txt_has) || (0U == wf_ready)) { return; }
+
+    /* ★★ 文本抢窗口要比图像**更有耐心** ★★
+       图像每轮主循环都重试（机会无数），文本只有 5Hz 的节奏；
+       之前文本和图像用同样的 300µs 预算，模块一忙文本永远抢不到
+       ⇒ 遥测/ACK 一条都发不出去。
+       文本很稀疏（5Hz、150 字节），这里最多等 2ms 完全值得（25ms/s ≈ 2.5%）。*/
+    for (i = 0U; i < 20U; i++)
+    {
+        if (HAL_GPIO_ReadPin(WIFI_INT_PORT, WIFI_INT_PIN) != GPIO_PIN_RESET) { break; }
+        wf_delay_us(100);
+    }
+    if (i >= 20U) { wf_txt_fail ++; return; }      /* 这还是忙 ⇒ 下一轮再来（不丢）*/
 
     left = wifi_f4_send((const uint8_t *)wf_txt_buf, (uint32_t)strlen(wf_txt_buf));
     if (0U == left)
     {
         wf_txt_has = 0U;
         wf_txt_pri = 0U;
+        wf_txt_ok ++;
+    }
+    else
+    {
+        wf_txt_fail ++;
     }
 }
 

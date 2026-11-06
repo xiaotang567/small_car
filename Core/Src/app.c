@@ -688,6 +688,11 @@ void app_loop (void)
                     flen ++;
                 }
             }
+            /* ★ 诊断用：把"文本发包成功/失败次数"塞进包头空字节(10/11)
+               上位机直接显示 ⇒ 不用靠遥测也能知道文本到底发没发出去 */
+            fpkt[10] = (uint8_t)(wifi_f4_txt_ok() & 0xFFU);
+            fpkt[11] = (uint8_t)(wifi_f4_txt_fail() & 0xFFU);
+
             fpkt[8] = (uint8_t)(flen >> 8);
             fpkt[9] = (uint8_t)flen;
             {
@@ -897,7 +902,7 @@ void app_loop (void)
         //     MD  = 当前采集模式（0 = 752 宽 / 1 = 188 宽）
         //     BIN = 188×120 配置是否成功（1 = 已写并回读一致）
         //     R0D/R0E = 两个 Read Mode 寄存器的**回读值**（列 bin 在 R0D[3:2]、行 bin 在 R0E[1:0]）
-        sprintf(buf, "S f=%lu V=%lu VS=%lu LG=%lu TO=%lu F=%u FL=%u P=%u RX=%lu CAM=%u ID=%04X N=%u MD=%u BIN=%u R0D=%04X W=%u E=%u K=%lu R=%04lX IE=%04lX MI=%04lX LW=%lu GP=%lu FW=2086 RST=%02lX PC=%08lX CF=%04lX BA=%08lX\r\n",
+        sprintf(buf, "S f=%lu V=%lu VS=%lu LG=%lu TO=%lu F=%u FL=%u P=%u RX=%lu CAM=%u ID=%04X N=%u MD=%u BIN=%u R0D=%04X W=%u E=%u K=%lu R=%04lX IE=%04lX MI=%04lX LW=%lu GP=%lu FW=2087 RST=%02lX PC=%08lX CF=%04lX BA=%08lX\r\n",
                 (unsigned long)cam_frame_cnt, (unsigned long)cam_vsync_isr_cnt,
                 (unsigned long)cam_vs_cap_cnt,
                 (unsigned long)disp_lag_max,
