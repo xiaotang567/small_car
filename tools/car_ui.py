@@ -336,9 +336,12 @@ class App(object):
 
     # ---------------------------------------------------------------- 命令确认（没回执就重发）
     def send_ack(self, cmd, pfx, note=None):
-        """发一条**板子会回 ACK** 的命令；0.4s 没回执就重发，最多 3 次。
-        目的是解决"按钮要按很多次才有反应" —— 数据链一忙，命令就可能丢。"""
+        """发一条**板子会回 ACK** 的命令；0.4s 没回执就重发，最多 2 次。
+        目的是解决"按钮要按很多次才有反应" —— 数据链一忙，命令就可能丢。
+        ⚠️ 新命令要**顶掉**同类的旧待确认项：否则"停止"的 `w 0 0` 可能在"启动"之后
+           才被重发出去，把刚转起来的电机又停掉。"""
         if self.send(cmd, note):
+            self.pending = [p for p in self.pending if p['pfx'] != pfx]
             self.pending.append({'cmd': cmd, 'pfx': pfx, 't': time.time(), 'n': 2})
 
     def _ack_seen(self, ln):
