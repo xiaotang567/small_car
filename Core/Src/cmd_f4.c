@@ -149,7 +149,7 @@ static void cam_cmd_status (void)
        DRP = 发送看门狗**主动放弃**的帧数（一直飙 ⇒ 链路/模块发不动）✓
        DST = DMA 停摆看门狗重启采集的次数（>0 ⇒ 采集链卡过，但已经自己救回来了）✓
        SELF= 连续 2 秒没有完整帧 ⇒ 重启采集的次数（和 DST 一起看）✓ */
-    sprintf(b, "CFG f=%u g=%u x=%u y=%u (%ux%u) d=%u CST=%u RV=%06lX LINE=%u FW=2092 EDG=%lu EL=%u ER=%u DRP=%lu DST=%lu SELF=%lu\r\n",
+    sprintf(b, "CFG f=%u g=%u x=%u y=%u (%ux%u) d=%u CST=%u RV=%06lX LINE=%u FW=2093 EDG=%lu EL=%u ER=%u DRP=%lu DST=%lu SELF=%lu\r\n",
             (unsigned)cam_cmd_fps, (unsigned)cam_cmd_gap_ms,
             (unsigned)cam_cmd_dx, (unsigned)cam_cmd_dy,
             (unsigned)(CAM_TXW / cam_cmd_dx), (unsigned)(CAM_H / cam_cmd_dy),
@@ -541,6 +541,22 @@ static void cam_cmd_line (char *s)
                 if (0 == *a) { break; }                 /* 单单一个 s ⇒ 回状态 */
 
                 v = cam_cmd_num(a);
+
+                /* ★ 2026-11-06：s 2 = **停图传**（链路全留给文本，调遥测用）
+                               s 3 = 恢复图传 */
+                if (2U == v)
+                {
+                    cam_img_off = 1U;
+                    cmd_txt("ACK s: image OFF (telemetry only)\r\n");
+                    return;
+                }
+                if (3U == v)
+                {
+                    cam_img_off = 0U;
+                    cmd_txt("ACK s: image ON\r\n");
+                    return;
+                }
+
                 cam_view_mode = (uint8_t)((0U == v) ? 0U : 1U);
                 sprintf(b, "ACK s: view=%u (%s)\r\n", (unsigned)cam_view_mode,
                         (0U == cam_view_mode) ? "GRAY 94x60" : "BIN 188x120");

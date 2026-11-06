@@ -51,6 +51,7 @@ extern uint32_t          cam_self_heal;
 /* ★ 上位机"原图 / 二值图"开关：0 = 发 8bit 灰度缩略图（94×60），1 = 发位打包二值整帧（默认）
    命令：`s 0` / `s 1` */
 extern uint8_t           cam_view_mode;
+extern uint8_t           cam_img_off;    /* 1 = 停图传（s 2）/ 0 = 正常（s 3）*/
 
 void cam_cmd_poll (void);
 void app_loop     (void);

@@ -216,8 +216,13 @@ class App(object):
         self.btn_bin.grid(row=0, column=0, padx=6, pady=6)
         self.btn_gray = self._btn(f, '原图灰度', lambda: self.do_mode(0), w=10)
         self.btn_gray.grid(row=0, column=1, padx=6, pady=6)
+        # ★ 停/恢复图传：把链路完全让给文本，专门用来验证遥测/命令
+        self.btn_img_off = self._btn(f, '停图传', lambda: self.do_img(0), w=10)
+        self.btn_img_off.grid(row=1, column=0, columnspan=2, padx=6, pady=(0, 6), sticky='ew')
+        self.btn_img_on = self._btn(f, '恢复图传', lambda: self.do_img(1), w=10)
+        self.btn_img_on.grid(row=1, column=2, columnspan=2, padx=6, pady=(0, 6), sticky='ew')
         self.lbl_mode = self._lbl(f, '当前：二值图 188×120', fg=C_DIM, font=('Microsoft YaHei', 9))
-        self.lbl_mode.grid(row=1, column=0, columnspan=2, sticky='w', padx=6, pady=(0, 6))
+        self.lbl_mode.grid(row=2, column=0, columnspan=4, sticky='w', padx=6, pady=(0, 6))
 
         # ---- 仪表 ----
         f = tk.LabelFrame(right, text=' 实时数据 ', bg=C_PANEL, fg=C_ACCENT,
@@ -612,6 +617,13 @@ class App(object):
             self.send_ack('r -1', 'ACK r', '舵机 → 单线半双工（只接 PC10 一根线）', self.btn_half)
         else:
             self.send_ack('r -2', 'ACK r', '舵机 → 全双工（PC10=TX, PC11=RX）', self.btn_full)
+
+    def do_img(self, on):
+        """图传开关：0 = 停（链路全给文本，调遥测用），1 = 恢复"""
+        if on:
+            self.send_ack('s 3', 'ACK s', '图传 → 恢复', self.btn_img_on)
+        else:
+            self.send_ack('s 2', 'ACK s', '图传 → 已停（只发文本）', self.btn_img_off)
 
     def do_clr_enc(self):
         self.send_ack('l', 'ACK l', '编码器清零', self.btn_enc)
