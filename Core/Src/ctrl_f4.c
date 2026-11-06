@@ -259,6 +259,7 @@ static uint8_t  g_last_tx_len = 0U;
 static void servo_poll (void);              /* 前置声明：servo_probe_id() 扫描时要调它 */
 static void servo_set_baud (uint32_t bps);  /* 前置声明：init 里要设初始波特率 */
 static uint32_t servo_wait_ms (uint32_t nbytes, uint32_t margin);   /* 前置声明 */
+void ctrl_servo_set_half (uint8_t half);    /* 前置声明：init 里要切默认物理层 */
 
 static uint8_t servo_checksum (const uint8_t *p, uint8_t n)
 {
@@ -315,6 +316,12 @@ void ctrl_servo_init (void)
     g_stx_head = g_stx_tail = 0U;
     g_srx_head = g_srx_tail = 0U;
     g_servo_pos = 0xFFFFU;
+
+    /* ★★ 2026-11-06：按宏选择默认物理层 ★★
+       默认 **单线半双工**（用户要求）：UART4 开 HDSEL，数据只走 PC10，
+       PC10 改成**开漏 + 上拉**（推挽会把舵机/调试板的回包顶死）。
+       运行时仍可用 `r -1` / `r -2` 切换。*/
+    ctrl_servo_set_half((uint8_t)CTRL_SERVO_HALF_DUPLEX_DEFAULT);
 
     /* ★ 等舵机自己初始化完（它上电要 ~1 秒），再扫 ID。总耗时最多 ~1.2 秒，
        全在 `ctrl_all_init()` 里、WiFi 初始化之前 ⇒ 不影响主循环。*/
@@ -406,7 +413,12 @@ void ctrl_servo_set_half (uint8_t half)
     g_stx_head = g_stx_tail = 0U;
     g_servo_pos = 0xFFFFU;                  /* 重新开始找舵机 */
 }
-uint8_t  ctrl_servo_rx_pin  (void) { return (0U != (GPIOC->IDR & GPIO_PIN_11)) ? 1U : 0U; }
+uint8_t  ctrl_servo_rx_pin  (void)
+{
+    /* 单线半双工时数据走 PC10；全双工时才是 PC11 */
+    return (0U != g_servo_half) ? ((0U != (GPIOC->IDR & GPIO_PIN_10)) ? 1U : 0U)
+                                : ((0U != (GPIOC->IDR & GPIO_PIN_11)) ? 1U : 0U);
+}
 uint32_t ctrl_servo_tx_cnt  (void) { return g_servo_tx_cnt; }
 uint32_t ctrl_servo_rx_cnt  (void) { return g_servo_rx_cnt; }
 

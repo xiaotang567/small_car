@@ -75,6 +75,11 @@
    ⚠️ 顺带修的一个坑：低速时 USARTDIV 会超过 4095（BRR 装不下）
       ⇒ `servo_set_baud()` 会自动切 OVER8=1（8 倍过采样），10000bps 以下才需要。*/
 #define CTRL_SERVO_BAUD         1000000UL
+/* ★ 2026-11-06：**开机默认走单线半双工**（用户要求）
+   1 = 默认单线：数据只走 **PC10** 一根线（UART4 HDSEL + PC10 开漏+上拉）
+   0 = 默认全双工：PC10=TX / PC11=RX
+   运行时仍可用 `r -1`（单线）/ `r -2`（全双工）切换，不用重烧。*/
+#define CTRL_SERVO_HALF_DUPLEX_DEFAULT  1
 #define CTRL_SERVO_ID           1            /* 总线上那颗舵机的 ID */
 #define CTRL_SERVO_POS_MIN      1048         /* 安全限位（原工程 2048 ± 1000） */
 #define CTRL_SERVO_POS_MAX      3048
