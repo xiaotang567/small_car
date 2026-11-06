@@ -113,6 +113,7 @@ class App(object):
         self.dir = +1               # 方向：+1 前进 / -1 后退
         self.ctrl_mode = 'pwm'      # ★ 默认"占空比"方式，滑条默认 30%
         self.presets = PWM_PRESETS
+        self.warn_zero = False      # 只提示一次"运行但输出 0"
 
         # ---- 窗口 ----
         self.root = tk.Tk()
@@ -655,6 +656,13 @@ class App(object):
             d1 = d.get('d1', 0.0) / 100.0
             d2 = d.get('d2', 0.0) / 100.0
             self.v_duty.set('电机1 %+.0f%%   电机2 %+.0f%%' % (d1, d2))
+            # 界面上"运行"但板子输出是 0 ⇒ 命令没到 / 被清零，提示一次
+            if self.running and abs(d.get('d1', 0.0)) < 1.0:
+                if not self.warn_zero:
+                    self.warn_zero = True
+                    self.log('⚠ 界面在"运行"，但板子输出 = 0%：命令没到板子，或已被清零')
+            else:
+                self.warn_zero = False
         if 'm' in d:
             self.mode_gray = (int(d['m']) == 0)
             self.refresh_buttons()
@@ -711,7 +719,7 @@ class App(object):
             text='%s    %s    帧率 %.1f    收 %.0f B/s    遥测 %.1fs 前'
                  % (conn, '原图' if self.mode_gray else '二值', self.fps, self.bps, age))
 
-        if age > 2.0:
+        if age > 3.0:
             for v in (self.v_rpm, self.v_acc, self.v_gyr, self.v_yaw, self.v_duty):
                 if v.get() != '---':
                     v.set('---')

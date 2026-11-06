@@ -666,4 +666,14 @@ void wifi_f4_send_string (const char *s)
         wf_delay_us(400);
     }
 }
+
+// ★ 遥测专用：**只试一次**，发不出去就丢掉。
+//   为什么单独加一个：`wifi_f4_send_string()` 会重试 10 次（最坏 ~7ms），
+//   10Hz 遥测用它就等于每 100ms 按主循环最多 7ms（严重时 70ms/s），
+//   而遥测丢一条无所谓（100ms 后又是新的一条）⇒ 绝不为它等。
+void wifi_f4_send_string_nb (const char *s)
+{
+    if (NULL == s) { return; }
+    (void)wifi_f4_send((const uint8_t *)s, (uint32_t)strlen(s));
+}
 //===================================================对外接口===================================================

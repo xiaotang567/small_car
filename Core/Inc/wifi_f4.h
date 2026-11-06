@@ -97,6 +97,8 @@ uint8_t  wifi_f4_last_err(void);
 uint32_t wifi_f4_send(const uint8_t *buf, uint32_t len);
 // 发字符串
 void     wifi_f4_send_string(const char *s);
+// ★ 遥测专用：只试一次，发不出去就丢（不重试、不阻塞）
+void     wifi_f4_send_string_nb(const char *s);
 
 // ★★ 接收：从模块里"取"回下行数据（电脑 TCP 发过来的东西）★★
 //   返回实际读到的字节数（0 = 这次没有数据）。非阻塞，主循环里轮询调用即可。
