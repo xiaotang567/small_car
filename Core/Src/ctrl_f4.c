@@ -246,6 +246,7 @@ static uint32_t g_servo_tx_bytes = 0U;   /* 一共**真正发出去**多少字�
 static uint32_t g_servo_rx_bad   = 0U;   /* 校验失败的帧数（>0 = 波特率/格式不对）*/
 static uint32_t g_servo_baud     = CTRL_SERVO_BAUD;   /* 当前使用的波特率（开机自动试）*/
 static uint8_t  g_servo_id      = CTRL_SERVO_ID;   /* ★ 开机自动扫描出来的舵机 ID */
+static uint32_t g_servo_mute_t  = 0U;   /* 噪声静默：非 0 = 静默中（起点时间戳）*/
 static uint8_t  g_servo_half    = 0U;              /* 1 = 单线半双工（数据走 PC10）*/
 static uint8_t  g_servo_last_id = 0xFFU;           /* 最近一帧合法应答的 ID（扫描用）*/
 static uint16_t g_servo_target  = CTRL_SERVO_POS_CENTER;
@@ -515,9 +516,38 @@ static void servo_poll (void)
     static uint8_t buf[40];
     static uint8_t n = 0U;
     uint8_t len, cs;
+    uint16_t budget = 0U;                       /* ★ 每次最多处理多少字节（防噪声把 CPU 吃光）*/
 
+    /* ★★ 噪声静默：上一轮发现"收得比舵机可能发的多得多" ⇒ 直接关掉 RX 中断 500ms。
+       这条线是 1Mbps，悬空时噪声能让 RXNE 每秒中断十万次，主循环就被吃干了。*/
+    if (0U != g_servo_mute_t)
+    {
+        if ((HAL_GetTick() - g_servo_mute_t) < 500U) { return; }
+        g_servo_mute_t = 0U;
+        g_srx_head = g_srx_tail = 0U;
+        UART4->CR1 |= USART_CR1_RXNEIE;         /* 解除静默，继续找舵机 */
+    }
+
+    /* ★★★ 2026-11-06：**噪声防护** ★★★
+       舵机没接好 / RX 悬空时，这条 1Mbps 的线会收到**连续噪声**：
+         · RXNE 中断 100k 次/秒
+         · 这个函数每次要逐字节解析 + memmove（还经常从头扫）
+       ⇒ 主循环被吃光 ⇒ 遥测发不出去、命令处理不过来、图像也开始掉帧
+       —— 这正是"实时数据在改单线之后就没有了"的真正原因（用户判断是对的）。
+       对策：一次最多处理 256 字节；剩下的直接**丢掉**。
+       舵机正常回包是 8 字节/次、5Hz 才 40 字节/秒，256 字节的预算绰绰有余。*/
     while (g_srx_tail != g_srx_head)
     {
+        if (budget >= 256U)
+        {
+            g_srx_tail = g_srx_head;            /* 丢掉剩下的噪声 */
+            n = 0U;
+            g_servo_mute_t = HAL_GetTick();     /* 静默 500ms，别再让中断风暴吃 CPU */
+            UART4->CR1 &= (uint16_t)(~USART_CR1_RXNEIE);
+            break;
+        }
+        budget ++;
+
         if (n < sizeof(buf)) { buf[n++] = g_srx[g_srx_tail]; }
         g_srx_tail = (uint16_t)((g_srx_tail + 1U) % SERVO_RX_SIZE);
 
@@ -1429,15 +1459,24 @@ void board_ctrl_tick (void)
     }
     else if (0xFFFFU == g_servo_pos)
     {
-        static uint8_t sid = 0U;
-        uint8_t f[8];
+        /* 还没找到舵机：**每 100ms** 换一个 ID 问一次（原来每 20ms 问一次太凶了，
+           线接得不对时会在 1Mbps 上刷一堆无效帧，还引出噪声/CPU 占用问题）*/
+        static uint8_t  sid = 0U;
+        static uint8_t  div = 0U;
 
-        f[0] = 0xFFU; f[1] = 0xFFU;
-        f[2] = sid; f[3] = 4U;
-        f[4] = SERVO_INSTR_READ; f[5] = SERVO_REG_CURPOS; f[6] = 2U;
-        f[7] = servo_checksum(&f[2], 5U);
-        (void)servo_queue(f, 8U);
-        sid = (uint8_t)((sid + 1U) % 21U);          /* 0~20 轮着问 */
+        div ++;
+        if (div >= 5U)
+        {
+            uint8_t f[8];
+
+            div = 0U;
+            f[0] = 0xFFU; f[1] = 0xFFU;
+            f[2] = sid; f[3] = 4U;
+            f[4] = SERVO_INSTR_READ; f[5] = SERVO_REG_CURPOS; f[6] = 2U;
+            f[7] = servo_checksum(&f[2], 5U);
+            (void)servo_queue(f, 8U);
+            sid = (uint8_t)((sid + 1U) % 21U);      /* 0~20 轮着问 */
+        }
     }
     else if (g_servo_target != g_servo_last_set)
     {
