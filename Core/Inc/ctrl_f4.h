@@ -130,7 +130,10 @@ uint16_t ctrl_servo_get_pos (void);        /* 最近一次**读到**的位置（
 uint8_t  ctrl_servo_get_err (void);        /* 最近一次应答里的 ERROR 字节（0 = 正常） */
 uint8_t  ctrl_servo_id     (void);         /* 开机扫描出来的舵机 ID */
 uint32_t ctrl_servo_rx_bytes (void);       /* 一共收到多少字节（0 = 舵机从没回过话）*/
+uint32_t ctrl_servo_tx_bytes (void);       /* 一共**真正发出去**多少字节（0 = TX 没工作）*/
 uint32_t ctrl_servo_rx_bad (void);         /* 校验失败的帧数（>0 = 波特率/格式不对）*/
+uint32_t ctrl_servo_baud   (void);         /* 当前用的波特率 */
+uint8_t  ctrl_servo_rx_pin (void);         /* PC11(RX) 现在的电平：1 = 空闲高（正常），0 = 被拉低 */
 uint32_t ctrl_servo_tx_cnt  (void);        /* 发出去几帧（诊断） */
 uint32_t ctrl_servo_rx_cnt  (void);        /* 收到几帧合法应答（诊断） */
 

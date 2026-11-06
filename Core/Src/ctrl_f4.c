@@ -242,7 +242,9 @@ static uint8_t  g_servo_err     = 0U;
 static uint32_t g_servo_tx_cnt  = 0U;
 static uint32_t g_servo_rx_cnt  = 0U;
 static uint32_t g_servo_rx_bytes = 0U;   /* 一共收到多少字节（0 = 舵机根本没回过话）*/
+static uint32_t g_servo_tx_bytes = 0U;   /* 一共**真正发出去**多少字节（0 = TX 没工作）*/
 static uint32_t g_servo_rx_bad   = 0U;   /* 校验失败的帧数（>0 = 波特率/格式不对）*/
+static uint32_t g_servo_baud     = CTRL_SERVO_BAUD;   /* 当前使用的波特率（开机自动试）*/
 static uint8_t  g_servo_id      = CTRL_SERVO_ID;   /* ★ 开机自动扫描出来的舵机 ID */
 static uint8_t  g_servo_last_id = 0xFFU;           /* 最近一帧合法应答的 ID（扫描用）*/
 static uint16_t g_servo_target  = CTRL_SERVO_POS_CENTER;
@@ -369,7 +371,10 @@ uint16_t ctrl_servo_get_pos (void) { return g_servo_pos; }
 uint8_t  ctrl_servo_get_err (void) { return g_servo_err; }
 uint8_t  ctrl_servo_id      (void) { return g_servo_id; }
 uint32_t ctrl_servo_rx_bytes (void) { return g_servo_rx_bytes; }
+uint32_t ctrl_servo_tx_bytes (void) { return g_servo_tx_bytes; }
 uint32_t ctrl_servo_rx_bad  (void) { return g_servo_rx_bad; }
+uint32_t ctrl_servo_baud    (void) { return g_servo_baud; }
+uint8_t  ctrl_servo_rx_pin  (void) { return (0U != (GPIOC->IDR & GPIO_PIN_11)) ? 1U : 0U; }
 uint32_t ctrl_servo_tx_cnt  (void) { return g_servo_tx_cnt; }
 uint32_t ctrl_servo_rx_cnt  (void) { return g_servo_rx_cnt; }
 
@@ -418,17 +423,64 @@ static uint8_t servo_probe_id (uint8_t id)
     return 0U;
 }
 
+/* 改波特率（F4 的 BRR：整数部分 <<4 | 小数，OVER8=0 时 1/16 位）*/
+static void servo_set_baud (uint32_t bps)
+{
+    uint32_t div;
+
+    if (0U == bps) { return; }
+    div = (CTRL_APB1_HZ_LOCAL + (bps / 2U)) / bps;      /* 四舍五入到整数分频 */
+    UART4->CR1 &= (uint16_t)(~USART_CR1_UE);
+    UART4->BRR  = (uint16_t)(div << 4);
+    UART4->CR1 |= USART_CR1_UE;
+    UART4->CR1 |= (uint16_t)(USART_CR1_TE | USART_CR1_RE);
+    g_servo_baud = bps;
+}
+
 void ctrl_servo_scan (void)
 {
-    uint8_t id;
+    /* ★ 先找波特率：舵机的波特率档位是可配的（出厂 1M 居多，但改过就不知道了）。
+       每档先给 0~5 号发一遍 READ，15ms 内**只要收到任何字节**就认定这档波特率是对的，
+       然后再在这一档上扫 ID 0~20。*/
+    static const uint32_t bauds[] = { 1000000UL, 500000UL, 250000UL, 115200UL,
+                                      57600UL, 19200UL, 9600UL };
+    uint8_t  bi, id, tries;
 
-    for (id = 0U; id <= 20U; id++)
+    for (bi = 0U; bi < (uint8_t)(sizeof(bauds) / sizeof(bauds[0])); bi++)
     {
-        if (0U != servo_probe_id(id))
+        uint32_t t0, rx0;
+
+        servo_set_baud(bauds[bi]);
+        HAL_Delay(2);
+
+        g_srx_head = g_srx_tail = 0U;
+        rx0 = g_servo_rx_bytes;
+
+        for (id = 0U; id <= 5U; id++)                  /* 先把常见 ID 都喊一遍 */
         {
-            g_servo_id = id;
-            return;
+            uint8_t f[8];
+
+            f[0] = 0xFFU; f[1] = 0xFFU;
+            f[2] = id; f[3] = 4U;
+            f[4] = SERVO_INSTR_READ; f[5] = SERVO_REG_CURPOS; f[6] = 2U;
+            f[7] = servo_checksum(&f[2], 5U);
+            (void)servo_queue(f, 8U);
         }
+
+        t0 = HAL_GetTick();
+        while ((HAL_GetTick() - t0) < 15U) { servo_poll(); }
+
+        if (g_servo_rx_bytes == rx0) { continue; }      /* 这档没动静，下一档 */
+
+        /* 波特率对了 ⇒ 在这一档上扫 ID（最多两轮，覆盖 0~20）*/
+        for (tries = 0U; tries < 2U; tries++)
+        {
+            for (id = 0U; id <= 20U; id++)
+            {
+                if (0U != servo_probe_id(id)) { g_servo_id = id; return; }
+            }
+        }
+        return;
     }
 }
 
@@ -512,6 +564,7 @@ void ctrl_uart4_irq (void)
         {
             UART4->DR = g_stx[g_stx_tail];
             g_stx_tail = (uint16_t)((g_stx_tail + 1U) % SERVO_TX_SIZE);
+            g_servo_tx_bytes ++;                   /* ★ 诊断：真正发出去的字节数 */
         }
         else
         {
