@@ -59,7 +59,11 @@ C_ESTOP   = '#b02020'
 C_ACCENT  = '#4aa3ff'
 
 # 快捷档 / 预设
-SPEED_PRESETS = (300, 600, 1000, 1500)
+# 电机控制：两种方式
+#   'pwm' —— 直接给占空比（默认 30%，开环，不依赖编码器，用来先确认电机装反没/转不转）
+#   'rpm' —— 走速度环闭环（需要编码器读数正确）
+PWM_PRESETS = (10, 20, 30, 50)          # 占空比 %
+RPM_PRESETS = (300, 600, 1000, 1500)
 SERVO_LEFT, SERVO_MID, SERVO_RIGHT = 1300, 2048, 2800
 SERVO_MIN, SERVO_MAX = 1048, 3048
 
@@ -107,6 +111,8 @@ class App(object):
         self.req_servo = SERVO_MID
         self.running = False        # ★ 电机1 是否"启动"状态：上电默认停
         self.dir = +1               # 方向：+1 前进 / -1 后退
+        self.ctrl_mode = 'pwm'      # ★ 默认"占空比"方式，滑条默认 30%
+        self.presets = PWM_PRESETS
 
         # ---- 窗口 ----
         self.root = tk.Tk()
@@ -187,48 +193,58 @@ class App(object):
             tk.Label(f, textvariable=v, bg=C_PANEL, fg=C_FG,
                      font=('Consolas', 11), anchor='w').grid(row=i, column=1, sticky='w')
 
-        # ---- 速度（电机1）----
-        f = tk.LabelFrame(right, text=' 电机1 转速 ', bg=C_PANEL, fg=C_ACCENT,
+        # ---- 电机1 ----
+        f = tk.LabelFrame(right, text=' 电机1 ', bg=C_PANEL, fg=C_ACCENT,
                           font=('Microsoft YaHei', 10, 'bold'), bd=1, relief='groove')
         f.grid(row=row, column=0, sticky='ew', pady=(0, 8)); row += 1
         for c in range(4):
             f.columnconfigure(c, weight=1)
 
-        self.var_rpm = tk.IntVar(value=500)
         self.lbl_rpm = tk.Label(f, text='电机1：停止', bg=C_PANEL, fg='#ffcc66',
                                 font=('Microsoft YaHei', 11, 'bold'))
         self.lbl_rpm.grid(row=0, column=0, columnspan=4, sticky='w', padx=6, pady=(4, 2))
 
-        # ★ 第一排只有"启动 / 停止"两个大按钮 —— 上电默认就是停止，必须按"启动"电机才会转
+        # ★ 控制方式：占空比（PWM %，默认 30%）或 转速（RPM，闭环）
+        self.btn_mode_pwm = self._btn(f, '占空比 %', (lambda: self.set_motor_mode('pwm')),
+                                      bg=C_ON, w=7, h=1)
+        self.btn_mode_pwm.grid(row=1, column=0, columnspan=2, padx=3, pady=(2, 2), sticky='ew')
+        self.btn_mode_rpm = self._btn(f, '转速 RPM', (lambda: self.set_motor_mode('rpm')),
+                                      bg=C_BTN, w=7, h=1)
+        self.btn_mode_rpm.grid(row=1, column=2, columnspan=2, padx=3, pady=(2, 2), sticky='ew')
+
+        # ★ 启动 / 停止：上电默认停止，必须按"启动"电机才会转
         self.btn_start = self._btn(f, '启 动', self.do_start, bg=C_BTN, w=8, h=2,
                                    font=('Microsoft YaHei', 12, 'bold'))
-        self.btn_start.grid(row=1, column=0, columnspan=2, padx=3, pady=3, sticky='ew')
+        self.btn_start.grid(row=2, column=0, columnspan=2, padx=3, pady=3, sticky='ew')
         self.btn_stop = self._btn(f, '停 止', self.do_stop_cmd, bg=C_STOP, fg='white', w=8, h=2,
                                   font=('Microsoft YaHei', 12, 'bold'))
-        self.btn_stop.grid(row=1, column=2, columnspan=2, padx=3, pady=3, sticky='ew')
+        self.btn_stop.grid(row=2, column=2, columnspan=2, padx=3, pady=3, sticky='ew')
 
-        # ★ 第二排：方向（只是选方向，本身不启动电机）
+        # ★ 方向（只选方向，本身不启动电机）
         self.btn_fwd = self._btn(f, '前进', lambda: self.do_dir(+1), bg=C_ON, w=7, h=1)
-        self.btn_fwd.grid(row=2, column=0, padx=3, pady=(2, 2), sticky='ew')
+        self.btn_fwd.grid(row=3, column=0, padx=3, pady=(2, 2), sticky='ew')
         self.btn_back = self._btn(f, '后退', lambda: self.do_dir(-1), bg=C_BTN, w=7, h=1)
-        self.btn_back.grid(row=2, column=1, padx=3, pady=(2, 2), sticky='ew')
+        self.btn_back.grid(row=3, column=1, padx=3, pady=(2, 2), sticky='ew')
         self.btn_zero = self._btn(f, '归零', self.do_zero, w=5, h=1)
-        self.btn_zero.grid(row=2, column=2, padx=3, pady=(2, 2), sticky='ew')
-        self.btn_speedq = self._btn(f, '500', (lambda: self.do_preset(500)), w=5, h=1,
-                                    font=('Consolas', 10))
-        self.btn_speedq.grid(row=2, column=3, padx=3, pady=(2, 2), sticky='ew')
+        self.btn_zero.grid(row=3, column=2, padx=3, pady=(2, 2), sticky='ew')
+        self.btn_hold = self._btn(f, '急停', self.do_estop, bg=C_ESTOP, fg='white', w=5, h=1,
+                                  font=('Microsoft YaHei', 10, 'bold'))
+        self.btn_hold.grid(row=3, column=3, padx=3, pady=(2, 2), sticky='ew')
 
-        for i, p in enumerate(SPEED_PRESETS):
-            b = self._btn(f, '%d' % p, (lambda v=p: self.do_preset(v)), w=6, h=1,
+        # 快捷档（文字/数值随模式变）
+        self.preset_btns = []
+        for i in range(4):
+            b = self._btn(f, '--', (lambda idx=i: self.do_preset_idx(idx)), w=6, h=1,
                           font=('Consolas', 10))
-            b.grid(row=3, column=i, padx=3, pady=(2, 4), sticky='ew')
+            b.grid(row=4, column=i, padx=3, pady=(2, 4), sticky='ew')
+            self.preset_btns.append(b)
 
-        self.sld_speed = tk.Scale(f, from_=0, to=3000, orient='horizontal',
+        self.sld_speed = tk.Scale(f, from_=0, to=100, orient='horizontal',
                                   bg=C_PANEL, fg=C_FG, troughcolor='#3c3c4c',
                                   highlightbackground=C_PANEL, showvalue=False, length=250,
                                   command=lambda v: self.on_speed_slide())
-        self.sld_speed.set(500)
-        self.sld_speed.grid(row=4, column=0, columnspan=4, sticky='ew', padx=6)
+        self.sld_speed.set(30)
+        self.sld_speed.grid(row=5, column=0, columnspan=4, sticky='ew', padx=6)
         self.sld_speed.bind('<ButtonRelease-1>', lambda e: self.on_speed_release())
 
         # ---- 舵机 ----
@@ -310,13 +326,40 @@ class App(object):
         self.refresh_buttons()
 
     # ---------------------------------------------------------------- 电机1
+    def set_motor_mode(self, m):
+        """切换控制方式：'pwm' 直接给占空比（默认 30%） / 'rpm' 走速度环闭环"""
+        if m == self.ctrl_mode:
+            return
+        self.running = False
+        if self.ctrl_mode == 'pwm':
+            self.send('w 0 0', '电机1 → PWM 清零')
+        else:
+            self.send('q 0', '电机1 → 速度环停止')
+
+        self.ctrl_mode = m
+        try:
+            if m == 'pwm':
+                self.sld_speed.configure(from_=0, to=100)
+                self.sld_speed.set(30)
+                self.presets = PWM_PRESETS
+            else:
+                self.sld_speed.configure(from_=0, to=3000)
+                self.sld_speed.set(500)
+                self.presets = RPM_PRESETS
+            for i, b in enumerate(self.preset_btns):
+                b.configure(text='%d' % self.presets[i])
+        except Exception:
+            pass
+        self.refresh_buttons()
+        self.update_speed_ui()
+
     def do_start(self):
-        """★ 启动：按当前的"方向 × 滑条速度"给电机1 发目标转速"""
+        """★ 启动：按当前的"方式 × 方向 × 滑条值"驱动电机1"""
         self.running = True
         self.apply_speed()
 
     def do_stop_cmd(self):
-        """★ 停止：目标清零 + 直接把两路占空比清零（双保险）"""
+        """★ 停止：速度环目标清零 + 两路占空比清零（两种方式都能停）"""
         self.running = False
         self.req_rpm = 0
         self.send('q 0', '电机1 → 停止')
@@ -331,7 +374,11 @@ class App(object):
         else:
             self.update_speed_ui()
 
-    def do_preset(self, v):
+    def do_preset_idx(self, i):
+        try:
+            v = self.presets[i]
+        except Exception:
+            return
         self.sld_speed.set(v)
         if self.running:
             self.apply_speed()
@@ -358,24 +405,33 @@ class App(object):
 
     def apply_speed(self):
         v = abs(int(self.sld_speed.get()))
-        self.req_rpm = self.dir * v
-        self.send('q %d' % self.req_rpm, '电机1 → %+d RPM' % self.req_rpm)
+        if self.ctrl_mode == 'pwm':
+            duty = self.dir * v * 100              # 30% → 3000（固件 w 命令的量纲 ±10000）
+            self.send('w %d 0' % duty, '电机1 → PWM %+d%%' % (self.dir * v))
+        else:
+            rpm = self.dir * v
+            self.send('q %d' % rpm, '电机1 → %+d RPM' % rpm)
         self.update_speed_ui()
 
     def update_speed_ui(self):
         v = abs(int(self.sld_speed.get()))
-        tgt = self.dir * v
+        if self.ctrl_mode == 'pwm':
+            tgt = '%+d%%' % (self.dir * v)
+        else:
+            tgt = '%+d RPM' % (self.dir * v)
         if self.running and v > 0:
-            txt = '电机1：运行 %+d RPM' % tgt
+            txt = '电机1：运行 %s' % tgt
             state_bg = C_ON
         else:
-            txt = '电机1：停止   (目标 %+d RPM)' % tgt
+            txt = '电机1：停止   (目标 %s)' % tgt
             state_bg = C_BTN
         try:
             self.lbl_rpm.configure(text=txt)
             self.btn_start.configure(bg=state_bg)
             self.btn_fwd.configure(bg=C_ON if self.dir > 0 else C_BTN)
             self.btn_back.configure(bg=C_ON if self.dir < 0 else C_BTN)
+            self.btn_mode_pwm.configure(bg=C_ON if self.ctrl_mode == 'pwm' else C_BTN)
+            self.btn_mode_rpm.configure(bg=C_ON if self.ctrl_mode == 'rpm' else C_BTN)
         except Exception:
             pass
 
