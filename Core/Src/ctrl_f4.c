@@ -471,9 +471,22 @@ void ctrl_servo_scan (void)
                                       500000UL, 250000UL, 4800UL };
     uint8_t  bi, id, tries;
 
+    /* ★★★ 第 1 步：先按**默认波特率**把 ID 0~20 完整扫一遍 ★★★
+       （旧版在每档波特率上只喊 0~5 号；如果舵机 ID 是 7，就会一路"没回音"扫到底，
+         最后停在 4800bps，屏幕上就显示 `4k` —— 这就是上一版截图里的现象。）*/
+    servo_set_baud(CTRL_SERVO_BAUD);
+    HAL_Delay(2);
+    for (id = 0U; id <= 20U; id++)
+    {
+        if (0U != servo_probe_id(id)) { g_servo_id = id; return; }
+    }
+
+    /* ★★★ 第 2 步：默认波特率不行，再换档试（每档只喊 0~5 号看有没有回音）★★★ */
     for (bi = 0U; bi < (uint8_t)(sizeof(bauds) / sizeof(bauds[0])); bi++)
     {
         uint32_t t0, rx0, wait;
+
+        if (bauds[bi] == CTRL_SERVO_BAUD) { continue; }    /* 刚试过 */
 
         servo_set_baud(bauds[bi]);
         HAL_Delay(2);
@@ -509,6 +522,11 @@ void ctrl_servo_scan (void)
         }
         return;
     }
+
+    /* ★★★ 第 3 步：一个都没找到 ⇒ **恢复默认波特率** ★★★
+       （旧版会把波特率停在最后试的那一档，比如 4800 —— 之后所有读写都用错波特率，
+         就算后来接线好了也永远通不了。）*/
+    servo_set_baud(CTRL_SERVO_BAUD);
 }
 
 /* 收包解析：在 20ms 节拍里跑，**绝不 while 等** */

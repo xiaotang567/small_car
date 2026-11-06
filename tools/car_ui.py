@@ -775,14 +775,15 @@ class App(object):
             sb  = int(d.get('sb', 0))
             st = int(d.get('st', 0))
             ba = int(d.get('sba', 0))
+            bas = ('%gM' % (ba / 1000000.0)) if ba >= 1000000 else ('%gk' % (ba / 1000.0))
             lv = int(d.get('sl', 1))
             if p < 0xFFFF:
-                self.v_srv.set('%d   (ID %d, %dk, 发%dB 收%dB)' % (p, sid, ba, st, rx))
+                self.v_srv.set('%d   (ID %d, %s, 发%dB 收%dB)' % (p, sid, bas, st, rx))
             else:
                 # 读不到时把诊断全带上：发了没 / 收了没 / 线是不是被拉低 / 校验错多少
                 tip = '' if lv else '  ← RX 被拉低!'
-                self.v_srv.set('--- (ID %d, %dk, 发%dB 收%dB 校验错%d%s)'
-                               % (sid, ba, st, rx, sb, tip))
+                self.v_srv.set('--- (ID %d, %s, 发%dB 收%dB 校验错%d%s)'
+                               % (sid, bas, st, rx, sb, tip))
         if 'd1' in d:
             d1 = d.get('d1', 0.0) / 100.0
             d2 = d.get('d2', 0.0) / 100.0
