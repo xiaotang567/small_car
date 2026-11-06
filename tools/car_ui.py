@@ -790,6 +790,11 @@ class App(object):
                 self.schedule_draw(force=True)
 
     # ================================================================ 文本
+    # ★ 已知的记录开头。板子发来的流里会混进大段 0x00（模块的 SPI 读事务会漏字节
+    #   到发送流里，实测 25KB/s），还会把一行从中间切断 ⇒ 解析前先洗一遍：
+    #   ① 去掉 NUL 和其它控制字符；② 从**最后一个**记录开头切进去（前面可能是半行/垃圾）。
+    PFX = ('T n=', 'ACK', 'CFG', 'CAM FOUND', 'S f=', 'BPF ', 'MD ', 'PIN ', 'CAM1', 'CAM2', 'CAM3')
+
     def on_text(self, txt):
         # ★ 文本可能被 TCP 分包切在两半（遥测行现在有 150 字节，很容易被切开）：
         #   先攒起来，只处理**完整的行**，否则半行会被当成整行丢掉或解析出乱七八糟的值。
@@ -802,8 +807,22 @@ class App(object):
                 return
             ln = self.txt_pend[:k].rstrip('\r')
             self.txt_pend = self.txt_pend[k + 1:]
-            if not ln.strip() or not all(32 <= ord(c) < 127 for c in ln):
+
+            # ① 洗掉 NUL / 控制字符（不能再用 "整行必须全是可打印字符" 一刀切，
+            #    否则只要夹了一个 0x00，这条遥测就没了 —— 之前"遥测一直是 ---"就是这么来的）
+            ln = ''.join(c for c in ln if 32 <= ord(c) < 127)
+            if not ln.strip():
                 continue
+
+            # ② 从最后一个已知记录开头切进去（半行文本会和下一条粘在一起）
+            cut = -1
+            for pfx in self.PFX:
+                i = ln.rfind(pfx)
+                if i > cut:
+                    cut = i
+            if cut > 0:
+                ln = ln[cut:]
+
             if ln.startswith('T '):
                 self.on_tele(ln[2:])
             elif ln.startswith('ACK') or ln.startswith('CFG') or ln.startswith('CAM'):

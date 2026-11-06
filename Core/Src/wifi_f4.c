@@ -312,6 +312,52 @@ volatile uint8_t  wifi_rd_cmd  = 0;     // 最近一次包头里的命令字
 volatile uint16_t wifi_rd_len  = 0;     // 最近一次包头里的长度
 volatile uint8_t  wifi_rd_int  = 0;     // 最近一次看到的 INT 电平（1 = 空闲，0 = 忙）
 
+/* ★★★ 2026-11-06（FW=2097）：**取一包（只 clock 模块真正返回的字节数）** ★★★
+   现场故障（抓包抓出来的）：上位机 20 秒收到 504KB，其中 **95% 是 0x00**，
+   25.2 KB/s 全是零；真正的遥测行夹在零里 ⇒ 上位机按行解析时"整行含 0x00 就丢弃"
+   ⇒ 遥测永远 `---`。
+
+   零从哪来：原来这里用 `wf_xfer_command(&p, 32)` —— 不管模块有没有数据，
+   **都硬 clock 32 个字节出去**。模块把这次 SPI 写进来的字节当"透传数据"，
+   于是每个主循环（~800 次/秒）就有 32 个 0x00 被塞进 TCP 流（800×32 ≈ 25 KB/s ✓）。
+   而且这些零会把模块 4KB 缓冲挤满，把真正的文本挤出/截断（S 行只剩后半截 ✓）。
+
+   ✅ 现在：先只发 4 字节包头，**看模块回的 length**：
+      · 没有数据（length=0 / 不是 0x90/0x91）⇒ **一个字节都不 clock** ⇒ 零泄漏；
+      · 有数据 ⇒ 按原来的定长 32 字节收发（数据通路行为不变，风险最小）。*/
+static void wf_read_one (wf_pkt_t *p)
+{
+    uint8_t  tx[4], rx[4];
+    uint8_t  zeros[WF_RECV_SIZE];
+    uint16_t n;
+
+    tx[0] = WF_CMD_DATA;                    /* 0x02：请求"把电脑发过来的数据给我"*/
+    tx[1] = 0U;
+    tx[2] = 0U;
+    tx[3] = 0U;
+
+    WF_CS_LOW();
+    wf_spi_tr(tx, rx, 4U);                  /* 包头（全双工：模块的应答就藏在这 4 字节里）*/
+
+    p->head.command = rx[0];
+    p->head.reserve = rx[1];
+    p->head.length  = (uint16_t)(((uint16_t)rx[2] << 8) | (uint16_t)rx[3]);
+
+    n = p->head.length;
+    if (n > (uint16_t)WF_RECV_SIZE) { n = (uint16_t)WF_RECV_SIZE; }
+
+    /* ★ 关键：**模块没有数据时，一个字节都不要 clock**（零泄漏的根源就在这）。
+       有数据时仍然按原来的定长 32 字节收发 —— 数据通路的行为完全不变，只去掉空闲时的泄漏。*/
+    if ((0U != n) &&
+        ((WF_REPLY_DATA_START == p->head.command) || (WF_REPLY_DATA_END == p->head.command)))
+    {
+        memset(zeros, 0, sizeof(zeros));
+        memset(p->buffer, 0, sizeof(p->buffer));
+        wf_spi_tr(zeros, p->buffer, WF_RECV_SIZE);
+    }
+    WF_CS_HIGH();
+}
+
 uint32_t wifi_f4_read (uint8_t *buf, uint32_t len)
 {
     wf_pkt_t p;
@@ -350,7 +396,7 @@ uint32_t wifi_f4_read (uint8_t *buf, uint32_t len)
         p.head.command = WF_CMD_DATA;           // 0x02：请求"把电脑发过来的数据给我"
         p.head.length  = 0;                     // 官方这里固定写 0
         wifi_rd_try ++;
-        wf_xfer_command(&p, WF_RECV_SIZE);      // 全双工 32 字节
+        wf_read_one(&p);                        /* ★ 只 clock 模块真正返回的字节数（见上）*/
         wf_delay_us(20);
 
         wifi_rd_cmd = p.head.command;           // ★ 记下模块到底回了什么
