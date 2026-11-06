@@ -290,6 +290,12 @@ class App(object):
                                    w=12, font=('Microsoft YaHei', 10, 'bold'))
         self.btn_estop.grid(row=0, column=1, padx=6, pady=4, sticky='ew')
 
+        # ★ 电机通道自检：先给"电机1"15%、再给"电机2"15%，各一秒
+        #   哪个轮子动就说明固件的"电机1/2"对应板子上的哪一路 —— 不用万用表
+        self.btn_mtest = self._btn(f, '电机通道自检 (1→2)', self.do_motor_selftest, w=24, h=1,
+                                   font=('Microsoft YaHei', 9))
+        self.btn_mtest.grid(row=1, column=0, columnspan=2, padx=6, pady=(0, 6), sticky='ew')
+
         # ---- 日志 ----
         f = tk.LabelFrame(right, text=' 板子回话 ', bg=C_PANEL, fg=C_ACCENT,
                           font=('Microsoft YaHei', 10, 'bold'), bd=1, relief='groove')
@@ -447,6 +453,22 @@ class App(object):
 
     def do_clr_enc(self):
         self.send('l', '编码器清零')
+
+    def do_motor_selftest(self):
+        """通道自检：电机1 15% 一秒 → 停 → 电机2 15% 一秒 → 停
+        看哪个轮子动，就知道固件的"电机1/2"对应板子上的哪一路。"""
+        self.running = False
+        self.send('q 0')
+        self.send('w 0 0', '自检开始（注意轮子！）')
+
+        def step(ms, cmd, note):
+            self.root.after(ms, lambda: self.send(cmd, note))
+
+        step(300,  'w 1500 0', '→ 只给电机1 15%')
+        step(1500, 'w 0 0',    '→ 全停')
+        step(2000, 'w 0 1500', '→ 只给电机2 15%')
+        step(3200, 'w 0 0',    '→ 全停，自检结束')
+        self.update_speed_ui()
 
     def do_estop(self):
         self.running = False
