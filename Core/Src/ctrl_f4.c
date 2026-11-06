@@ -464,10 +464,10 @@ static void servo_set_baud (uint32_t bps)
 
 void ctrl_servo_scan (void)
 {
-    /* ★ 先找波特率：舵机波特率可配（出厂 1M 居多，用户这块是 **10000**）。
+    /* ★ 先找波特率：舵机波特率可配（用户这块是 **1M**）。
        每档给 0~5 号发一遍 READ，等待时间按波特率放大（低波特率下一帧就要 8ms）。*/
-    static const uint32_t bauds[] = { 10000UL, 1000000UL, 115200UL, 57600UL,
-                                      38400UL, 19200UL, 14400UL, 9600UL,
+    static const uint32_t bauds[] = { 1000000UL, 115200UL, 57600UL, 38400UL,
+                                      19200UL, 14400UL, 9600UL, 10000UL,
                                       500000UL, 250000UL, 4800UL };
     uint8_t  bi, id, tries;
 

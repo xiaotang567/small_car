@@ -69,11 +69,12 @@
 #define CTRL_SPEED_SIGN_AUTO    1            /* 1 = 反馈极性自动识别 */
 
 /* ---- 舵机（幻尔 HX 总线舵机）----
-   ★ 2026-11-06：用户这块舵机是 **10000 bps**（不是常见的 1M）。
-     10000bps 在 APB1=42MHz、16 倍过采样下**超出 BRR 的表示范围**（最低约 10255）
-     ⇒ `servo_set_baud()` 里会自动切 **OVER8=1（8 倍过采样）**。
-     开机还会自动在 11 档波特率里找一遍，所以这里的默认值只是"第一个试的"。*/
-#define CTRL_SERVO_BAUD         10000UL
+   ★ 2026-11-06：用户这块舵机是 **1 Mbps**（幻尔 HX 出厂默认）。
+     开机还会自动在 11 档波特率里找一遍（10000 也在列表里，用户一度以为是 10000），
+     所以这里的默认值只是"第一个试的"。
+   ⚠️ 顺带修的一个坑：低速时 USARTDIV 会超过 4095（BRR 装不下）
+      ⇒ `servo_set_baud()` 会自动切 OVER8=1（8 倍过采样），10000bps 以下才需要。*/
+#define CTRL_SERVO_BAUD         1000000UL
 #define CTRL_SERVO_ID           1            /* 总线上那颗舵机的 ID */
 #define CTRL_SERVO_POS_MIN      1048         /* 安全限位（原工程 2048 ± 1000） */
 #define CTRL_SERVO_POS_MAX      3048
