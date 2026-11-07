@@ -187,7 +187,7 @@ void ctrl_encoder_clear (void)
 uint8_t ctrl_encoder_z_cnt (void) { return (uint8_t)(g_enc_z & 0xFFU); }
 
 /* 每 20ms 由 board_ctrl_tick() 调：取增量 → 清 CNT → 算 M 法转速 */
-static void encoder_tick (uint32_t dt_ms)
+static void encoder_tick_us (uint32_t dt_us)
 {
     int32_t d;
 
@@ -203,12 +203,15 @@ static void encoder_tick (uint32_t dt_ms)
     g_enc_delta  = d;
     g_enc_total += d;
 
-    if (0U == dt_ms) { dt_ms = CTRL_PERIOD_MS; }
+    if (0U == dt_us) { dt_us = (uint32_t)CTRL_PERIOD_MS * 1000U; }
 
-    /* RPM×10 = ΔN × 600000 / (CPR × **实际周期ms**)   —— 必须 int64，原工程踩过 int32 溢出
-       ★ 2026-11-07（FW=2116）：原来这里写死 CTRL_PERIOD_MS(20)，主循环被拖慢时读数就会跳。*/
-    g_enc_rpm_x10 = (int16_t)(((int64_t)d * 600000LL) /
-                              ((int64_t)CTRL_ENC_CPR * (int64_t)dt_ms));
+    /* RPM×10 = d×600000000 / (CPR × **实际周期µs**)
+       ★★★ 2026-11-07（FW=2117）：**改到 µs 精度** ★★★
+       之前用 HAL_GetTick() 的 ms 算，20ms 窗口里 ±1ms 就是 ±5% ⇒ 500RPM 正好 ±25 的抖动，
+       实测日志里 rpm 就是 466~526 在摆。改用 DWT 周期计数器（168MHz）算 dt，
+       分辨率约 6ns，测速噪声立刻降下来。*/
+    g_enc_rpm_x10 = (int16_t)(((int64_t)d * 600000000LL) /
+                              ((int64_t)CTRL_ENC_CPR * (int64_t)dt_us));
 }
 
 /* stm32f4xx_it.c 的 EXTI0_IRQHandler 转发到这里 */
@@ -1114,6 +1117,17 @@ static void speed_tick (void)
 
     meas_x10 = g_enc_rpm_x10;
 
+    /* ★★★ 2026-11-07（FW=2117）：**测速一阶低通** ★★★
+       日志实测：占空比很稳（2824~3212），但 rpm 在 466~526 之间慢慢摆（周期约 2s）。
+       20ms 窗口里编码器量化的 ±1 个计数 ≈ ±7RPM，会被 P 项放大成可见的摆动。
+       这里做 y += (x-y)/4（时间常数约 4 拍 = 80ms）：对真实加减速几乎无延迟，
+       但把量化噪声压掉大半，速度环就不会再"追噪声"。*/
+    {
+        static int32_t meas_f_x10 = 0;
+        meas_f_x10 += (meas_x10 - meas_f_x10) / 4;
+        meas_x10 = meas_f_x10;
+    }
+
 #if CTRL_SPEED_SIGN_AUTO
     /* 反馈极性自动识别：上一拍给了明显正占空比，实测却是明显负转速 ⇒ 反了 */
     if ((0U == g_sc_sign_locked) && (g_sc_duty > 800))
@@ -1704,7 +1718,8 @@ void ctrl_all_init (void)
 
 void board_ctrl_tick (void)
 {
-    static uint32_t t_last = 0U;
+    static uint32_t t_last     = 0U;
+    static uint32_t t_last_cyc = 0U;    /* ★ DWT 周期计数：给测速算 µs 级的真实间隔 */
     static uint8_t  srv_div = 0U;
     uint32_t now = HAL_GetTick();
 
@@ -1717,14 +1732,17 @@ void board_ctrl_tick (void)
        实际周期常常是 22~30ms ⇒ 同一个增量被当成 20ms 的 ⇒ 读数忽高忽低。
        ⇒ 这里把真实间隔 dt 传进 encoder_tick()，用它算 RPM。*/
     {
-        uint32_t dt = now - t_last;
+        uint32_t cyc   = DWT->CYCCNT;
+        uint32_t dt_us = (uint32_t)((cyc - t_last_cyc) / (SystemCoreClock / 1000000UL));
 
-        t_last = now;
-        if (0U == dt)      { dt = CTRL_PERIOD_MS; }
-        if (dt > 200U)     { dt = 200U; }        /* 卡太久就夹住，别算出离谱的值 */
+        t_last_cyc = cyc;
+        t_last     = now;
 
-        /* 1) 编码器：取增量 + 用**真实 dt** 算转速 */
-        encoder_tick(dt);
+        if (0U == dt_us)         { dt_us = (uint32_t)CTRL_PERIOD_MS * 1000U; }
+        if (dt_us > 200000UL)    { dt_us = 200000UL; }      /* 卡太久就夹住 */
+
+        /* 1) 编码器：取增量 + 用**DWT 实测的 µs 间隔**算转速 */
+        encoder_tick_us(dt_us);
     }
 
     /* 2) 速度环（只在目标非 0 时才会有输出） */
