@@ -2719,13 +2719,17 @@ static void lf_trace_track (void)
     }
     if (seed_r < 0) { return; }
 
-    /* ②③ 从种子往上、往下各走一遍：只认同"重叠最多 + 不跳变"的白段 */
+    /* ②③ 从种子往上、往下各走一遍：**只认同 8 邻域连通的下一行**
+       ★ FW=2169：**找不到就立刻结束，绝不估算**。
+         之前这里会"用上一行的位置硬填最多 4 行"，结果就是隔着一条黑缝也画出了线
+         （你在上位机上看到的那些孤立红点）。现在的规则和 8 邻域一致：
+           下一行的白段必须和本行区间**有重叠**（= 8 邻域意义上相连）才继续，
+           否则这一侧到此为止，剩下的行一律 0xFF（上位机不画）✓ */
     for (dir = -1; dir <= 1; dir += 2)
     {
-        int32_t rr   = seed_r + dir;
-        int32_t l    = sl;
-        int32_t rg   = sr;
-        int32_t lost = 0;
+        int32_t rr = seed_r + dir;
+        int32_t l  = sl;
+        int32_t rg = sr;
 
         while ((rr >= 0) && (rr < (int32_t)CAM_H))
         {
@@ -2739,30 +2743,19 @@ static void lf_trace_track (void)
                 int32_t b  = (int32_t)lf_re[j];
                 int32_t ov;
 
-                /* 左右都不许跳太远（急弯由 LF_MAX_JUMP 逐步累积完成）*/
-                if ((LF_ABS(a - l) > LF_MAX_JUMP) && (LF_ABS(b - rg) > LF_MAX_JUMP)) { continue; }
-
                 ov = ((b < rg) ? b : rg) - ((a > l) ? a : l) + 1;   /* 与上一行区间重叠长度 */
+                if (ov <= 0) { continue; }                          /* 中间隔着黑 ⇒ 不相连 */
                 if (ov > bestov) { bestov = ov; bestj = j; }
             }
 
-            if ((0xFFU != bestj) && (bestov > 0))
-            {
-                l  = (int32_t)lf_rs[bestj];
-                rg = (int32_t)lf_re[bestj];
-                cam_bound[rr]   = (uint8_t)l;
-                cam_bound_r[rr] = (uint8_t)rg;
-                lf_real_l[rr]   = 1U;
-                lf_real_r[rr]   = 1U;
-                lost = 0;
-            }
-            else
-            {
-                lost ++;
-                if (lost > LF_LOST_MAX) { break; }
-                cam_bound[rr]   = (uint8_t)l;      /* 估一行：位置/宽度沿用上一行 */
-                cam_bound_r[rr] = (uint8_t)rg;
-            }
+            if (0xFFU == bestj) { break; }        /* ★ 收不到就结束，不猜 */
+
+            l  = (int32_t)lf_rs[bestj];
+            rg = (int32_t)lf_re[bestj];
+            cam_bound[rr]   = (uint8_t)l;
+            cam_bound_r[rr] = (uint8_t)rg;
+            lf_real_l[rr]   = 1U;
+            lf_real_r[rr]   = 1U;
             rr += dir;
         }
     }
