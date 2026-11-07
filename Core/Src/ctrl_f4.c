@@ -1071,9 +1071,27 @@ const char * ctrl_speed_state_name (void)
     }
 }
 
+/* ★★★ 2026-11-07（FW=2119）：**开环 / 闭环切换** ★★★
+   现象：上位机用"占空比模式"发 `w 300 0`，电机没反应。
+   原因：固件上电就自动闭环跑 500RPM，`speed_tick()` **每 20ms 都会写一次占空比**
+         ⇒ 你发的值下一个节拍就被覆盖了。
+   做法：收到 `w` ⇒ 进开环，速度环直接让位（什么都不写），电机只认你给的占空比；
+        收到 `q`（含 `q 0` 停止）⇒ 回闭环。
+   顺便：开环时堵转保护也不参与（没目标转速可比）。*/
+static uint8_t g_open_loop = 0U;
+
+void ctrl_open_loop (uint8_t on)
+{
+    g_open_loop = (0U != on) ? 1U : 0U;
+}
+
+uint8_t ctrl_is_open_loop (void) { return g_open_loop; }
+
 static void speed_tick (void)
 {
     int32_t meas_x10, err_x10, p_term, i_step, ff_term, out;
+
+    if (0U != g_open_loop) { return; }      /* ★ 开环模式：速度环完全让位 */
 
     /* ★★★ 安全：**断链强制停车** ★★★
        上位机一关（或 WiFi 掉线），板子不知道，会按最后一次目标转速一直跑 —— 很危险。
@@ -1466,6 +1484,7 @@ static uint8_t  s_motor_stalled = 0U;      /* 1 = 堵转停机，等 PC2 */
 static uint16_t s_below_cnt     = 0U;      /* 连续低于阈值拍数（保护关掉时不需要）*/
 #endif
 static uint16_t s_grace_cnt     = 0U;      /* 起转宽限拍数 */
+static uint8_t  s_btn_armed     = 0U;      /* PC2 已经"松开"过（边沿触发用）*/
 
 /* 重新生成 4 行文字（内容变了才标 dirty） */
 static void oled_text_update (void)
@@ -1625,8 +1644,8 @@ void ctrl_buzzer (uint8_t on)
 
 static void motor_supervisor (void)
 {
-    /* ① 第一次进主循环：自动起转（要"上电不转"就把 CTRL_RUN_AUTO_START 改成 0）*/
-    if (0U == s_motor_started)
+    /* ① 自动起转（仅闭环、只做一次）*/
+    if ((0U == g_open_loop) && (0U == s_motor_started))
     {
         s_motor_started = 1U;
         s_grace_cnt     = 0U;
@@ -1635,22 +1654,29 @@ static void motor_supervisor (void)
 #endif
     }
 
-    /* ② 堵转停机后：PC2 按下（低电平有效）⇒ 解除并重新起转 */
-    if ((0U != s_motor_stalled) && (0U != ctrl_key(1U)))
+    /* ② 堵转停机后：PC2 **边沿触发**（必须先松开、再按下）⇒ 回闭环重新起转
+       ★ 用边沿而不是电平：万一按键卡住/接线常低，电平触发会在"停机"的下一拍
+         立刻把自己解除掉，表现就是"堵转保护不动作"。*/
+    if (0U != s_motor_stalled)
     {
-        s_motor_stalled = 0U;
-        s_grace_cnt     = 0U;
+        if (0U == ctrl_key(1U)) { s_btn_armed = 1U; }          /* 见到"松开" */
+        else if (0U != s_btn_armed)
+        {
+            s_motor_stalled = 0U;
+            s_grace_cnt     = 0U;
+            s_btn_armed     = 0U;
 #if CTRL_STALL_ENABLE
-        s_below_cnt     = 0U;
+            s_below_cnt     = 0U;
 #endif
-        ctrl_speed_set_target((int16_t)CTRL_RUN_RPM);
+            ctrl_open_loop(0U);                                /* 回闭环巡航 */
+            ctrl_speed_set_target((int16_t)CTRL_RUN_RPM);
+        }
         return;
     }
 
-    if (0U != s_motor_stalled) { return; }
-
-    /* ③ 起转宽限：刚起步转速天然是 0，这几秒里不做堵转判断 */
-    if (s_grace_cnt < (uint16_t)(CTRL_STALL_GRACE_MS / CTRL_PERIOD_MS))
+    /* ③ 起转宽限（只对闭环起步有意义：那几秒转速天然是 0）*/
+    if ((0U == g_open_loop) &&
+        (s_grace_cnt < (uint16_t)(CTRL_STALL_GRACE_MS / CTRL_PERIOD_MS)))
     {
         s_grace_cnt ++;
 #if CTRL_STALL_ENABLE
@@ -1659,20 +1685,34 @@ static void motor_supervisor (void)
         return;
     }
 
-    /* ④ 堵转检测（只在"有目标"时做；目标 0 = 正常停车，不算堵转）
-       ★ 2026-11-07（FW=2114）：**用户要求先关掉**，用 CTRL_STALL_ENABLE 控制。
-          关掉以后 s_motor_stalled 永远是 0 ⇒ PC2 也不会触发重启（没有"停机"可解除）。
-          想恢复保护：把 ctrl_f4.h 里的 CTRL_STALL_ENABLE 改回 1。*/
+    /* ④ 堵转检测（★ 2026-11-07 FW=2119：**开环 / 闭环都管**）
+          · 闭环：实测转速 < 目标 × 80%  持续 2 秒（目标 0 = 正常停车，不判）
+          · 开环：给了够大的占空比、转速却几乎为 0 持续 2 秒（原来开环完全不判，
+                  所以"占空比模式下堵转保护没反应"）。*/
 #if CTRL_STALL_ENABLE
     {
-        int16_t tgt   = ctrl_speed_get_target();
         int16_t rpm   = ctrl_speed_get_rpm();
-        int32_t a_tgt = (tgt < 0) ? -(int32_t)tgt : (int32_t)tgt;
         int32_t a_rpm = (rpm < 0) ? -(int32_t)rpm : (int32_t)rpm;
+        int32_t thr;
 
-        if (0 == a_tgt) { s_below_cnt = 0U; return; }
+        if (0U != g_open_loop)
+        {
+            int16_t duty   = ctrl_motor_get((uint8_t)CTRL_SPEED_MOTOR);
+            int32_t a_duty = (duty < 0) ? -(int32_t)duty : (int32_t)duty;
 
-        if (a_rpm < ((a_tgt * (int32_t)CTRL_STALL_PCT) / 100))
+            if (a_duty < (int32_t)CTRL_STALL_DUTY_MIN) { s_below_cnt = 0U; return; }
+            thr = (int32_t)CTRL_STALL_OPEN_RPM;
+        }
+        else
+        {
+            int16_t tgt   = ctrl_speed_get_target();
+            int32_t a_tgt = (tgt < 0) ? -(int32_t)tgt : (int32_t)tgt;
+
+            if (0 == a_tgt) { s_below_cnt = 0U; return; }
+            thr = (a_tgt * (int32_t)CTRL_STALL_PCT) / 100;
+        }
+
+        if (a_rpm < thr)
         {
             if (s_below_cnt < 0xFFFFU) { s_below_cnt ++; }
 
@@ -1680,12 +1720,14 @@ static void motor_supervisor (void)
             {
                 s_motor_stalled = 1U;
                 s_below_cnt     = 0U;
-                ctrl_speed_set_target(0);          /* ★ 停机 */
+                ctrl_open_loop(0U);                    /* 退回闭环，才能被 PC2 正常重启 */
+                ctrl_speed_set_target(0);              /* ★ 停机 */
+                ctrl_motor_set((uint8_t)CTRL_SPEED_MOTOR, 0);   /* 开环时也确保真的停 */
             }
         }
         else
         {
-            s_below_cnt = 0U;                      /* 转速回来了 ⇒ 计数清零 */
+            s_below_cnt = 0U;                          /* 转速回来了 ⇒ 计数清零 */
         }
     }
 #endif  /* CTRL_STALL_ENABLE */

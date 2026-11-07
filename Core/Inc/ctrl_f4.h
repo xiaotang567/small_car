@@ -72,6 +72,9 @@
 #define CTRL_STALL_MS           2000         /* 低于阈值持续多久判堵转 */
 #define CTRL_STALL_PCT          80           /* 阈值 = 目标的 80%（500 → 400 RPM）*/
 #define CTRL_STALL_GRACE_MS     3000         /* ★ 起转后的宽限期：这段时间不做堵转判断 */
+/* ↓ 开环（占空比模式）下的堵转判定：占空比 ≥ DUTY_MIN 而转速 < OPEN_RPM，持续 2 秒 ⇒ 堵转 */
+#define CTRL_STALL_DUTY_MIN     300          /* 3% 占空比以上才判（低于它本来就不该转）*/
+#define CTRL_STALL_OPEN_RPM     50           /* 开环时"转速几乎为 0"的阈值 */
 #define CTRL_STALL_TICKS        (CTRL_STALL_MS / CTRL_PERIOD_MS)   /* 100 拍 */
 
 /* ---- 速度环（数值全部照抄原工程 speed_ctrl.h，只把电机的编号放松成可配）---- */
@@ -143,6 +146,9 @@ uint8_t  ctrl_encoder_z_cnt (void);
 
 /* ---------- 速度环（PI + 前馈 + 斜坡）---------- */
 void     ctrl_speed_init (void);
+/* ★ 开环(1)/闭环(0) 切换：发 `w` 进开环（速度环让位），发 `q` 回闭环 */
+void     ctrl_open_loop (uint8_t on);
+uint8_t  ctrl_is_open_loop (void);
 void     ctrl_speed_set_target (int16_t rpm);      /* 目标转速；0 = 停机 */
 int16_t  ctrl_speed_get_target (void);
 int16_t  ctrl_speed_get_duty   (void);

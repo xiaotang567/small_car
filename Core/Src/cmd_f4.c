@@ -56,7 +56,7 @@ static void cmd_txt (const char *s)
        ⇒ 这时 f=0 是安全的，相 0 只等 5ms。
    ⇒ 一帧 = 打包 ~1ms + 发送 ~4.4ms + 歇 5ms ≈ 10ms，上限由传感器 50fps 决定。
    ⚠️ 只有**切回助手模式**（SEND_MODE_VOFA=1）时才需要把它调回 20~30，否则会重演 0.9fps。*/
-/* ★★★ 2026-11-07（FW=2118）：**默认帧率 10 → 6** ★★★
+/* ★★★ 2026-11-07（FW=2119）：**默认帧率 10 → 6** ★★★
    实测（图传默认打开后）25 秒里只收到 7 条 S + 5 条遥测（正常应是 50 + 125），
    S 行还都被截断 —— 说明 10fps × 2894B ≈ 29KB/s 把这个模块（实测吞吐 25~33KB/s）
    占满了，遥测/ACK 挤不出去 ⇒ 上位机点按钮没有回执。
@@ -154,7 +154,7 @@ static void cam_cmd_status (void)
        DRP = 发送看门狗**主动放弃**的帧数（一直飙 ⇒ 链路/模块发不动）✓
        DST = DMA 停摆看门狗重启采集的次数（>0 ⇒ 采集链卡过，但已经自己救回来了）✓
        SELF= 连续 2 秒没有完整帧 ⇒ 重启采集的次数（和 DST 一起看）✓ */
-    sprintf(b, "CFG f=%u g=%u x=%u y=%u (%ux%u) d=%u CST=%u RV=%06lX LINE=%u FW=2118 EDG=%lu EL=%u ER=%u DRP=%lu DST=%lu SELF=%lu\r\n",
+    sprintf(b, "CFG f=%u g=%u x=%u y=%u (%ux%u) d=%u CST=%u RV=%06lX LINE=%u FW=2119 EDG=%lu EL=%u ER=%u DRP=%lu DST=%lu SELF=%lu\r\n",
             (unsigned)cam_cmd_fps, (unsigned)cam_cmd_gap_ms,
             (unsigned)cam_cmd_dx, (unsigned)cam_cmd_dy,
             (unsigned)(CAM_TXW / cam_cmd_dx), (unsigned)(CAM_H / cam_cmd_dy),
@@ -482,6 +482,7 @@ static void cam_cmd_line (char *s)
                 int32_t r = cam_cmd_snum(s + 1);
                 if (r >  6000) { r =  6000; }
                 if (r < -6000) { r = -6000; }
+                ctrl_open_loop(0U);             /* ★ 回闭环：速度环重新接管 */
                 ctrl_speed_set_target((int16_t)r);
                 sprintf(b, "ACK q: target=%d state=%s\r\n",
                         (int)ctrl_speed_get_target(), ctrl_speed_state_name());
@@ -494,9 +495,10 @@ static void cam_cmd_line (char *s)
                 int32_t d1 = cam_cmd_snum(s + 1);
                 int32_t d2 = cam_cmd_snum(cam_cmd_next(s + 1));
 
+                ctrl_open_loop(1U);             /* ★ 进开环：速度环让位，只认这里的占空比 */
                 ctrl_motor_set(1U, (int16_t)d1);
                 ctrl_motor_set(2U, (int16_t)d2);
-                sprintf(b, "ACK w: d1=%d d2=%d\r\n", (int)d1, (int)d2);
+                sprintf(b, "ACK w: d1=%d d2=%d (open-loop)\r\n", (int)d1, (int)d2);
                 cmd_txt(b);
             }
             return;
@@ -625,7 +627,7 @@ void cam_cmd_poll (void)
                 cam_cmd_len = 0U;
             }
         }
-        /* ★★★ 2026-11-07（FW=2118）：**只收可打印字符，别把模块的 0x00 填充塞进命令行** ★★★
+        /* ★★★ 2026-11-07（FW=2119）：**只收可打印字符，别把模块的 0x00 填充塞进命令行** ★★★
            现场：上位机点按钮一直重发，板子却回的是 `CFG`（default 分支），不是 `ACK r`。
            真凶：模块把下行数据放在 32 字节块里，**前面补了一堆 0x00**；
            这些 0 被当成命令字符塞进 `cam_cmd_buf`，于是 `cam_cmd_line()` 看到的第一个字节是
