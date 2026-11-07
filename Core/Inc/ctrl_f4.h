@@ -81,6 +81,11 @@
 /* ---- 速度环（数值全部照抄原工程 speed_ctrl.h，只把电机的编号放松成可配）---- */
 #define CTRL_SPEED_MOTOR        1            /* 速度环驱动哪个电机：1 / 2（原工程是 MOTOR_1）*/
 #define CTRL_SPEED_FF_PER_1000  5000         /* 前馈：目标每 1000RPM 给多少占空比 */
+#define CTRL_SPEED_FF_OFFSET    1200         /* ★ 2193：前馈"死区补偿"：只要不是停机就给 12% 起步占空比
+                                                （100RPM 时原来只有 5% ⇒ 电机根本转不起来）*/
+#define CTRL_SPEED_KICK_DUTY    2600         /* ★ 2193：起转"踹一脚"：目标非 0 但转速起不来时用的占空比 */
+#define CTRL_SPEED_KICK_RPM     30           /* ★ 2193：转速低于它就算"没转起来" */
+#define CTRL_SPEED_KICK_MS      400          /* ★ 2193：持续这么久才踹 */
 #define CTRL_SPEED_RAMP_RPM_S   3000         /* 设定值斜坡：每秒允许升多少 RPM */
 #define CTRL_SPEED_KP_X1000     1500         /* Kp = 1.500 */
 #define CTRL_SPEED_KI_X1000     150          /* Ki = 0.150（每个控制周期） */

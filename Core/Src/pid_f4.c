@@ -154,11 +154,42 @@ void ctrl_speed_tick (void)
     if (g_sc_i_acc >  CTRL_SPEED_I_LIMIT) { g_sc_i_acc =  CTRL_SPEED_I_LIMIT; }
     if (g_sc_i_acc < -CTRL_SPEED_I_LIMIT) { g_sc_i_acc = -CTRL_SPEED_I_LIMIT; }
 
+    /* ★ 2193：前馈加"死区补偿"。纯比例前馈在低速时给出的占空比太小
+       （100RPM ⇒ 5%），电机有静摩擦/齿槽，5% 根本转不动。
+       加一个常量偏置：只要在跑就给 FF_OFFSET。*/
     ff_term = (g_sc_ramp_x10 * CTRL_SPEED_FF_PER_1000) / 10000;
+    if (g_sc_ramp_x10 > 0)      { ff_term += CTRL_SPEED_FF_OFFSET; }
+    else if (g_sc_ramp_x10 < 0) { ff_term -= CTRL_SPEED_FF_OFFSET; }
 
     out = ff_term + p_term + g_sc_i_acc;
     if (out > CTRL_SPEED_DUTY_MAX) { out = CTRL_SPEED_DUTY_MAX; }
     if (out < 0)                   { out = 0; }
+
+    /* ★★ 2193：**起转踹一脚**
+       目标非 0、但实测转速一直起不来（< KICK_RPM 持续 KICK_MS）⇒ 直接给 KICK_DUTY 踹一下，
+       等它转起来再交回 PID。没有这一下，低速目标（100RPM）会卡在静摩擦里一动不动。*/
+    {
+        static uint32_t s_kick_t   = 0U;
+        static uint8_t  s_kick_on  = 0U;
+
+        if ((0 != g_sc_ramp_x10) && (meas_x10 < CTRL_SPEED_KICK_RPM * 10) &&
+            (meas_x10 > -CTRL_SPEED_KICK_RPM * 10))
+        {
+            if (0U == s_kick_t) { s_kick_t = HAL_GetTick(); }
+
+            if ((HAL_GetTick() - s_kick_t) > CTRL_SPEED_KICK_MS)
+            {
+                if (out < CTRL_SPEED_KICK_DUTY) { out = CTRL_SPEED_KICK_DUTY; }
+                s_kick_on = 1U;
+            }
+        }
+        else
+        {
+            s_kick_t  = 0U;
+            s_kick_on = 0U;
+        }
+        (void)s_kick_on;
+    }
 
     g_sc_duty = (int16_t)out;
     ctrl_motor_set((uint8_t)CTRL_SPEED_MOTOR, g_sc_duty);
