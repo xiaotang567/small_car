@@ -76,6 +76,8 @@
 #define CTRL_STALL_ENABLE       1            /* ★ 1 = 打开堵转保护；0 = 关闭 */
 #define CTRL_STALL_RPM          50           /* ★ 2192：150 -> 50（用户改）*/
 #define CTRL_STALL_MS           3000         /* ★ 2190：2000 -> 3000ms（用户改）*/
+#define CTRL_STALL_GRACE_MS     2500         /* ★ 2194：**起转宽限**：目标由 0 变非 0 后的 2.5 秒内不判堵转
+                                                （实测低速起转来不及加速就被判堵转杀掉）*/
 #define CTRL_STALL_TICKS        (CTRL_STALL_MS / CTRL_PERIOD_MS)   /* 100 拍（20ms × 100 = 2s）*/
 
 /* ---- 速度环（数值全部照抄原工程 speed_ctrl.h，只把电机的编号放松成可配）---- */

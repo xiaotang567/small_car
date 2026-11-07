@@ -21,6 +21,8 @@
 static uint8_t  s_motor_started = 0U;      /* 0 = 还没起过转 */
 static uint8_t  s_motor_stalled = 0U;      /* 1 = 堵转停机，等按键 */
 static uint32_t s_stall_tick    = 0U;      /* ★ 2191：进堵转的时刻（远程重启要冷却 2 秒）*/
+static int16_t  s_tgt_prev      = 0;       /* ★ 2194：上一拍的目转速（判"刚起转"）*/
+static uint32_t s_run_tick      = 0U;      /* ★ 2194：刚起转的时刻 */
 #if CTRL_STALL_ENABLE
 static uint16_t s_below_cnt     = 0U;      /* 连续低于阈值拍数 */
 #endif
@@ -87,6 +89,17 @@ void ctrl_protect_tick (void)
 
         /* 根本没在驱动 ⇒ 不算堵转（这就是"已经停了"）*/
         if ((0 == duty) && (0 == tgt))
+        {
+            s_below_cnt = 0U;
+            return;
+        }
+
+        /* ★★ 2194：**起转宽限**——目标由 0 变非 0 后 2.5 秒内不判堵转
+           （低速起转时电机要 1~2 秒才转起来，之前 3 秒判据直接把它杀了）*/
+        if ((0 != tgt) && (0 == s_tgt_prev)) { s_run_tick = HAL_GetTick(); }
+        s_tgt_prev = tgt;
+
+        if ((0 != tgt) && ((HAL_GetTick() - s_run_tick) < (uint32_t)CTRL_STALL_GRACE_MS))
         {
             s_below_cnt = 0U;
             return;
