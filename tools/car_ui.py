@@ -136,7 +136,7 @@ class App(object):
         self.expo_val = EXPO_INIT       # ★ 100（和固件默认的 cam_shutter 一致）
         self.running = False        # ★ 电机1 是否"启动"状态：上电默认停
         self.dir = +1               # 方向：+1 前进 / -1 后退
-        self.ctrl_mode = 'rpm'      # ★ 默认"转速闭环"（固件巡航目标 500 RPM）；可切回占空比
+        self.ctrl_mode = 'rpm'      # ★ 默认"转速闭环"（固件巡航目标 300 RPM）；可切回占空比
         self.presets = RPM_PRESETS
         self.pending = []           # 等回执的命令（send_ack 用）
         self.txt_pend = ''          # 文本行缓冲（TCP 分包时半行先攒着）
@@ -341,7 +341,7 @@ class App(object):
                                   bg=C_PANEL, fg=C_FG, troughcolor='#3c3c4c',
                                   highlightbackground=C_PANEL, showvalue=False, length=250,
                                   command=lambda v: self.on_speed_slide())
-        self.sld_speed.set(500)          # ★ 默认闭环 500 RPM（和固件巡航目标一致）
+        self.sld_speed.set(300)          # ★ 2190：默认闭环 300 RPM（和固件巡航目标一致）
         self.sld_speed.grid(row=5, column=0, columnspan=4, sticky='ew', padx=6)
         self.sld_speed.bind('<ButtonRelease-1>', lambda e: self.on_speed_release())
 
@@ -565,7 +565,7 @@ class App(object):
                 self.presets = PWM_PRESETS
             else:
                 self.sld_speed.configure(from_=0, to=3000)
-                self.sld_speed.set(500)
+                self.sld_speed.set(300)
                 self.presets = RPM_PRESETS
             for i, b in enumerate(self.preset_btns):
                 b.configure(text='%d' % self.presets[i])
