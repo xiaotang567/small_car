@@ -56,7 +56,7 @@ static void cmd_txt (const char *s)
        ⇒ 这时 f=0 是安全的，相 0 只等 5ms。
    ⇒ 一帧 = 打包 ~1ms + 发送 ~4.4ms + 歇 5ms ≈ 10ms，上限由传感器 50fps 决定。
    ⚠️ 只有**切回助手模式**（SEND_MODE_VOFA=1）时才需要把它调回 20~30，否则会重演 0.9fps。*/
-/* ★★★ 2026-11-07（FW=2129）：**默认帧率 10 → 6** ★★★
+/* ★★★ 2026-11-07（FW=2131）：**默认帧率 10 → 6** ★★★
    实测（图传默认打开后）25 秒里只收到 7 条 S + 5 条遥测（正常应是 50 + 125），
    S 行还都被截断 —— 说明 10fps × 2894B ≈ 29KB/s 把这个模块（实测吞吐 25~33KB/s）
    占满了，遥测/ACK 挤不出去 ⇒ 上位机点按钮没有回执。
@@ -154,7 +154,7 @@ static void cam_cmd_status (void)
        DRP = 发送看门狗**主动放弃**的帧数（一直飙 ⇒ 链路/模块发不动）✓
        DST = DMA 停摆看门狗重启采集的次数（>0 ⇒ 采集链卡过，但已经自己救回来了）✓
        SELF= 连续 2 秒没有完整帧 ⇒ 重启采集的次数（和 DST 一起看）✓ */
-    sprintf(b, "CFG f=%u g=%u x=%u y=%u (%ux%u) d=%u CST=%u RV=%06lX LINE=%u FW=2129 EDG=%lu EL=%u ER=%u DRP=%lu DST=%lu SELF=%lu TH=%u SH=%u AE=%u\r\n",
+    sprintf(b, "CFG f=%u g=%u x=%u y=%u (%ux%u) d=%u CST=%u RV=%06lX LINE=%u FW=2131 EDG=%lu EL=%u ER=%u DRP=%lu DST=%lu SELF=%lu TH=%u SH=%u\r\n",
             (unsigned)cam_cmd_fps, (unsigned)cam_cmd_gap_ms,
             (unsigned)cam_cmd_dx, (unsigned)cam_cmd_dy,
             (unsigned)(CAM_TXW / cam_cmd_dx), (unsigned)(CAM_H / cam_cmd_dy),
@@ -167,7 +167,7 @@ static void cam_cmd_status (void)
             (unsigned long)cam_dma_stall,
             (unsigned long)cam_self_heal,
             (unsigned)((0U != cam_thresh_manual) ? (unsigned)cam_thresh_manual : (unsigned)cam_thresh),
-            (unsigned)cam_r0e, (unsigned)cam_ae);
+            (unsigned)cam_r0e);
     cmd_txt(b);
 }
 
@@ -366,7 +366,7 @@ static void cam_cmd_line (char *s)
 
         // ★ 曝光：`e <行数>` 直接写 R0x0B（Total Shutter Width，单位=行），下一帧生效 ✓
         //   行 bin4 后帧只有 120 行 ⇒ 行数必须 < 120（出厂 443 会卡死不成帧 ✓）
-        //   ★★ 2026-11-07（FW=2129）：**写完立刻回读**，把"写进去的值"和"芯片里实际的值"
+        //   ★★ 2026-11-07（FW=2131）：**写完立刻回读**，把"写进去的值"和"芯片里实际的值"
         //      都报出来 —— 用户反馈"感觉动态调曝光没生效"，有了回读就能分清
         //      是"写没写进去"（wr/rd 不一致 = SCCB 没应答）还是"写了但画面变化小"。
         case 'e':
@@ -380,10 +380,10 @@ static void cam_cmd_line (char *s)
                 wr = cam_sccb_write_reg(0x0BU, cam_shutter);
                 rr = cam_sccb_read_reg(0x0BU, &rb);
 
-                sprintf(b, "ACK e: shutter=%u wr=%u rd=%u(%u) %s AE=%u\r\n",
+                sprintf(b, "ACK e: shutter=%u wr=%u rd=%u(%u) %s\r\n",
                         (unsigned)cam_shutter, (unsigned)wr, (unsigned)rb, (unsigned)rr,
                         ((0U == wr) && (0U == rr) && (rb == (uint16_t)cam_shutter))
-                            ? "OK" : "MISMATCH!", (unsigned)cam_ae);
+                            ? "OK" : "MISMATCH!");
                 cmd_txt(b);
             }
             return;
@@ -422,7 +422,7 @@ static void cam_cmd_line (char *s)
             const char *p = s + 1U;
             uint8_t     has_arg = 0U;
 
-            /* ★★★ 2026-11-07（FW=2129）：`th <n>` = **二值化阈值**（0 = 自动 Otsu）★★★
+            /* ★★★ 2026-11-07（FW=2131）：`th <n>` = **二值化阈值**（0 = 自动 Otsu）★★★
                a~z 全被占了，所以挂在 `t` 下面做子命令：th 0 / th 80 / th 120 …
                上位机的【阈值】按钮就是循环发这个。*/
             if ((p[0] == 'h') || (p[0] == 'H'))
@@ -659,7 +659,7 @@ void cam_cmd_poll (void)
                 cam_cmd_len = 0U;
             }
         }
-        /* ★★★ 2026-11-07（FW=2129）：**只收可打印字符，别把模块的 0x00 填充塞进命令行** ★★★
+        /* ★★★ 2026-11-07（FW=2131）：**只收可打印字符，别把模块的 0x00 填充塞进命令行** ★★★
            现场：上位机点按钮一直重发，板子却回的是 `CFG`（default 分支），不是 `ACK r`。
            真凶：模块把下行数据放在 32 字节块里，**前面补了一堆 0x00**；
            这些 0 被当成命令字符塞进 `cam_cmd_buf`，于是 `cam_cmd_line()` 看到的第一个字节是
