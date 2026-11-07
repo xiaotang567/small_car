@@ -1055,12 +1055,29 @@ class App(object):
         self.t_draw = now
         self.draw()
 
+    def view_size(self):
+        """★ 2026-11-07：显示尺寸**跟着左侧面板走**（原来是写死 752×480）
+           写死的后果：窗口一大，画面就缩在中间一小块 —— 用户说的"图片站不满"。
+           这里按面板大小 + 188:120 的宽高比算一个尽量大的尺寸（不拉伸变形）。"""
+        try:
+            fw = self.img_lbl.master.winfo_width() - 18
+            fh = self.img_lbl.master.winfo_height() - 30
+        except Exception:
+            fw, fh = VIEW_W, VIEW_H
+        if fw < 120 or fh < 80:
+            return VIEW_W, VIEW_H
+        sc = min(fw / float(BIN_W), fh / float(BIN_H))
+        return max(120, int(BIN_W * sc)), max(80, int(BIN_H * sc))
+
     def draw(self):
         if (self.shot is None) or (not HAVE_PIL):
             return
         w, h, data, gray = self.shot
         im = Image.frombytes('L', (w, h), data)
-        im = im.resize((VIEW_W, VIEW_H), Image.NEAREST).convert('RGB')
+        vw, vh = self.view_size()
+        im = im.resize((vw, vh), Image.NEAREST).convert('RGB')
+        sx = vw / float(w if w else BIN_W)
+        sy = vh / float(h if h else BIN_H)
 
         if self.edges:
             d = ImageDraw.Draw(im)
@@ -1072,10 +1089,12 @@ class App(object):
                     if x is None:
                         prev = None
                         continue
-                    px, py = x * s + s // 2, r * s + s // 2
+                    px, py = int(x * sx), int(r * sy + sy / 2)
                     if prev is not None and abs(x - prev[0]) <= 12:
                         d.line([(prev[1], prev[2]), (px, py)], fill=(255, 0, 0), width=2)
-                    d.rectangle([x * s, r * s, x * s + s - 1, r * s + s - 1], fill=(255, 0, 0))
+                    d.rectangle([int(x * sx), int(r * sy),
+                                 int(x * sx + max(sx, 1)) - 1, int(r * sy + max(sy, 1)) - 1],
+                                fill=(255, 0, 0))
                     prev = (x, px, py)
 
         try:

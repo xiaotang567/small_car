@@ -472,15 +472,15 @@ uint8_t board_cam_pol_index (void)
 //       否则 `board_cam_init()` 会用 primer 启动 ⇒ 可能落在"会花/黑屏"的组上 ✗✗
 //   📌 回退：把 `CAM_POL_ROTATE` 改回 1 即可恢复老行为。
 //-------------------------------------------------------------------------------------------------------------------
-#define CAM_POL_ROTATE      1       /* ★★ 2157：**打开自动搜索**（每 800ms 换一组，出帧就锁定）*/
+#define CAM_POL_ROTATE      0       /* ★★ 2157：**打开自动搜索**（每 800ms 换一组，出帧就锁定）*/
                                     //   用户实测：第 1 组能出图（第 3 组会斜），而轮换每 0.8s
                                     //   强改一次 DCMI->CR ⇒ 前 6.4 秒画面本来就不可信，
                                     //   而且"改极性"会把正在同步的 DCMI 再打乱一次。
                                     //   ⚠️ 实测依据：PCLK 只在有效像素期间有时钟（K≈1134kHz =
                                     //      188×120×50），DCMI 在消隐期采不到 VSYNC/HSYNC，
                                     //      所以分帧本来就不稳 —— 先固定极性，再解决硬件（见文档）。
-#define CAM_POL_MODE        0       /* ★ 2157：0 = 普查（换到出帧就停）*/
-#define CAM_POL_PRIMER      3U      /* ★★ 2026-11-07（FW=2156）：**1 -> 3** ★★
+#define CAM_POL_MODE        4       /* ★ 2157：0 = 普查（换到出帧就停）*/
+#define CAM_POL_PRIMER      1U      /* ★★ 2026-11-07（FW=2156）：**1 -> 3** ★★
                                        位映射：bit0=PCKPOL  bit1=HSPOL  bit2=VSPOL
                                        实测 CR=0x4021 = PCKPOL=1 / HSPOL=**0** / VSPOL=0
                                        => HREF 极性反了 => DCMI 一个字节都不搬（ND 不动）
@@ -1972,71 +1972,6 @@ uint8_t cam_sccb_set_bin4 (void)
     uint16_t v   = 0U;
     uint8_t  err = 0U;
 
-    /* ★★★ 2026-11-07（FW=2140）：**先把传感器从"复位保持"里放出来** ★★★
-       现场抓包：ID=1324（SCCB 正常）、BIN=1、R0D=030A（bin4 已写入），
-                 但 V=0 / VS=0 / F=0 —— **完全没有 VSYNC**，也就是"配置得上、就是不出帧"。
-       这个组合最典型的原因是传感器**被按在复位里**：
-       2136/2137 我给 R0x0C（Reset）写过 1，却**从来没有写过 0 释放**，
-       而寄存器在断电前不会自己恢复 ⇒ 一直 reset 着 ⇒ 不出帧（但 SCCB 仍可读）。
-       ⇒ 这里做一个标准的复位脉冲：先 1 保持 2ms，再写 0 释放，等 50ms 再配置。*/
-    (void)cam_sccb_write_reg(0x0CU, 0x0001U);       /* 复位有效 */
-    HAL_Delay(2);
-    (void)cam_sccb_write_reg(0x0CU, 0x0000U);       /* ★ 释放复位 */
-    HAL_Delay(50);
-
-    /* ★★★ 2026-11-07（FW=2143）：**把 R0xAF 恢复成出厂值 0x0003** ★★★
-       `dr` 抓到的寄存器快照：
-           0B:0064 0C:0000 0D:030A 03:01E0 04:02F0 07:0388 0F:0100 **AF:0000**
-       除了 AF 之外**全部正确**（快门/bin4/窗口/控制位/HDR 都好，复位也释放了），
-       唯独 R0xAF（AEC/AGC Enable）被我 2132 那次写成了 0，之后就一直是 0
-       ⇒ 手册 Table 8 的出厂值是 **0x0003**（AEC 开、AGC 开）。
-       这就是"配置全对却完全没有 VSYNC"的唯一异常项 ⇒ 这里显式写回 0x0003。*/
-    (void)cam_sccb_write_reg(0xAFU, 0x0003U);      /* ★ 恢复出厂：AEC=1, AGC=1 */
-    HAL_Delay(5);
-
-    /* ★★★ 2026-11-07（FW=2144）：**整机恢复出厂寄存器**（最后手段）★★★
-       现场：所有关键寄存器读回都是正确值（0B=0064 0C=0000 0D=030A 03=01E0 04=02F0
-             07=0388 0F=0100 AF=0003），却完全没有 VSYNC / W=0 / RISR=0。
-       手册 p63 还提到：**STANDBY 拉高时传感器会关闭数字逻辑/内部时钟/模拟电源，
-       但那两条线之外 SCCB 仍然可读** —— 症状完全吻合。
-       ⇒ 把 Table 8 里**所有有默认值的主寄存器**逐个写回出厂值，
-         再重新配 bin4 + 快门，尽量把芯片从任何未知状态拉回。*/
-    {
-        /* ★★★ 2026-11-07（FW=2158）：**修正 0x20 / 0x24 的默认值** ★★★
-           2144 那版我在这张表里**凭空写了 0x20=0x0007、0x24=0x0002**，
-           而手册 Table 8 的默认值是 **0x20=0x01C1、0x24=0x0010**。
-           这两个是 Reserved 寄存器，手册开头就警告：
-             "Writing and changing the value of a reserved register (word or bit)
-              puts the device in an unknown state and may damage the device."
-           ⇒ 这就是"写坏了寄存器、图像再也没回来"的确切来源。
-           现在全部按手册 Table 8 的真实默认值写回。*/
-        static const uint8_t  regs[14] = {0x01,0x02,0x03,0x04,0x05,0x06,0x07,
-                                          0x08,0x09,0x0A,0x0B,0x0F,0x20,0x24};
-        static const uint16_t vals[14] = {0x0001,0x0004,0x01E0,0x02F0,0x005E,0x002D,0x0388,
-                                          0x01BB,0x01D9,0x0164,0x01E0,0x0100,0x01C1,0x0010};
-        uint8_t k;
-
-        for (k = 0U; k < 14U; k++)
-        {
-            (void)cam_sccb_write_reg(regs[k], vals[k]);
-            HAL_Delay(1);
-        }
-
-        (void)cam_sccb_write_reg(0x0DU, 0x0300U);      /* 先回默认读模式 */
-        HAL_Delay(1);
-    }
-
-    /* ★★★ 2026-11-07（FW=2145）：**把 AEC 的曝光上限钉在 110 行以内** ★★★
-       本文件早就记着这个坑：曝光 > 一帧行数（行 bin4 后 = 120）时，
-       传感器**永远完不成一帧**，症状是"PIXCLK 一直在跑，但 VSYNC/HREF 一个边沿都没有"。
-       现场实测正是这样：K=4089（PCLK 在跑）、VS=0（没有 VSYNC）、W=0、R=0000。
-       而 R0xAF 现在是 0x0003 ⇒ **AEC 开着**，它会自己把曝光往上调（画面一暗就超 120 行）。
-       ⇒ 手册 Table 8：R0xAD = AEC Maximum Exposure。
-          把它限制到 cam_shutter（100，且 ≤110），AEC 再怎么调也超不过一帧。*/
-    (void)cam_sccb_write_reg(0xACU, 0x0001U);          /* AEC 最小曝光 = 1 */
-    (void)cam_sccb_write_reg(0xADU, (uint16_t)cam_shutter);   /* ★ AEC 最大曝光 ≤ 110 */
-    HAL_Delay(2);
-
     // 🔥🔥🔥 2026-10-20 重大更正：**R0x0D 是 Context A 的 Read Mode，R0x0E 是 Context B 的！**
     //   （手册 P29 原文：`0x0E (14)  Read Mode Context B`）
     //   传感器默认跑在 **Context A** ⇒ **行 bin 也必须写在 R0x0D 里**！
@@ -2045,24 +1980,19 @@ uint8_t cam_sccb_set_bin4 (void)
     //      —— 这就是"DCMI 看到的行数和固件假设的 120 对不上"的深层原因之一 ✓
     //   ✅ 正确写法：**R0x0D[3:2] = 2（列 bin4）且 R0x0D[1:0] = 2（行 bin4）**，两个都在 R0x0D ✓
     //      （0b1010 = 0x0A；保留位 [9:8]=3 用读-改-写保住 ✓）
-    /* ★★★ 2026-11-07（FW=2146）：**直接写死 0x030A，不再"读-改-写"** ★★★
-       现场 `dr` 抓到 R0x0D = **0x03FA**（正确应为 0x030A）：
-           [9:8]=11 固定位 ✓  [3:2]=2 列bin4 ✓  [1:0]=2 行bin4 ✓
-           **但 [7:4] = 1111（0xF0）被写成了垃圾** ← 读模式被搞坏 ⇒ 不出帧
-       原因就是下面这段原来的写法：
-           读 0x0D -> 只改低 4 位 -> 写回
-       只要**那一次 SCCB 读**读错（排线/上拉边际时就会），垃圾高半字节就被原样写回传感器。
-       这种"把读错的值写回去"比不写更糟 —— 而这正是"配置全对却不出帧"的来源。
-       ⇒ 改成**直接写正确值 0x030A**（[9:8]=11 是必须的固定位），不再依赖读。*/
-    /* ★★★ 2026-11-07（FW=2152）：**换回以前能出图的老配置：全分辨率 752x480，不做 bin** ★★★
-       代码注释里写着"只做列 bin4 曾经出过几千张完整帧"、752 宽的老版本更是长期能用。
-       现在 bin4(188x120) 无论怎么配都不出帧 ⇒ 先退回老配置，确认**传感器本身还能不能出图**。
-         R0x0D = 0x0300  （不做任何 bin ⇒ 752x480）
-         R0x0B = 0x012C  （快门 300 < 480 行）*/
-    (void)cam_sccb_write_reg(0x0DU, 0x0300U);
-    (void)cam_sccb_write_reg(0x0BU, 300U);
-    (void)cam_sccb_write_reg(0xADU, 300U);          /* AEC 最大曝光也放到 300 */
-    HAL_Delay(2);
+    if (0U == cam_sccb_read_reg(0x0DU, &v))
+    {
+        // ★★ 2026-10-20 实测定论：行 bin4（[1:0]=2）在这颗芯片上**无法成帧**（CAM1：PF 有时钟、RISR=0 永久为 0）✗
+        //    而**只做列 bin4**（[3:2]=2，[1:0]=0 → 输出 188×480）曾经出过几千张完整帧 ✓✓
+        //    ⇒ 放弃行 bin4，固件改为 4:1 纵向抽行（见 board_cam_set_mode / set_span(480)）✓
+        // ★★ 实测定论（图传出图 2400 行全好 ✓）：**列 bin4 + 行 bin4 都要**，
+        //    但必须配 **快门 R0x0B ≤ 120 行**（行 bin4 后一帧只有 120 行，
+        //    出厂默认曝光 443 行 > 120 → 永远完不成帧 —— 那才是当时“行 bin4 不成帧”的真凶手 ✓）
+        //    掩码 ~0x0F：[3:2]=2（列 bin4）且 [1:0]=2（行 bin4）⇒ 0x0A ✓
+        v = (uint16_t)((v & (uint16_t)~0x000FU) | 0x000AU);
+        (void)cam_sccb_write_reg(0x0DU, v);
+    }
+    else { err = 1U; }
 
     // 🔥🔥🔥 2026-10-20 **第二个致命参数：曝光（R0x0B Total Shutter Width）**
     //   R0x0B 的单位是"行"，**出厂默认 443 行**：
@@ -2091,15 +2021,7 @@ uint8_t cam_sccb_set_bin4 (void)
     if (0U != cam_sccb_read_reg(0x0BU, &v)) { err = 1U; }
     cam_r0e = v;                        // ★ 复用 R0E 字段报"快门回读值"（正常应为 100=0x64）
 
-    /* ★ 2146：除了低 4 位，**高半字节也必须是 0x030**（03FA 那种被写垃圾要能判出来并纠正）*/
-    if ((0U != err) && (cam_r0d != 0x030AU))
-    {
-        (void)cam_sccb_write_reg(0x0DU, 0x030AU);      /* 再纠正一次 */
-        HAL_Delay(1);
-        if (0U == cam_sccb_read_reg(0x0DU, &v)) { cam_r0d = v; }
-    }
-
-    if ((0U == err) && (cam_r0d == 0x030AU))
+    if ((0U == err) && ((cam_r0d & 0x000CU) == 0x0008U) && ((cam_r0d & 0x0003U) == 0x0002U))
     {
         cam_bin_ok = 1U;
     }
