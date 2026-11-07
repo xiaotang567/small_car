@@ -1382,6 +1382,16 @@ static void board_vsync_measure (void)
 
 volatile uint32_t dbg_vsync_khz = 0;
 
+/* ★ 2026-11-07（FW=2147）：**绕过 DCMI，直接数 PB7（VSYNC）的边沿** ★
+   判读：>0  ⇒ 传感器确实在发 VSYNC（那问题就在 DCMI 同步/配置）
+         =0  ⇒ 这根线上根本没有帧同步（传感器没在出帧，或这根线没通）
+   测完会把 PB7 还给 DCMI（AF13）。*/
+uint32_t board_vsync_probe (void)
+{
+    board_vsync_measure();
+    return dbg_vsync_khz * 1000UL;
+}
+
 uint32_t board_vsync_hz (void)
 {
     /* ★ 188 模式 PB7 已经借给 TIM4 了，不能再改成 TIM4 测频（会把捕获配置冲掉）*/

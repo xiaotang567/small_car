@@ -149,7 +149,7 @@ static void cam_cmd_status (void)
        DRP = 发送看门狗**主动放弃**的帧数（一直飙 ⇒ 链路/模块发不动）✓
        DST = DMA 停摆看门狗重启采集的次数（>0 ⇒ 采集链卡过，但已经自己救回来了）✓
        SELF= 连续 2 秒没有完整帧 ⇒ 重启采集的次数（和 DST 一起看）✓ */
-    sprintf(b, "CFG f=%u g=%u x=%u y=%u (%ux%u) d=%u CST=%u RV=%06lX LINE=%u FW=2146 EDG=%lu EL=%u ER=%u DRP=%lu DST=%lu SELF=%lu TH=%u\r\n",
+    sprintf(b, "CFG f=%u g=%u x=%u y=%u (%ux%u) d=%u CST=%u RV=%06lX LINE=%u FW=2147 EDG=%lu EL=%u ER=%u DRP=%lu DST=%lu SELF=%lu TH=%u\r\n",
             (unsigned)cam_cmd_fps, (unsigned)cam_cmd_gap_ms,
             (unsigned)cam_cmd_dx, (unsigned)cam_cmd_dy,
             (unsigned)(CAM_TXW / cam_cmd_dx), (unsigned)(CAM_H / cam_cmd_dy),
@@ -216,7 +216,7 @@ static void cam_cmd_line (char *s)
         case 'a': cam_cmd_fps = 0U; cam_cmd_gap_ms = 0U; cam_cmd_dx = 1U; cam_cmd_dy = 1U; break;
 
         case 'd':                                   // ★ 心跳档位：0 静默 / 1 精简(默认) / 2 全量
-            /* ★ 2026-11-07（FW=2146）：`dr` = **一行**打印 8 个最关键寄存器
+            /* ★ 2026-11-07（FW=2147）：`dr` = **一行**打印 8 个最关键寄存器
                为什么只一行：cmd_txt() 是单槽缓冲，同一拍里连发多次只有最后一次能出去。*/
             if ((s[1] == 'r') || (s[1] == 'R'))
             {
@@ -232,6 +232,14 @@ static void cam_cmd_line (char *s)
                     sprintf(&b[4U + i * 8U], " %02X:%04X", (unsigned)rg[i], (unsigned)rv);
                 }
                 cmd_txt(b);
+
+                /* ★ 2147：再单独发一行 VSYNC 实测（PB7 边沿频率，绕开 DCMI）*/
+                {
+                    uint32_t vhz = board_vsync_probe();
+
+                    sprintf(b, "VSP %lu Hz (0 = no frame sync on PB7)", (unsigned long)vhz);
+                    cmd_txt(b);
+                }
                 return;
             }
             cam_dbg_level = cam_cmd_clamp(cam_cmd_num(s + 1), 0U, 2U);
@@ -655,7 +663,7 @@ void cam_cmd_poll (void)
                 cam_cmd_len = 0U;
             }
         }
-        /* ★★★ 2026-11-07（FW=2146）：**只收可打印字符，别把模块的 0x00 填充塞进命令行** ★★★
+        /* ★★★ 2026-11-07（FW=2147）：**只收可打印字符，别把模块的 0x00 填充塞进命令行** ★★★
            现场：上位机点按钮一直重发，板子却回的是 `CFG`（default 分支），不是 `ACK r`。
            真凶：模块把下行数据放在 32 字节块里，**前面补了一堆 0x00**；
            这些 0 被当成命令字符塞进 `cam_cmd_buf`，于是 `cam_cmd_line()` 看到的第一个字节是
