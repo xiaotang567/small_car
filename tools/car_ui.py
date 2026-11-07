@@ -76,7 +76,7 @@ RPM_PRESETS = (500, 800, 1200, 1500)
 # ★ 2026-11-07：二值化阈值（手动，**加减 1** 调节；0 在固件里仍是自动 Otsu）
 THRESH_MIN, THRESH_MAX, THRESH_INIT = 1, 255, 100
 # ★ 2026-11-07：曝光（SCCB R0x0B 行数，**加减 5** 调节；越小越暗，运行时立即生效）
-EXPO_MIN, EXPO_MAX, EXPO_INIT = 1, 110, 100
+EXPO_MIN, EXPO_MAX, EXPO_INIT = 1, 110, 50
 SERVO_MID = 2748                       # ★ 2026-11-07 用户实测：默认中位
 SERVO_MIN, SERVO_MAX = 1700, 3024      # ★ 安全行程（左/右快捷档就取这两个端点）
 SERVO_LEFT, SERVO_RIGHT = SERVO_MIN, SERVO_MAX
