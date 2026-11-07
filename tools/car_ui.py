@@ -433,8 +433,9 @@ class App(object):
         self.btn_sweep.grid(row=1, column=1, padx=4, pady=(0, 4), sticky='ew')
 
         # ★ 2198：环岛"直走"模式总开关（命令 rb 0/1）—— 现场 A/B 对比用，不用重烧
-        self.rb_on = True
-        self.btn_rb = self._btn(f, '环岛直走  rb', self.do_rb_toggle, bg=C_ON, w=10, h=1)
+        #   ★ 固件那边**默认关**（第一版默认开，正常赛道被当成环岛 ⇒ 弯道直线全废），按钮跟着显示
+        self.rb_on = False
+        self.btn_rb = self._btn(f, '环岛直走  rb', self.do_rb_toggle, bg=C_BTN, w=10, h=1)
         self.btn_rb.grid(row=2, column=0, columnspan=2, padx=4, pady=(0, 6), sticky='ew')
 
         # ---- 其它 ----
@@ -1094,14 +1095,15 @@ class App(object):
         # ★ 2198：环岛 / 开阔区（rb=1 时板子"直走"，不再跟着那块宽白地打舵）
         if 'rb' in d:
             iw = int(d.get('iw', 0))
+            ih = int(d.get('ih', 0))
             ir = int(d.get('ir', 0))
             wn = int(d.get('wn', 0))
             if int(d['rb']):
-                self.v_rb.set('环岛 %dpx@%d行  常宽%d' % (iw, ir, wn))
-            elif iw >= 8:
-                self.v_rb.set('无 有缝%d@%d 常宽%d' % (iw, ir, wn))
+                self.v_rb.set('直走中 %dx%d@%d 常宽%d' % (iw, ih, ir, wn))
+            elif ih >= 6 and iw >= 20:
+                self.v_rb.set('有岛 %dx%d@%d (未启用)' % (iw, ih, ir))
             else:
-                self.v_rb.set('无            常宽%d' % wn)
+                self.v_rb.set('无 常宽%d' % wn)
         if 'm' in d:
             self.mode_gray = (int(d['m']) == 0)
             self.refresh_buttons()

@@ -172,7 +172,8 @@ void cam_track_eval (void);                    /* ★ 2174 算直道/弯道 + �
 extern volatile uint8_t  cam_island;      /* 1 = 本帧白区里夹着一个黑岛 */
 extern volatile uint8_t  cam_wide;        /* 1 = 环岛/开阔区模式（舵机直走） */
 extern volatile int32_t  cam_hole_w;      /* 本帧最大黑缝宽度（px） */
-extern volatile int32_t  cam_hole_row;    /* 那道缝在第几行 */
+extern volatile int32_t  cam_hole_row;    /* 那块"岛"最下面一行 */
+extern volatile int32_t  cam_hole_h;      /* 那块"岛"垂直方向有多少行（★ 单行黑缝不算岛）*/
 extern volatile int32_t  cam_hole_l;      /* 缝的左边界列 */
 extern volatile int32_t  cam_hole_r;      /* 缝的右边界列 */
 extern volatile int32_t  cam_wide_err;    /* 开阔区模式给舵机的偏差（0 ⇒ 直走） */

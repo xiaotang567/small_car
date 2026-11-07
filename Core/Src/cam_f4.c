@@ -2843,41 +2843,43 @@ volatile float   cam_w_est    = 120.0f;  /* ★ 2183 赛道宽度估计（像素
 // ★★★ FW=2198：**环岛 / 开阔区识别**（2026-11-07）★★★
 //   现场（用户原话）："车前方就是环岛，最前面是白色墙壁，也被看到了"；形状=**中间一块黑色圆岛，车要绕过去**，
 //   过岛方向他选的是 **直走**。
-//   静止帧实测量出来的东西（f_2900 那一片）：
+//   静止帧实测量出来的东西：
 //     · 靠近车的行（74~114）白地宽到 **155px**，右边一直白到画面边缘（右边界贴 187 列）
-//     · 中间 38~56 行夹着一块 **41~42px 宽的黑岛**（1240 行上白-黑-白）
+//     · 中间 30~56 行夹着一块 **41~49px 宽的黑岛**（白-黑-白，垂直连通 23 行）
 //     · 再往上 0~27 行是一大块白 = **那面白墙**（和赛道白连成一片，完全分不开）
 //   旧代码在这种画面上会连错三处（已用 PC 复刻验证，en/ef/nc 和板子发回来的完全一样）：
 //     ① w_est 只在不裁边且宽 0.6~1.4× 时更新 ⇒ 遇上宽白区永远不更新，越拖越小（实测掉到 60）
 //     ② 单边行用 "左边界 + w_est/2" 补中心 ⇒ 第 115 行本该 113，算成 48（偏左 65px！）
 //     ③ 拟合出歪线（res≈27）⇒ 误判弯道 cv=1 ⇒ 舵机按弯道大增益乱打
-//   识别办法：
-//     · **岛** = 某一行的白被一段 ≥RB_HOLE_MIN 的黑缝夹断，且**两侧各**还有 ≥RB_SIDE_MIN 的白
-//               （≤4px 的细黑线早就被 lf_row_runs 并进白段了，不会误判）
-//     · **开阔区** = 靠近车的行里，白区比正常赛道宽 ≥1.45×，或者白直接铺到画面两边
-//   进/出都要连续 N 帧（滞回），进去以后：
-//     · 舵机**保持直走**（用户要求），只有岛离车中线太近时才朝"远离岛"的一侧纠一点
-//     · 冻结宽度学习、关掉"宽度突变判背景"的修补、强制 cv=0
-//   注意：**只有"岛"能触发进入**（开阔区只用来"续命"），这样普通急弯里右边界贴边不会被误判成环岛。
+//
+//   ⚠️⚠️ 2026-11-07 21:43 教训（重要，别再犯）⚠️⚠️
+//     第一版判据是"某一行里有 >=14px 的黑缝就算岛"，结果**正常赛道也满屏命中**
+//     （白地外面到处是黑，白-黑-白太容易成立）⇒ cam_wide 一进去就出不来 ⇒ 车只会直走，
+//     弯道直线全废。用户原话："加了环岛后就走不了弯道和直线了"。
+//     ⇒ 现在改成：**必须垂直连通成一块**（≥6 行高、最宽 ≥20px）才算岛，单行一条黑缝不算。
+//        而且两侧的白都**不许贴画面边**（贴边的是背景白，不是"夹住岛的赛道白"）。
+//     ⇒ 另外这套逻辑默认**关**（cam_rb_enable = 0），用命令 `rb 1` 才打开 —— 先把车开回正常再说。
 //-------------------------------------------------------------------------------------------------------------------
-#define RB_HOLE_MIN      14      /* 行内黑缝 ≥14px 才算岛 */
-#define RB_SIDE_MIN       8      /* 岛两侧的白各至少 8px，否则那道缝不算"被白夹住的洞" */
+#define RB_HOLE_MIN      14      /* 行内黑缝 ≥14px 才算候选 */
+#define RB_SIDE_MIN       8      /* 洞两侧的白各至少 8px */
+#define RB_EXT_MIN        6      /* ★ 块的垂直高度 ≥6 行才算岛（单行黑缝不算） */
+#define RB_WID_MIN       20      /* ★ 块的最大宽度 ≥20px 才算岛 */
 #define RB_ROW_LO        26      /* 找岛的行范围。★ 不能更小：最上面 2~20 行里有板子自己画的 FPS/R2 文字，
                                     文字左边的空白会被当成"洞"（实测第 20 行有个 72px 的假洞）*/
 #define RB_ROW_HI       102
-#define RB_OPEN_K         1.45f  /* 开阔区：白区宽 ≥ 正常宽度 × 1.45 */
-#define RB_OPEN_EDGE_K    1.35f  /* 贴边判据：从另一条边量到画面边缘 ≥ 正常宽度 × 1.35 */
-#define RB_OPEN_ROWS     10      /* 至少 10 行（74~114 共 41 行）才算开阔区 */
+#define RB_OPEN_ROWS     10      /* 开阔区：74~114 这 41 行里至少 10 行"白铺到画面边" */
 #define RB_CONFIRM        3      /* 连续 3 帧有岛 ⇒ 进环岛 */
 #define RB_RELEASE        8      /* 连续 8 帧既没岛也不开阔 ⇒ 出环岛 */
 #define RB_HOLD_MS     2500U     /* 进过环岛以后，最少保持 2.5 秒（路过岛的时候岛会短暂消失）*/
 #define RB_KEEP          20      /* 岛边缘离车中线至少留 20px */
+#define RB_MAX_HOLE       8      /* 一行最多同时跟 8 个洞（走连通块用）*/
 
 volatile uint8_t cam_island    = 0U;
 volatile uint8_t cam_wide      = 0U;
-volatile uint8_t cam_rb_enable = 1U;      /* 命令 `rb 0/1` 开关；关掉 ⇒ 完全按老逻辑走 */
+volatile uint8_t cam_rb_enable = 0U;      /* ★ 默认**关**：先保证正常赛道能跑；命令 `rb 1` 打开 */
 volatile int32_t cam_hole_w    = 0;
 volatile int32_t cam_hole_row  = 0;
+volatile int32_t cam_hole_h    = 0;       /* ★ 岛这块在垂直方向有多少行 */
 volatile int32_t cam_hole_l    = 0;
 volatile int32_t cam_hole_r    = 0;
 volatile int32_t cam_wide_err  = 0;
@@ -2886,59 +2888,145 @@ static   uint8_t rb_hit  = 0U;
 static   uint8_t rb_miss = 0U;
 static   uint32_t rb_t_last = 0U;    /* 上一次"看到岛"的时刻 */
 
-static void rb_detect (void)
+/* 洞的垂直连通块（每帧重算）：最多 RB_MAX_HOLE 块 */
+static uint8_t rb_cm_r0[RB_MAX_HOLE];
+static uint8_t rb_cm_r1[RB_MAX_HOLE];
+static uint8_t rb_cm_w [RB_MAX_HOLE];
+static uint8_t rb_cm_n = 0U;
+/* 上一行的洞（用于连通） */
+static uint8_t rb_pa[RB_MAX_HOLE], rb_pb[RB_MAX_HOLE], rb_pc[RB_MAX_HOLE], rb_pn = 0U;
+
+static uint8_t rb_open_rows (void)
 {
-    int32_t r, best = 0, b_row = 0, b_l = 0, b_r = 0;
-    int32_t open_rows = 0;
-    uint8_t n, j;
+    int32_t r;
+    uint8_t cnt = 0U;
 
-    /* ── ① 找"被白夹住的黑缝" = 岛 ── */
-    for (r = RB_ROW_LO; r <= RB_ROW_HI; r++)
-    {
-        int32_t gp = 0, gl = 0, gr = 0;
-
-        n = lf_row_runs((uint8_t)r);
-        for (j = 0U; (uint8_t)(j + 1U) < n; j++)
-        {
-            int32_t wl = (int32_t)lf_re[j]     - (int32_t)lf_rs[j]     + 1;   /* 左边那段白多宽 */
-            int32_t wr = (int32_t)lf_re[j + 1U] - (int32_t)lf_rs[j + 1U] + 1;  /* 右边那段白多宽 */
-            int32_t a  = (int32_t)lf_re[j] + 1;                              /* 缝的起止列 */
-            int32_t b  = (int32_t)lf_rs[j + 1U] - 1;
-            int32_t gw = b - a + 1;
-
-            if ((wl < RB_SIDE_MIN) || (wr < RB_SIDE_MIN)) { continue; }
-            if (gw < RB_HOLE_MIN) { continue; }
-            if (gw > gp) { gp = gw; gl = a; gr = b; }
-        }
-        if (gp > best) { best = gp; b_row = r; b_l = gl; b_r = gr; }
-    }
-    cam_island   = (best >= RB_HOLE_MIN) ? 1U : 0U;
-    cam_hole_w   = best;
-    cam_hole_row = b_row;
-    cam_hole_l   = b_l;
-    cam_hole_r   = b_r;
-
-    /* ── ② 开阔区：靠近车的行里白区比正常赛道宽很多，或者白直接铺到画面边 ── */
     for (r = 74; r <= 114; r++)
     {
         int32_t l  = (cam_bound[r]   != 0xFFU) ? (int32_t)cam_bound[r]   : -1;
         int32_t rr = (cam_bound_r[r] != 0xFFU) ? (int32_t)cam_bound_r[r] : -1;
-        int32_t w;
-        int32_t clip_l, clip_r;
 
         if ((l < 0) || (rr < 0) || (rr <= l)) { continue; }
+        /* 只有"白铺到画面两边"才算开阔区 —— 宽度不可靠：这个场地的赛道本身就有 155px 宽 */
+        if ((l <= 2) && (rr >= (int32_t)CAM_TXW - 2)) { cnt ++; }
+    }
+    return cnt;
+}
 
-        w      = rr - l;
-        clip_l = (l  <= 2) ? 1 : 0;
-        clip_r = (rr >= (int32_t)CAM_TXW - 2) ? 1 : 0;
+static void rb_detect (void)
+{
+    int32_t r, best_h = 0, best_w = 0, b_row = 0;
+    uint8_t n, j;
 
-        if ((0 != clip_l) && (0 != clip_r))                                    { open_rows ++; }
-        else if (w >= (int32_t)(cam_w_norm * RB_OPEN_K))                        { open_rows ++; }
-        else if ((0 != clip_r) && ((int32_t)CAM_TXW - l >= (int32_t)(cam_w_norm * RB_OPEN_EDGE_K))) { open_rows ++; }
-        else if ((0 != clip_l) && (rr >= (int32_t)(cam_w_norm * RB_OPEN_EDGE_K)))                   { open_rows ++; }
+    rb_cm_n = 0U;
+    rb_pn   = 0U;
+
+    /* ── ① 把每行的黑洞按行**连通成块**，再看整块的高/宽 ── */
+    for (r = RB_ROW_LO; r <= RB_ROW_HI; r++)
+    {
+        uint8_t ca[RB_MAX_HOLE], cb[RB_MAX_HOLE], cc[RB_MAX_HOLE], cn = 0U;
+        uint8_t used[RB_MAX_HOLE];
+
+        n = lf_row_runs((uint8_t)r);
+        for (j = 0U; j < RB_MAX_HOLE; j++) { used[j] = 0U; }
+
+        for (j = 0U; (uint8_t)(j + 1U) < n; j++)
+        {
+            int32_t wl = (int32_t)lf_re[j]      - (int32_t)lf_rs[j]      + 1;
+            int32_t wr = (int32_t)lf_re[j + 1U] - (int32_t)lf_rs[j + 1U] + 1;
+            int32_t a  = (int32_t)lf_re[j] + 1;
+            int32_t b  = (int32_t)lf_rs[j + 1U] - 1;
+            int32_t gw = b - a + 1;
+            int32_t k, bi = -1, ov_best = 0, ci;
+
+            if ((wl < RB_SIDE_MIN) || (wr < RB_SIDE_MIN))            { continue; }
+            if ((a < 3) || (b > (int32_t)CAM_TXW - 3))               { continue; }  /* 两侧不许贴画面边 */
+            if (gw < RB_HOLE_MIN)                                    { continue; }
+            if (cn >= RB_MAX_HOLE)                                   { break; }
+
+            /* 和上一行的洞比：重叠 ≥50% ⇒ 同一块 */
+            for (k = 0; k < (int32_t)rb_pn; k++)
+            {
+                int32_t ov = ((b < (int32_t)rb_pb[k]) ? b : (int32_t)rb_pb[k])
+                           - ((a > (int32_t)rb_pa[k]) ? a : (int32_t)rb_pa[k]) + 1;
+                if (used[k]) { continue; }
+                if (ov > ov_best) { ov_best = ov; bi = k; }
+            }
+            if ((bi >= 0) && ((ov_best * 2) >= (int32_t)(rb_pb[bi] - rb_pa[bi] + 1)))
+            {
+                used[bi] = 1U;
+                ci = rb_pc[bi];
+                rb_cm_r1[ci] = (uint8_t)r;
+                if (gw > (int32_t)rb_cm_w[ci]) { rb_cm_w[ci] = (uint8_t)gw; }
+            }
+            else if (rb_cm_n < RB_MAX_HOLE)
+            {
+                ci = rb_cm_n;
+                rb_cm_n ++;
+                rb_cm_r0[ci] = (uint8_t)r;
+                rb_cm_r1[ci] = (uint8_t)r;
+                rb_cm_w [ci] = (uint8_t)gw;
+            }
+            else
+            {
+                continue;
+            }
+
+            ca[cn] = (uint8_t)a; cb[cn] = (uint8_t)b; cc[cn] = (uint8_t)ci; cn ++;
+        }
+
+        for (j = 0U; j < cn; j++) { rb_pa[j] = ca[j]; rb_pb[j] = cb[j]; rb_pc[j] = cc[j]; }
+        rb_pn = cn;
     }
 
-    /* ── ③ 进入/退出（滞回）── */
+    /* 挑"最高的那一块"，高度 ≥RB_EXT_MIN 且宽度 ≥RB_WID_MIN 才算岛 */
+    {
+        uint8_t ci;
+
+        for (ci = 0U; ci < rb_cm_n; ci++)
+        {
+            int32_t h = (int32_t)rb_cm_r1[ci] - (int32_t)rb_cm_r0[ci] + 1;
+
+            if ((h >= RB_EXT_MIN) && ((int32_t)rb_cm_w[ci] >= RB_WID_MIN) && (h > best_h))
+            {
+                best_h = h;
+                best_w = (int32_t)rb_cm_w[ci];
+                b_row  = (int32_t)rb_cm_r1[ci];      /* 记最下面一行（离车最近） */
+            }
+        }
+    }
+    cam_island = (best_h >= RB_EXT_MIN) ? 1U : 0U;
+    cam_hole_h = best_h;
+    cam_hole_w = best_w;
+    cam_hole_row = b_row;
+    cam_hole_l = 0;
+    cam_hole_r = 0;
+    if ((0U != cam_island) && (b_row > 0))
+    {
+        /* 用最下面那一行重新取洞的左右边界（给"躲岛"用） */
+        uint8_t ca2[RB_MAX_HOLE], cb2[RB_MAX_HOLE], cn2 = 0U;
+
+        n = lf_row_runs((uint8_t)b_row);
+        for (j = 0U; (uint8_t)(j + 1U) < n; j++)
+        {
+            int32_t wl = (int32_t)lf_re[j]      - (int32_t)lf_rs[j]      + 1;
+            int32_t wr = (int32_t)lf_re[j + 1U] - (int32_t)lf_rs[j + 1U] + 1;
+            int32_t a  = (int32_t)lf_re[j] + 1;
+            int32_t b  = (int32_t)lf_rs[j + 1U] - 1;
+
+            if ((wl < RB_SIDE_MIN) || (wr < RB_SIDE_MIN)) { continue; }
+            if ((a < 3) || (b > (int32_t)CAM_TXW - 3))    { continue; }
+            if ((b - a + 1) < RB_HOLE_MIN) { continue; }
+            if (cn2 < RB_MAX_HOLE) { ca2[cn2] = (uint8_t)a; cb2[cn2] = (uint8_t)b; cn2 ++; }
+        }
+        if (cn2 > 0U)
+        {
+            cam_hole_l = (int32_t)ca2[cn2 - 1U];
+            cam_hole_r = (int32_t)cb2[cn2 - 1U];
+        }
+    }
+
+    /* ── ② 进入/退出（滞回）── */
     if (0U != cam_island)
     {
         rb_t_last = HAL_GetTick();
@@ -2958,8 +3046,7 @@ static void rb_detect (void)
     }
     else if (0U != cam_wide)
     {
-        /* 还在宽白区（开阔 or 刚看过岛）就继续直走；宽白没了、又过了保持时间才退出 */
-        int32_t still_open = ((open_rows >= RB_OPEN_ROWS) || (0U != cam_island)) ? 1 : 0;
+        int32_t still_open = ((rb_open_rows() >= RB_OPEN_ROWS) || (0U != cam_island)) ? 1 : 0;
         int32_t hold_ok    = ((HAL_GetTick() - rb_t_last) < RB_HOLD_MS) ? 1 : 0;
 
         if ((0 == still_open) && (0 == hold_ok) && (rb_miss >= RB_RELEASE))
@@ -2973,7 +3060,7 @@ static void rb_detect (void)
         }
     }
 
-    /* ── ④ 开阔区里给舵机的偏差：默认 0（直走），岛太近才朝远离岛的方向纠一点 ── */
+    /* ── ③ 开阔区里给舵机的偏差：默认 0（直走），岛太近才朝远离岛的方向纠一点 ── */
     if (0U == cam_rb_enable)                 /* 命令 `rb 0` 关掉这套逻辑 */
     {
         cam_wide = 0U;
@@ -2982,7 +3069,7 @@ static void rb_detect (void)
     }
 
     cam_wide_err = 0;
-    if ((0U != cam_wide) && (0U != cam_island) && (cam_hole_w >= RB_HOLE_MIN) && (cam_hole_row > 0))
+    if ((0U != cam_wide) && (0U != cam_island) && (cam_hole_w >= RB_WID_MIN) && (cam_hole_row > 0))
     {
         int32_t cx = (int32_t)CAM_TXW / 2;
         int32_t ic = (cam_hole_l + cam_hole_r) / 2;
@@ -3001,7 +3088,7 @@ static void rb_detect (void)
         if (cam_wide_err < -40) { cam_wide_err = -40; }
     }
 
-    /* ── ⑤ 正常赛道宽度学习（开阔区里一概不学，不然会被宽白区带跑）── */
+    /* ── ④ 正常赛道宽度学习（开阔区里一概不学）── */
     if ((0U == cam_wide) && (0U == cam_island))
     {
         int32_t n2 = 0;
@@ -3027,7 +3114,6 @@ static void rb_detect (void)
             if (cam_w_norm > 170.0f) { cam_w_norm = 170.0f; }
         }
     }
-    cam_w_est = cam_w_norm;              /* 单边补中心也用它，别再让那个掉到 60 的估计值捣乱 */
 }
 
 //-------------------------------------------------------------------------------------------------------------------
@@ -3071,8 +3157,13 @@ static uint8_t lf_row_center (int32_t r)
         }
         else
         {
-            /* ★ 2198：宽度学习搬到 rb_detect() 里了（那边能避开环岛/开阔区，还会过滤贴边行）。
-               这里只保留"两边都靠谱就直接取中点" ✓ */
+            /* ★ 2183：宽度只在"和估计差不多"时才更新，避免被裁边的行把估计带跑
+               ★ 2198：环岛/开阔区里不学（那片白地会被当成赛道，把估计带跑）*/
+            if ((0U == cam_wide) && (w > 20.0f) && (w < (float)CAM_TXW - 4.0f) &&
+                ((w > cam_w_est * 0.6f) && (w < cam_w_est * 1.4f)))
+            {
+                cam_w_est = cam_w_est * 0.9f + w * 0.1f;
+            }
             out = (uint8_t)((l + rr) / 2);
         }
     }
