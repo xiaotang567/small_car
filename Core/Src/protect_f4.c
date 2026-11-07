@@ -20,6 +20,7 @@
 
 static uint8_t  s_motor_started = 0U;      /* 0 = 还没起过转 */
 static uint8_t  s_motor_stalled = 0U;      /* 1 = 堵转停机，等按键 */
+static uint32_t s_stall_tick    = 0U;      /* ★ 2191：进堵转的时刻（远程重启要冷却 2 秒）*/
 #if CTRL_STALL_ENABLE
 static uint16_t s_below_cnt     = 0U;      /* 连续低于阈值拍数 */
 #endif
@@ -98,6 +99,7 @@ void ctrl_protect_tick (void)
             if (s_below_cnt >= (uint16_t)CTRL_STALL_TICKS)
             {
                 s_motor_stalled = 1U;
+                s_stall_tick    = HAL_GetTick();      /* ★ 2191 */
                 s_below_cnt     = 0U;
                 ctrl_open_loop(0U);                             /* 退回闭环，便于 PC2 重启 */
                 ctrl_speed_set_target(0);                       /* ★ 关电机 */
@@ -113,9 +115,17 @@ void ctrl_protect_tick (void)
 }
 
 /* ★ 2026-11-07（FW=2121）：上位机发 `q <非零>` 时清掉"堵转停机"状态 ——
-   这样即使按键坏了/没接，也能从面板上把电机重新起转。*/
+   这样即使按键坏了/没接，也能从面板上把电机重新起转。
+   ★★ 2191：**冷却 2 秒** —— 实测上位机的 `q` 因为 ACK 丢失会自动重发（每 250ms），
+      每次重发都会把堵转状态清掉 ⇒ 堵转保护形同虚设（电机 44% 占空比、0 转速一直转）。
+      现在：进入堵转后 2 秒内，远程 `q` 不允许清除，必须在面板上再点一次（2 秒后）。*/
 void ctrl_motor_clear_stall (void)
 {
+    if ((0U != s_motor_stalled) && ((HAL_GetTick() - s_stall_tick) < 2000U))
+    {
+        return;                                  /* 冷却中：不让重发把保护清掉 */
+    }
+
     s_motor_stalled = 0U;
     s_btn_armed     = 0U;
 #if CTRL_STALL_ENABLE

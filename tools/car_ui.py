@@ -71,7 +71,7 @@ C_WAIT    = '#b8860b'      # ★ 命令"已发出、等板子回执"时按钮变
 #   'pwm' —— 直接给占空比（默认 30%，开环，不依赖编码器，用来先确认电机装反没/转不转）
 #   'rpm' —— 走速度环闭环（需要编码器读数正确）
 PWM_PRESETS = (10, 20, 30, 50)          # 占空比 %
-RPM_PRESETS = (300, 800, 1200, 1500)
+RPM_PRESETS = (100, 300, 800, 1200)
 
 # ★ 2026-11-07：二值化阈值（手动，**加减 1** 调节；0 在固件里仍是自动 Otsu）
 THRESH_MIN, THRESH_MAX, THRESH_INIT = 1, 255, 100
@@ -136,7 +136,7 @@ class App(object):
         self.expo_val = EXPO_INIT       # ★ 100（和固件默认的 cam_shutter 一致）
         self.running = False        # ★ 电机1 是否"启动"状态：上电默认停
         self.dir = +1               # 方向：+1 前进 / -1 后退
-        self.ctrl_mode = 'rpm'      # ★ 默认"转速闭环"（固件巡航目标 300 RPM）；可切回占空比
+        self.ctrl_mode = 'rpm'      # ★ 默认"转速闭环"（固件巡航目标 100 RPM）；可切回占空比
         self.presets = RPM_PRESETS
         self.pending = []           # 等回执的命令（send_ack 用）
         self.txt_pend = ''          # 文本行缓冲（TCP 分包时半行先攒着）
@@ -341,7 +341,7 @@ class App(object):
                                   bg=C_PANEL, fg=C_FG, troughcolor='#3c3c4c',
                                   highlightbackground=C_PANEL, showvalue=False, length=250,
                                   command=lambda v: self.on_speed_slide())
-        self.sld_speed.set(300)          # ★ 2190：默认闭环 300 RPM（和固件巡航目标一致）
+        self.sld_speed.set(100)          # ★ 2192：默认闭环 100 RPM（和固件巡航目标一致）
         self.sld_speed.grid(row=5, column=0, columnspan=4, sticky='ew', padx=6)
         self.sld_speed.bind('<ButtonRelease-1>', lambda e: self.on_speed_release())
 
@@ -565,7 +565,7 @@ class App(object):
                 self.presets = PWM_PRESETS
             else:
                 self.sld_speed.configure(from_=0, to=3000)
-                self.sld_speed.set(300)
+                self.sld_speed.set(100)
                 self.presets = RPM_PRESETS
             for i, b in enumerate(self.preset_btns):
                 b.configure(text='%d' % self.presets[i])

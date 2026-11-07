@@ -70,11 +70,11 @@
      · 关掉后按 PC2（松开→按下）重新起转；
      · OLED 第 2 行显示 RUN 500 / STALL PC2 / STOP。
    把 CTRL_RUN_AUTO_START 改成 0 就回到"上电不转、等上位机命令"。*/
-#define CTRL_RUN_RPM            300          /* ★ 2190：500 -> 300（用户改）*/
+#define CTRL_RUN_RPM            100          /* ★ 2192：300 -> 100（用户改）*/
 #define CTRL_RUN_AUTO_START     0            /* ★ 2026-11-07：**默认不转**（用户要求）——上电只初始化，
                                                 等上位机发 `q <rpm>`（PID 闭环）或 `w <duty>`（开环）才动 */
 #define CTRL_STALL_ENABLE       1            /* ★ 1 = 打开堵转保护；0 = 关闭 */
-#define CTRL_STALL_RPM          150          /* ★ 2190：400 -> 150（用户改）*/
+#define CTRL_STALL_RPM          50           /* ★ 2192：150 -> 50（用户改）*/
 #define CTRL_STALL_MS           3000         /* ★ 2190：2000 -> 3000ms（用户改）*/
 #define CTRL_STALL_TICKS        (CTRL_STALL_MS / CTRL_PERIOD_MS)   /* 100 拍（20ms × 100 = 2s）*/
 
