@@ -58,24 +58,20 @@
 /* ---- 控制周期 ---- */
 #define CTRL_PERIOD_MS          20           /* 速度环 / 姿态积分周期（原工程 ENC_SAMPLE_PERIOD_MS = 20） */
 
-/* ---- ★★★ 2026-11-07（FW=2112）：电机闭环巡航 + 防堵转 ★★★
+/* ---- ★★★ 2026-11-07（FW=2120）：电机闭环巡航 + 全局堵转保护 ★★★
    行为：
-     · 主循环一开始就**闭环跑到 CTRL_RUN_RPM**（原来是开环占空比，已废弃）；
-     · 实测转速连续 **CTRL_STALL_MS** 都低于"目标的 80%" ⇒ 判堵转，**立即停机**；
-     · 停机后**按下 PC2（低电平）**重新起转；
+     · 主循环一开始就**闭环跑到 CTRL_RUN_RPM**（原来是开环占空比）；
+     · **全局判据（不管闭环/开环/谁在控制）**：
+           实测转速 < CTRL_STALL_RPM(400) 持续 CTRL_STALL_MS(2 秒) ⇒ **立刻关电机**；
+     · 关掉后按 PC2（松开→按下）重新起转；
      · OLED 第 2 行显示 RUN 500 / STALL PC2 / STOP。
    把 CTRL_RUN_AUTO_START 改成 0 就回到"上电不转、等上位机命令"。*/
 #define CTRL_RUN_RPM            500          /* 巡航目标转速（RPM）*/
 #define CTRL_RUN_AUTO_START     1            /* 1 = 主循环一开始就自动起转 */
-#define CTRL_STALL_ENABLE       1            /* ★ 1 = **打开堵转保护**：转速连续 2 秒低于目标的 80% ⇒ 停机，
-                                                按 PC2（低电平）重新起转。0 = 关闭（只跑不保护）。*/
-#define CTRL_STALL_MS           2000         /* 低于阈值持续多久判堵转 */
-#define CTRL_STALL_PCT          80           /* 阈值 = 目标的 80%（500 → 400 RPM）*/
-#define CTRL_STALL_GRACE_MS     3000         /* ★ 起转后的宽限期：这段时间不做堵转判断 */
-/* ↓ 开环（占空比模式）下的堵转判定：占空比 ≥ DUTY_MIN 而转速 < OPEN_RPM，持续 2 秒 ⇒ 堵转 */
-#define CTRL_STALL_DUTY_MIN     300          /* 3% 占空比以上才判（低于它本来就不该转）*/
-#define CTRL_STALL_OPEN_RPM     50           /* 开环时"转速几乎为 0"的阈值 */
-#define CTRL_STALL_TICKS        (CTRL_STALL_MS / CTRL_PERIOD_MS)   /* 100 拍 */
+#define CTRL_STALL_ENABLE       1            /* ★ 1 = 打开堵转保护；0 = 关闭 */
+#define CTRL_STALL_RPM          400          /* ★★ 全局判据：实测转速 < 400 RPM 持续 2 秒 ⇒ 关电机 ★★ */
+#define CTRL_STALL_MS           2000         /* 低于 400 持续多久判堵转 */
+#define CTRL_STALL_TICKS        (CTRL_STALL_MS / CTRL_PERIOD_MS)   /* 100 拍（20ms × 100 = 2s）*/
 
 /* ---- 速度环（数值全部照抄原工程 speed_ctrl.h，只把电机的编号放松成可配）---- */
 #define CTRL_SPEED_MOTOR        1            /* 速度环驱动哪个电机：1 / 2（原工程是 MOTOR_1）*/
