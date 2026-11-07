@@ -103,6 +103,7 @@ class App(object):
         self.gray_img = bytearray(GRAY_W * GRAY_H)
         self.gray_got = set()
         self.edges = None
+        self.straight_now = True      # ★ 直道/弯道判定结果（True = 直道）
         self.mode_gray = False
         self.shot = None
         self.photo = None
@@ -1069,6 +1070,49 @@ class App(object):
         sc = min(fw / float(BIN_W), fh / float(BIN_H))
         return max(120, int(BIN_W * sc)), max(80, int(BIN_H * sc))
 
+    # ---- 直道 / 弯道判定 ----
+    #   思路：赛道中线 = (左边界 + 右边界) / 2。直道上，中线在画面里是**一条直线**；
+    #         弯道上，中线会弯。所以对每一行取上下各 STRAIGHT_WIN 行的中线做最小二乘拟合，
+    #         看拟合残差：残差小 ⇒ 直道（红线），残差大 ⇒ 弯道（蓝线）。
+    STRAIGHT_WIN = 9         # 半窗（行）
+    STRAIGHT_TOL = 1.6       # 残差阈值（像素）：越小越"直"
+    C_STRAIGHT   = (255, 40, 40)     # 直道 = 红
+    C_CURVE      = (60, 160, 255)    # 弯道 = 蓝
+
+    def center_of(self, e):
+        l, r = e
+        if (l is None) or (r is None) or (r <= l):
+            return None
+        return (l + r) * 0.5
+
+    def classify_rows(self):
+        """每行：True = 直道 / False = 弯道 / None = 这一行没有边界"""
+        n = len(self.edges)
+        cx = [self.center_of(e) for e in self.edges]
+        kind = [None] * n
+        for i in range(n):
+            if cx[i] is None:
+                continue
+            xs, ys = [], []
+            for j in range(max(0, i - self.STRAIGHT_WIN),
+                           min(n, i + self.STRAIGHT_WIN + 1)):
+                if cx[j] is not None:
+                    xs.append(j)
+                    ys.append(cx[j])
+            m = len(xs)
+            if m < 6:
+                continue
+            sx  = float(sum(xs))
+            sy  = float(sum(ys))
+            sxx = float(sum(x * x for x in xs))
+            sxy = float(sum(x * y for x, y in zip(xs, ys)))
+            den = m * sxx - sx * sx
+            k = 0.0 if den == 0 else (m * sxy - sx * sy) / den
+            b = (sy - k * sx) / m
+            res = max(abs(k * x + b - y) for x, y in zip(xs, ys))
+            kind[i] = (res < self.STRAIGHT_TOL)
+        return kind
+
     def draw(self):
         if (self.shot is None) or (not HAVE_PIL):
             return
@@ -1081,7 +1125,15 @@ class App(object):
 
         if self.edges:
             d = ImageDraw.Draw(im)
-            s = SCALE_EDGE
+            kind = self.classify_rows()
+
+            # 近处（画面下方 40 行里有边界的行）弯道占比 > 50% 就认为"现在是弯道"
+            good = [k for k in kind if k is not None]
+            near = good[-40:] if len(good) >= 40 else good
+            if near:
+                n_curve = sum(1 for k in near if not k)
+                self.straight_now = (n_curve * 100 // len(near)) < 50
+
             for side in (0, 1):
                 prev = None
                 for r, e in enumerate(self.edges):
@@ -1089,13 +1141,14 @@ class App(object):
                     if x is None:
                         prev = None
                         continue
+                    col = self.C_STRAIGHT if kind[r] is not False else self.C_CURVE
                     px, py = int(x * sx), int(r * sy + sy / 2)
-                    if prev is not None and abs(x - prev[0]) <= 12:
-                        d.line([(prev[1], prev[2]), (px, py)], fill=(255, 0, 0), width=2)
+                    if prev is not None and abs(x - prev[0]) <= 12 and prev[3] == col:
+                        d.line([(prev[1], prev[2]), (px, py)], fill=col, width=2)
                     d.rectangle([int(x * sx), int(r * sy),
                                  int(x * sx + max(sx, 1)) - 1, int(r * sy + max(sy, 1)) - 1],
-                                fill=(255, 0, 0))
-                    prev = (x, px, py)
+                                fill=col)
+                    prev = (x, px, py, col)
 
         try:
             self.photo = ImageTk.PhotoImage(im)
@@ -1124,8 +1177,10 @@ class App(object):
         age = (now - self.t_tele) if self.t_tele else 99.0
         conn = '已连接' if self.conn else '未连接'
         self.lbl_stat.configure(
-            text='%s    %s    帧率 %.1f    收 %.0f B/s    遥测 %.1f/s 丢%.0f%% (%.1fs 前)    板子文本 ok=%d fail=%d'
-                 % (conn, '原图' if self.mode_gray else '二值', self.fps, self.bps,
+            text='%s    %s    %s    帧率 %.1f    收 %.0f B/s    遥测 %.1f/s 丢%.0f%% (%.1fs 前)    板子文本 ok=%d fail=%d'
+                 % (conn, '原图' if self.mode_gray else '二值',
+                    '直道' if self.straight_now else '弯道',
+                    self.fps, self.bps,
                     self.tel_rate, self.tel_loss, age, self.txt_ok, self.txt_fail))
 
         if age > 3.0:
