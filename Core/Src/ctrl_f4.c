@@ -1483,7 +1483,8 @@ static uint8_t  s_motor_stalled = 0U;      /* 1 = 堵转停机，等 PC2 */
 #if CTRL_STALL_ENABLE
 static uint16_t s_below_cnt     = 0U;      /* 连续低于阈值拍数（保护关掉时不需要）*/
 #endif
-static uint8_t  s_btn_armed     = 0U;      /* PC2 已经"松开"过（边沿触发用）*/
+static uint8_t  s_btn_armed     = 0U;      /* 进堵转时已记住按键电平 */
+static uint8_t  s_key_prev      = 0U;      /* 进堵转那一刻的按键电平（PC2/PC3）*/
 
 /* 重新生成 4 行文字（内容变了才标 dirty） */
 static void oled_text_update (void)
@@ -1652,24 +1653,40 @@ static void motor_supervisor (void)
 #endif
     }
 
-    /* ② 堵转停机后：PC2 **边沿触发**（必须先松开、再按下）⇒ 回闭环重新起转
-       ★ 用边沿而不是电平：万一按键卡住/接线常低，电平触发会在"停机"的下一拍
-         立刻把自己解除掉，表现就是"堵转保护不动作"。*/
+    /* ② 堵转停机后：**任意按键（PC2 / PC3）新按下** ⇒ 回闭环重新起转
+       ★ 2026-11-07（FW=2121）：实测遥测 `k1` **242 条全是 0** —— PC2 一直是低电平
+         （按键卡住 / 常闭 / 板上有下拉电阻），"先松开再按下"的边沿永远等不到
+         ⇒ 按 PC2 毫无反应。改成：
+           · 进堵转时记住当时的电平；
+           · 之后只要有任意一次电平变化、并且变成"有键按下"就重启；
+           · PC2 卡死不动也没关系，按 PC3 一样能重启。*/
     if (0U != s_motor_stalled)
     {
-        if (0U == ctrl_key(1U)) { s_btn_armed = 1U; }          /* 见到"松开" */
-        else if (0U != s_btn_armed)
+        uint8_t k = (uint8_t)(((0U != ctrl_key(1U)) ? 1U : 0U) |
+                              ((0U != ctrl_key(2U)) ? 2U : 0U));
+
+        if (0U == s_btn_armed)
         {
-            s_motor_stalled = 0U;
-            s_btn_armed     = 0U;
+            s_key_prev  = k;          /* 刚进堵转：记住当前电平（卡住的键不会误触发）*/
+            s_btn_armed = 1U;
+        }
+        else if (k != s_key_prev)
+        {
+            s_key_prev = k;
+            if (0U != k)              /* 变成"有键按下" ⇒ 重启 */
+            {
+                s_motor_stalled = 0U;
+                s_btn_armed     = 0U;
 #if CTRL_STALL_ENABLE
-            s_below_cnt     = 0U;
+                s_below_cnt     = 0U;
 #endif
-            ctrl_open_loop(0U);                                /* 回闭环巡航 */
-            ctrl_speed_set_target((int16_t)CTRL_RUN_RPM);
+                ctrl_open_loop(0U);                                /* 回闭环巡航 */
+                ctrl_speed_set_target((int16_t)CTRL_RUN_RPM);
+            }
         }
         return;
     }
+    s_btn_armed = 0U;                 /* 没堵转时复位，下次堵转重新记住电平 */
 
     /* ③ ★★★ 全局堵转判据（FW=2120，用户要求，**不再分模式/不再看目标**）★★★
           规则只有一条：**实测转速 < CTRL_STALL_RPM(400) 持续 CTRL_STALL_MS(2 秒) ⇒ 关电机**
@@ -1709,6 +1726,17 @@ static void motor_supervisor (void)
         }
     }
 #endif  /* CTRL_STALL_ENABLE */
+}
+
+/* ★ 2026-11-07（FW=2121）：上位机发 `q <非零>` 时清掉"堵转停机"状态 ——
+   这样即使按键坏了/没接，也能从面板上把电机重新起转。*/
+void ctrl_motor_clear_stall (void)
+{
+    s_motor_stalled = 0U;
+    s_btn_armed     = 0U;
+#if CTRL_STALL_ENABLE
+    s_below_cnt     = 0U;
+#endif
 }
 
 void ctrl_all_init (void)

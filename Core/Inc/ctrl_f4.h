@@ -145,6 +145,8 @@ void     ctrl_speed_init (void);
 /* ★ 开环(1)/闭环(0) 切换：发 `w` 进开环（速度环让位），发 `q` 回闭环 */
 void     ctrl_open_loop (uint8_t on);
 uint8_t  ctrl_is_open_loop (void);
+/* ★ 清掉"堵转停机"状态（上位机发 q <非零> 时用，按键坏了也能从面板重启）*/
+void     ctrl_motor_clear_stall (void);
 void     ctrl_speed_set_target (int16_t rpm);      /* 目标转速；0 = 停机 */
 int16_t  ctrl_speed_get_target (void);
 int16_t  ctrl_speed_get_duty   (void);
