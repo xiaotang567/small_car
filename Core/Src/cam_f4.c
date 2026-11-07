@@ -2719,9 +2719,9 @@ static void lf_trace_track (void)
        找不到 ⇒ 立刻结束，剩下的行留空（不猜、不外推）*/
     for (r = (int32_t)CAM_H - 2; r >= 0; r--)
     {
-        uint8_t n     = lf_row_runs((uint8_t)r);
-        uint8_t j, bestj = 0xFFU;
-        int32_t bestov = 0;
+        uint8_t n = lf_row_runs((uint8_t)r);
+        uint8_t j;
+        int32_t ul = -1, ur = -1;        /* 所有"与上一行相连的白段"的并集 */
 
         for (j = 0U; j < n; j++)
         {
@@ -2731,13 +2731,19 @@ static void lf_trace_track (void)
 
             ov = ((b < rg) ? b : rg) - ((a > l) ? a : l) + 1;   /* 与上一行区间重叠长度 */
             if (ov <= 0) { continue; }                          /* 中间隔着黑 ⇒ 不相连 */
-            if (ov > bestov) { bestov = ov; bestj = j; }
+
+            /* ★ FW=2171：**取并集，不只挑一段**
+               赛道中间的黑洞会把这一行切成左右两段，两段都和上一行相连；
+               只挑一段的话，左右边界就一起贴到黑洞边上（你看到的就是这个）。
+               ⇒ 左边取最早那段的起点、右边取最晚那段的终点，黑洞夹在中间不影响边界 ✓ */
+            if ((ul < 0) || (a < ul)) { ul = a; }
+            if ((ur < 0) || (b > ur)) { ur = b; }
         }
 
-        if (0xFFU == bestj) { break; }            /* ★ 收不到就结束 */
+        if ((ul < 0) || (ur < 0)) { break; }      /* ★ 收不到就结束 */
 
-        l  = (int32_t)lf_rs[bestj];
-        rg = (int32_t)lf_re[bestj];
+        l  = ul;
+        rg = ur;
         cam_bound[r]   = (uint8_t)l;
         cam_bound_r[r] = (uint8_t)rg;
         lf_real_l[r]   = 1U;
