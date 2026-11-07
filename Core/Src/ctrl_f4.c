@@ -1445,7 +1445,9 @@ static void oled_pad (char *b)
 /* ★ 电机巡航/堵转状态（定义在这里、给下面的 OLED 和 motor_supervisor 共用）*/
 static uint8_t  s_motor_started = 0U;      /* 0 = 还没起过转 */
 static uint8_t  s_motor_stalled = 0U;      /* 1 = 堵转停机，等 PC2 */
-static uint16_t s_below_cnt     = 0U;      /* 连续低于阈值拍数 */
+#if CTRL_STALL_ENABLE
+static uint16_t s_below_cnt     = 0U;      /* 连续低于阈值拍数（保护关掉时不需要）*/
+#endif
 static uint16_t s_grace_cnt     = 0U;      /* 起转宽限拍数 */
 
 /* 重新生成 4 行文字（内容变了才标 dirty） */
@@ -1606,11 +1608,6 @@ void ctrl_buzzer (uint8_t on)
 
 static void motor_supervisor (void)
 {
-    int16_t tgt;
-    int16_t rpm;
-    int32_t a_tgt;
-    int32_t a_rpm;
-
     /* ① 第一次进主循环：自动起转（要"上电不转"就把 CTRL_RUN_AUTO_START 改成 0）*/
     if (0U == s_motor_started)
     {
@@ -1625,8 +1622,10 @@ static void motor_supervisor (void)
     if ((0U != s_motor_stalled) && (0U != ctrl_key(1U)))
     {
         s_motor_stalled = 0U;
-        s_below_cnt     = 0U;
         s_grace_cnt     = 0U;
+#if CTRL_STALL_ENABLE
+        s_below_cnt     = 0U;
+#endif
         ctrl_speed_set_target((int16_t)CTRL_RUN_RPM);
         return;
     }
@@ -1637,33 +1636,42 @@ static void motor_supervisor (void)
     if (s_grace_cnt < (uint16_t)(CTRL_STALL_GRACE_MS / CTRL_PERIOD_MS))
     {
         s_grace_cnt ++;
+#if CTRL_STALL_ENABLE
         s_below_cnt = 0U;
+#endif
         return;
     }
 
-    /* ④ 堵转检测（只在"有目标"时做；目标 0 = 正常停车，不算堵转）*/
-    tgt   = ctrl_speed_get_target();
-    rpm   = ctrl_speed_get_rpm();
-    a_tgt = (tgt < 0) ? -(int32_t)tgt : (int32_t)tgt;
-    a_rpm = (rpm < 0) ? -(int32_t)rpm : (int32_t)rpm;
-
-    if (0 == a_tgt) { s_below_cnt = 0U; return; }
-
-    if (a_rpm < ((a_tgt * (int32_t)CTRL_STALL_PCT) / 100))
+    /* ④ 堵转检测（只在"有目标"时做；目标 0 = 正常停车，不算堵转）
+       ★ 2026-11-07（FW=2114）：**用户要求先关掉**，用 CTRL_STALL_ENABLE 控制。
+          关掉以后 s_motor_stalled 永远是 0 ⇒ PC2 也不会触发重启（没有"停机"可解除）。
+          想恢复保护：把 ctrl_f4.h 里的 CTRL_STALL_ENABLE 改回 1。*/
+#if CTRL_STALL_ENABLE
     {
-        if (s_below_cnt < 0xFFFFU) { s_below_cnt ++; }
+        int16_t tgt   = ctrl_speed_get_target();
+        int16_t rpm   = ctrl_speed_get_rpm();
+        int32_t a_tgt = (tgt < 0) ? -(int32_t)tgt : (int32_t)tgt;
+        int32_t a_rpm = (rpm < 0) ? -(int32_t)rpm : (int32_t)rpm;
 
-        if (s_below_cnt >= (uint16_t)CTRL_STALL_TICKS)
+        if (0 == a_tgt) { s_below_cnt = 0U; return; }
+
+        if (a_rpm < ((a_tgt * (int32_t)CTRL_STALL_PCT) / 100))
         {
-            s_motor_stalled = 1U;
-            s_below_cnt     = 0U;
-            ctrl_speed_set_target(0);          /* ★ 停机 */
+            if (s_below_cnt < 0xFFFFU) { s_below_cnt ++; }
+
+            if (s_below_cnt >= (uint16_t)CTRL_STALL_TICKS)
+            {
+                s_motor_stalled = 1U;
+                s_below_cnt     = 0U;
+                ctrl_speed_set_target(0);          /* ★ 停机 */
+            }
+        }
+        else
+        {
+            s_below_cnt = 0U;                      /* 转速回来了 ⇒ 计数清零 */
         }
     }
-    else
-    {
-        s_below_cnt = 0U;                      /* 转速回来了 ⇒ 计数清零 */
-    }
+#endif  /* CTRL_STALL_ENABLE */
 }
 
 void ctrl_all_init (void)

@@ -67,6 +67,8 @@
    把 CTRL_RUN_AUTO_START 改成 0 就回到"上电不转、等上位机命令"。*/
 #define CTRL_RUN_RPM            500          /* 巡航目标转速（RPM）*/
 #define CTRL_RUN_AUTO_START     1            /* 1 = 主循环一开始就自动起转 */
+#define CTRL_STALL_ENABLE       0            /* ★ 0 = **暂时关掉堵转保护**（用户要求，先让电机能转起来）
+                                                1 = 打开：转速连续 2 秒低于目标的 80% ⇒ 停机，PC2 重启 */
 #define CTRL_STALL_MS           2000         /* 低于阈值持续多久判堵转 */
 #define CTRL_STALL_PCT          80           /* 阈值 = 目标的 80%（500 → 400 RPM）*/
 #define CTRL_STALL_GRACE_MS     3000         /* ★ 起转后的宽限期：这段时间不做堵转判断 */
