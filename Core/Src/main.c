@@ -164,7 +164,11 @@ int main(void)
   //       3 = 连不上电脑(IP不对 / 上位机没开 / 防火墙) → 闪 3 下
   //       0 = 成功 → LED 常亮
   {
-    uint8_t ret = wifi_f4_init();
+    uint8_t ret;
+
+    ctrl_oled_boot(3U);                  /* ★ 开机阶段 3：正在连 WiFi / 连上位机（最长 60 秒）*/
+    ret = wifi_f4_init();
+    ctrl_oled_boot(4U);                  /* ★ 开机阶段 4：WiFi 初始化返回，准备进主循环 */
     board_led_show((0 == ret) ? LED_CODE_READY : ret);
   }
 

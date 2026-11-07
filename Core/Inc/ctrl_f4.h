@@ -181,6 +181,11 @@ void     ctrl_oled_status (void);
    主循环要等 wifi_f4_init() 返回（最长几十秒）才开始转，
    不先画一次的话屏幕会一直停在开机画面上。约 34ms。 */
 void     ctrl_oled_first_page (void);
+/* ★★★ 2026-11-07（FW=2101）：**启动阶段显示** ★★★
+   开机到主循环之间有 `ctrl_servo_scan()`（1~8 秒）和 `wifi_f4_init()`（最长 60 秒），
+   这段时间屏幕**本来是静止的** ⇒ 卡在这两段里和"真死机"看起来一模一样。
+   现在每一步都在第 0 行写 `BOOT n`，卡住时屏幕上就停在那一步的编号上。 */
+void     ctrl_oled_boot (uint8_t stage);
 
 /* ---------- 按键 / 蜂鸣器 ---------- */
 void     ctrl_io_init (void);

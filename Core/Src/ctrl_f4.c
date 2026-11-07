@@ -332,6 +332,7 @@ void ctrl_servo_init (void)
     /* ★ 等舵机自己初始化完（它上电要 ~1 秒），再扫 ID。总耗时最多 ~1.2 秒，
        全在 `ctrl_all_init()` 里、WiFi 初始化之前 ⇒ 不影响主循环。*/
     HAL_Delay(1000);
+    ctrl_oled_boot(9U);      /* ★ 开机阶段 9：正在扫舵机 ID（这一步要是卡住，屏幕就停在 BOOT 9）*/
     ctrl_servo_scan();
 }
 
@@ -529,7 +530,8 @@ void ctrl_servo_scan (void)
        每档扫 ID 0~20；等待时间按波特率自动放大（servo_wait_ms）。*/
     static const uint32_t bauds[] = { 1000000UL, 115200UL, 500000UL, 250000UL,
                                       57600UL, 38400UL, 19200UL, 9600UL, 10000UL, 4800UL };
-    uint8_t bi, id;
+    uint8_t  bi, id;
+    uint32_t t_scan = HAL_GetTick();
 
     for (bi = 0U; bi < (uint8_t)(sizeof(bauds) / sizeof(bauds[0])); bi++)
     {
@@ -538,6 +540,15 @@ void ctrl_servo_scan (void)
 
         for (id = 0U; id <= 20U; id++)
         {
+            /* ★★★ 2026-11-07（FW=2101）：**整个扫描的硬上限 6 秒** ★★★
+               现场：把 PC10/PC11 并起来（= 收发短接）后开机就卡死。
+               这一段是开机唯一碰 UART4 的地方：每发一帧都会立刻收到自己的回显，
+               RX 中断 + `servo_probe_id` 里那个 `while (HAL_GetTick()-t0 < 5ms)` 一旦
+               遇到时间基准不前进（2098 以前 SysTick 是最低优先级！）就**永远不出来**
+               ⇒ 开机卡死、WiFi 永远不初始化、断电也没用（短接线还在）。
+               现在：不管什么原因，6 秒一到立刻放弃扫描，把开机让出来。*/
+            if ((HAL_GetTick() - t_scan) > 6000UL) { bi = 99U; break; }
+
             if (0U != servo_probe_id(id)) { g_servo_id = id; return; }
         }
     }
@@ -1392,12 +1403,35 @@ void ctrl_oled_first_page (void)
     g_oled_t_txt  = HAL_GetTick();
 }
 
+/* ★★★ 2026-11-07（FW=2101）：**启动阶段显示** ★★★
+   开机到主循环之间有两段长时间的阻塞：`ctrl_servo_scan()`（1~8 秒）和
+   `wifi_f4_init()`（最长 60 秒）。这两段里屏幕**本来就是静止的** ⇒
+   "卡在这里"和"真的死机"看起来完全一样。现在每过一个阶段就在第 0 行写 `BOOT n`，
+   卡住时屏幕上就停在那一步的编号 —— 不用连电脑也能看。
+     1 = 进 ctrl_all_init（OLED 刚点亮）
+     2 = ctrl_all_init 完成（舵机扫描也做完了）
+     3 = 正在 wifi_f4_init（连热点/连上位机，最长 60 秒）
+     4 = wifi_f4_init 返回，准备进主循环
+     9 = 正在扫舵机 ID（ctrl_servo_scan 内部）
+   主循环一起来，第 0 行会被状态页重新盖掉（这里故意把缓存清空，保证一定重画）。*/
+void ctrl_oled_boot (uint8_t stage)
+{
+    char b[20];
+
+    if (0U == g_oled_ok) { return; }
+
+    sprintf(b, "BOOT %u", (unsigned)stage);
+    oled_pad(b);
+    ctrl_oled_text(0U, 0U, b, 2U);
+    g_oled_line[0][0] = '\0';                /* 让状态页一定把它重画掉 */
+    g_oled_dirty = (uint8_t)(g_oled_dirty & (uint8_t)~1U);
+}
+
 void ctrl_oled_status (void)
 {
     uint32_t now = HAL_GetTick();
 
     if (0U == g_oled_ok) { return; }
-
     if ((now - g_oled_t_txt) >= CTRL_OLED_TEXT_MS)           /* 10Hz 更新文字 */
     {
         g_oled_t_txt = now;
@@ -1468,10 +1502,12 @@ void ctrl_all_init (void)
     ctrl_oled_init();
     ctrl_oled_clear();
     ctrl_oled_first_page();
+    ctrl_oled_boot(1U);      /* ★ 开机阶段 1：OLED 已点亮 */
 
     /* ★ 舵机放最后：它上电要 ~1 秒才肯说话，`ctrl_servo_init()` 里会等 1 秒再扫 ID
        ⇒ 先把屏幕点亮，别让这一秒黑着。 */
     ctrl_servo_init();
+    ctrl_oled_boot(2U);      /* ★ 开机阶段 2：车模控制全部初始化完成 */
 
     ctrl_speed_init();
 }
