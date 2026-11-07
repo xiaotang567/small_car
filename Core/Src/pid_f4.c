@@ -165,30 +165,44 @@ void ctrl_speed_tick (void)
     if (out > CTRL_SPEED_DUTY_MAX) { out = CTRL_SPEED_DUTY_MAX; }
     if (out < 0)                   { out = 0; }
 
-    /* ★★ 2193：**起转踹一脚**
-       目标非 0、但实测转速一直起不来（< KICK_RPM 持续 KICK_MS）⇒ 直接给 KICK_DUTY 踹一下，
-       等它转起来再交回 PID。没有这一下，低速目标（100RPM）会卡在静摩擦里一动不动。*/
+    /* ★★ 2195：**起转踹一脚 —— 只在开始那一下**
+       用户要求："踹只能开始的时候踹"。
+       所以不再按"转速低就踹"，而是：
+         · 目标由 0 变非 0 的那一刻记下时间；
+         · 之后 **CTRL_SPEED_KICK_WIN_MS（800ms）** 之内，占空比至少给 KICK_DUTY(40%)；
+         · 过了这个窗口就不再踹（跑起来以后速度掉下去也不踹，交给 PID 和堵转保护）。
+        目标回到 0 时复位，下次启动重新踹。*/
     {
-        static uint32_t s_kick_t   = 0U;
-        static uint8_t  s_kick_on  = 0U;
+        static uint32_t s_kick_t    = 0U;
+        static uint8_t  s_kick_act  = 0U;
+        static int16_t  s_kick_tgt  = 0;
 
-        if ((0 != g_sc_ramp_x10) && (meas_x10 < CTRL_SPEED_KICK_RPM * 10) &&
-            (meas_x10 > -CTRL_SPEED_KICK_RPM * 10))
+        if (0 == g_sc_ramp_x10)
         {
-            if (0U == s_kick_t) { s_kick_t = HAL_GetTick(); }
-
-            if ((HAL_GetTick() - s_kick_t) > CTRL_SPEED_KICK_MS)
-            {
-                if (out < CTRL_SPEED_KICK_DUTY) { out = CTRL_SPEED_KICK_DUTY; }
-                s_kick_on = 1U;
-            }
+            s_kick_act = 0U;                       /* 停机 ⇒ 复位，下次启动重新踹 */
+            s_kick_t   = 0U;
         }
         else
         {
-            s_kick_t  = 0U;
-            s_kick_on = 0U;
+            if ((0 != s_kick_t) && (0 == s_kick_tgt)) { s_kick_t = HAL_GetTick(); s_kick_act = 1U; }
+            if (0U == s_kick_t) { s_kick_t = HAL_GetTick(); s_kick_act = 1U; }
+
+            if ((0U != s_kick_act) &&
+                ((HAL_GetTick() - s_kick_t) < (uint32_t)CTRL_SPEED_KICK_WIN_MS))
+            {
+                if (out < CTRL_SPEED_KICK_DUTY) { out = CTRL_SPEED_KICK_DUTY; }
+            }
+            else
+            {
+                s_kick_act = 0U;                   /* 窗口过了：以后不再踹 */
+            }
         }
-        (void)s_kick_on;
+        s_kick_tgt = (int16_t)(g_sc_ramp_x10 / 10);
+
+        /* 踹完再夹一次上限（KICK_DUTY 可能比 DUTY_MAX 大，比如 40% vs 50% 现在没超，
+           但这样写以后改参数也不会把限幅突破）*/
+        if (out > CTRL_SPEED_DUTY_MAX) { out = CTRL_SPEED_DUTY_MAX; }
+        if (out < 0)                   { out = 0; }
     }
 
     g_sc_duty = (int16_t)out;

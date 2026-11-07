@@ -85,14 +85,15 @@
 #define CTRL_SPEED_FF_PER_1000  5000         /* 前馈：目标每 1000RPM 给多少占空比 */
 #define CTRL_SPEED_FF_OFFSET    1200         /* ★ 2193：前馈"死区补偿"：只要不是停机就给 12% 起步占空比
                                                 （100RPM 时原来只有 5% ⇒ 电机根本转不起来）*/
-#define CTRL_SPEED_KICK_DUTY    2600         /* ★ 2193：起转"踹一脚"：目标非 0 但转速起不来时用的占空比 */
+#define CTRL_SPEED_KICK_DUTY    4000         /* ★ 2195：**踹的力度 40%**（原来 26%）*/
+#define CTRL_SPEED_KICK_WIN_MS  800          /* ★ 2195：**只在起转后这 800ms 内踹**，之后不再踹 */
 #define CTRL_SPEED_KICK_RPM     30           /* ★ 2193：转速低于它就算"没转起来" */
 #define CTRL_SPEED_KICK_MS      400          /* ★ 2193：持续这么久才踹 */
 #define CTRL_SPEED_RAMP_RPM_S   3000         /* 设定值斜坡：每秒允许升多少 RPM */
 #define CTRL_SPEED_KP_X1000     1500         /* Kp = 1.500 */
 #define CTRL_SPEED_KI_X1000     150          /* Ki = 0.150（每个控制周期） */
 #define CTRL_SPEED_I_LIMIT      2500         /* 积分限幅（占空比单位） */
-#define CTRL_SPEED_DUTY_MAX     8000         /* ★ 2026-11-07：500RPM 在 50% 就顶住了 ⇒ 放到 80%（原 5000） */
+#define CTRL_SPEED_DUTY_MAX     5000         /* ★ 2195：**上限 50%**（用户改，原来 80%）*/
 #define CTRL_SPEED_SIGN_AUTO    1            /* 1 = 反馈极性自动识别 */
 
 /* ---- 舵机（幻尔 HX 总线舵机）----
