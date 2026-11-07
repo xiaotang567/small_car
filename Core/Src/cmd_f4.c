@@ -149,7 +149,7 @@ static void cam_cmd_status (void)
        DRP = 发送看门狗**主动放弃**的帧数（一直飙 ⇒ 链路/模块发不动）✓
        DST = DMA 停摆看门狗重启采集的次数（>0 ⇒ 采集链卡过，但已经自己救回来了）✓
        SELF= 连续 2 秒没有完整帧 ⇒ 重启采集的次数（和 DST 一起看）✓ */
-    sprintf(b, "CFG f=%u g=%u x=%u y=%u (%ux%u) d=%u CST=%u RV=%06lX LINE=%u FW=2141 EDG=%lu EL=%u ER=%u DRP=%lu DST=%lu SELF=%lu TH=%u\r\n",
+    sprintf(b, "CFG f=%u g=%u x=%u y=%u (%ux%u) d=%u CST=%u RV=%06lX LINE=%u FW=2142 EDG=%lu EL=%u ER=%u DRP=%lu DST=%lu SELF=%lu TH=%u\r\n",
             (unsigned)cam_cmd_fps, (unsigned)cam_cmd_gap_ms,
             (unsigned)cam_cmd_dx, (unsigned)cam_cmd_dy,
             (unsigned)(CAM_TXW / cam_cmd_dx), (unsigned)(CAM_H / cam_cmd_dy),
@@ -216,46 +216,20 @@ static void cam_cmd_line (char *s)
         case 'a': cam_cmd_fps = 0U; cam_cmd_gap_ms = 0U; cam_cmd_dx = 1U; cam_cmd_dy = 1U; break;
 
         case 'd':                                   // ★ 心跳档位：0 静默 / 1 精简(默认) / 2 全量
-            /* ★ 2026-11-07（FW=2141）：`dr` = dump 传感器关键寄存器
-               ⚠️ cmd_txt() 是**单槽缓冲**，连续调用会互相覆盖 ⇒ 每行先拼成完整字符串再发一次。*/
+            /* ★ 2026-11-07（FW=2142）：`dr` = **一行**打印 8 个最关键寄存器
+               为什么只一行：cmd_txt() 是单槽缓冲，同一拍里连发多次只有最后一次能出去。*/
             if ((s[1] == 'r') || (s[1] == 'R'))
             {
+                static const uint8_t rg[8] = {0x0B, 0x0C, 0x0D, 0x03, 0x04, 0x07, 0x0F, 0xAF};
                 uint16_t rv = 0U;
                 uint8_t  i;
 
-                b[0] = 'R'; b[1] = 'E'; b[2] = 'G'; b[3] = '0';
+                b[0] = 'D'; b[1] = 'R'; b[2] = 'G'; b[3] = ' ';
                 for (i = 0U; i < 8U; i++)
                 {
                     rv = 0xAAAAU;
-                    (void)cam_sccb_read_reg((uint16_t)i, &rv);
-                    sprintf(&b[4U + i * 8U], " %02X:%04X", (unsigned)i, (unsigned)rv);
-                }
-                cmd_txt(b);
-
-                b[0] = 'R'; b[1] = 'E'; b[2] = 'G'; b[3] = '1';
-                for (i = 0U; i < 8U; i++)
-                {
-                    rv = 0xAAAAU;
-                    (void)cam_sccb_read_reg((uint16_t)(8U + i), &rv);
-                    sprintf(&b[4U + i * 8U], " %02X:%04X", (unsigned)(8U + i), (unsigned)rv);
-                }
-                cmd_txt(b);
-
-                b[0] = 'R'; b[1] = 'E'; b[2] = 'G'; b[3] = '2';
-                for (i = 0U; i < 8U; i++)
-                {
-                    rv = 0xAAAAU;
-                    (void)cam_sccb_read_reg((uint16_t)(0x20U + i), &rv);
-                    sprintf(&b[4U + i * 8U], " %02X:%04X", (unsigned)(0x20U + i), (unsigned)rv);
-                }
-                cmd_txt(b);
-
-                b[0] = 'R'; b[1] = 'E'; b[2] = 'G'; b[3] = 'A';
-                for (i = 0U; i < 8U; i++)
-                {
-                    rv = 0xAAAAU;
-                    (void)cam_sccb_read_reg((uint16_t)(0xA8U + i), &rv);
-                    sprintf(&b[4U + i * 8U], " %02X:%04X", (unsigned)(0xA8U + i), (unsigned)rv);
+                    (void)cam_sccb_read_reg((uint16_t)rg[i], &rv);
+                    sprintf(&b[4U + i * 8U], " %02X:%04X", (unsigned)rg[i], (unsigned)rv);
                 }
                 cmd_txt(b);
                 return;
@@ -681,7 +655,7 @@ void cam_cmd_poll (void)
                 cam_cmd_len = 0U;
             }
         }
-        /* ★★★ 2026-11-07（FW=2141）：**只收可打印字符，别把模块的 0x00 填充塞进命令行** ★★★
+        /* ★★★ 2026-11-07（FW=2142）：**只收可打印字符，别把模块的 0x00 填充塞进命令行** ★★★
            现场：上位机点按钮一直重发，板子却回的是 `CFG`（default 分支），不是 `ACK r`。
            真凶：模块把下行数据放在 32 字节块里，**前面补了一堆 0x00**；
            这些 0 被当成命令字符塞进 `cam_cmd_buf`，于是 `cam_cmd_line()` 看到的第一个字节是
