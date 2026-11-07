@@ -90,9 +90,9 @@
 #define CTRL_SPEED_KICK_RPM     30           /* ★ 2193：转速低于它就算"没转起来" */
 #define CTRL_SPEED_KICK_MS      400          /* ★ 2193：持续这么久才踹 */
 #define CTRL_SPEED_RAMP_RPM_S   3000         /* 设定值斜坡：每秒允许升多少 RPM */
-#define CTRL_SPEED_KP_X1000     1500         /* Kp = 1.500 */
-#define CTRL_SPEED_KI_X1000     150          /* Ki = 0.150（每个控制周期） */
-#define CTRL_SPEED_I_LIMIT      2500         /* 积分限幅（占空比单位） */
+#define CTRL_SPEED_KP_X1000     2500         /* ★ 2197：1.5 -> 2.5（100RPM 时 P 只有 150，太弱）*/
+#define CTRL_SPEED_KI_X1000     450          /* ★ 2197：0.15 -> 0.45（积分太弱，爬到 100RPM 要好几百 ms）*/
+#define CTRL_SPEED_I_LIMIT      3500         /* ★ 2197：2500 -> 3500（配合更大的 Ki）*/
 #define CTRL_SPEED_DUTY_MAX     5000         /* ★ 2195：**上限 50%**（用户改，原来 80%）*/
 #define CTRL_SPEED_SIGN_AUTO    1            /* 1 = 反馈极性自动识别 */
 
