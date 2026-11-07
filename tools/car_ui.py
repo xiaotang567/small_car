@@ -104,6 +104,8 @@ class App(object):
         self.gray_got = set()
         self.edges = None
         self.straight_now = True      # ★ 直道/弯道判定结果（True = 直道）
+        self.vision_on = True         # ★ 视觉打舵开关（对应固件 vs 0/1）
+        self.sweep_on  = False        # ★ 扫舵测试开关（对应固件 st）
         self.mode_gray = False
         self.shot = None
         self.photo = None
@@ -388,6 +390,22 @@ class App(object):
         self.btn_half = self._btn(f, '单线半双工(只接PC10)', lambda: self.do_duplex(1), w=18, h=1,
                                   font=('Microsoft YaHei', 9))
         self.btn_half.grid(row=4, column=3, columnspan=2, padx=3, pady=(2, 4), sticky='ew')
+
+        # ---- 视觉打舵 / 扫舵测试 ----
+        f = tk.LabelFrame(right, text=' 视觉打舵 ', bg=C_PANEL, fg=C_ACCENT,
+                          font=('Microsoft YaHei', 10, 'bold'), bd=1, relief='groove')
+        f.grid(row=row, column=0, sticky='ew', pady=(0, 8)); row += 1
+        f.columnconfigure(0, weight=1)
+        f.columnconfigure(1, weight=1)
+
+        self.lbl_vis = tk.Label(f, text='视觉打舵：开', bg=C_PANEL, fg='#66e08a',
+                                font=('Microsoft YaHei', 10, 'bold'))
+        self.lbl_vis.grid(row=0, column=0, columnspan=2, sticky='w', padx=6, pady=(4, 2))
+
+        self.btn_vis = self._btn(f, '开 / 关  vs', self.do_vision_toggle, bg=C_ON, w=10, h=1)
+        self.btn_vis.grid(row=1, column=0, padx=4, pady=(0, 4), sticky='ew')
+        self.btn_sweep = self._btn(f, '扫舵测试  st', self.do_sweep_toggle, bg=C_BTN, w=10, h=1)
+        self.btn_sweep.grid(row=1, column=1, padx=4, pady=(0, 4), sticky='ew')
 
         # ---- 其它 ----
         f = tk.LabelFrame(right, text=' 其它 ', bg=C_PANEL, fg=C_ACCENT,
@@ -688,6 +706,28 @@ class App(object):
             self.send_ack('r -1', 'ACK r', '舵机 → 单线半双工（只接 PC10 一根线）', self.btn_half)
         else:
             self.send_ack('r -2', 'ACK r', '舵机 → 全双工（PC10=TX, PC11=RX）', self.btn_full)
+
+    def do_vision_toggle(self):
+        """视觉打舵 开/关（固件 vs 0 / vs 1）"""
+        self.vision_on = not self.vision_on
+        self.send_ack('vs %d' % (1 if self.vision_on else 0), 'ACK vs',
+                      '视觉打舵 → %s' % ('开' if self.vision_on else '关'), self.btn_vis)
+        try:
+            self.btn_vis.configure(bg=C_ON if self.vision_on else C_BTN)
+            self.lbl_vis.configure(text='视觉打舵：%s' % ('开' if self.vision_on else '关'),
+                                   fg='#66e08a' if self.vision_on else C_DIM)
+        except Exception:
+            pass
+
+    def do_sweep_toggle(self):
+        """扫舵测试 开/关（固件 st，中位±300 每 200ms 换向）"""
+        self.sweep_on = not self.sweep_on
+        self.send_ack('st', 'ACK st', '扫舵测试 → %s' % ('开' if self.sweep_on else '关'),
+                      self.btn_sweep)
+        try:
+            self.btn_sweep.configure(bg=C_ON if self.sweep_on else C_BTN)
+        except Exception:
+            pass
 
     def do_img(self, on):
         """图传开关：0 = 停（链路全给文本，调遥测用），1 = 恢复"""
