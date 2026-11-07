@@ -631,9 +631,11 @@ void ctrl_servo_tick (void)
 #define STEER_R_NEAR     112      /* 近处行号：决定回不回中线 */
 #define STEER_W_STR      0.20f    /* 直道：近处权重 0.8 ⇒ 一定回到中线 */
 #define STEER_W_CUR      0.60f    /* 弯道：远处权重 0.6 ⇒ 提前打舵 */
-#define STEER_I_LIMIT    600.0f   /* 积分限幅（像素·次）：抹掉安装/机械中位偏差 */
+#define STEER_I_LIMIT    200.0f   /* ★ 2180：600 -> 200（积分只做微调，不许把舵机顶到限位）*/
 #define STEER_I_LEAK     0.985f   /* 没线时积分泄放系数 */
 #define STEER_E_LIMIT    90.0f    /* 误差限幅（像素），防跑飞 */
+#define STEER_D_LIMIT    60.0f    /* ★ 2180：微分项最大贡献（舵机步数）*/
+#define STEER_DE_LIMIT   5.0f     /* ★ 2180：单周期误差变化限幅（像素），压掉噪声 */
 #define STEER_SLEW       400      /* ★ 2177：每 20ms 最多变 400 步（=20000 步/秒，舵机自己会限速）*/
 
 volatile uint8_t  g_steer_enable       = 1U;   /* 1 = 视觉打舵开 */
@@ -642,12 +644,13 @@ volatile uint32_t g_steer_manual_until = 0U;   /* 手动打舵优先到这个时
 volatile float    g_steer_sign         = 1.0f; /* ★ 方向：+1 / -1 */
 volatile float    g_steer_kp           = 5.0f; /* 直道 P */
 volatile float    g_steer_ki           = 0.50f;/* 直道 I（2176：0.1 → 0.5）*/
-volatile float    g_steer_kd           = 10.0f;/* 直道 D */
+volatile float    g_steer_kd           = 6.0f; /* ★ 2180：10 -> 6（微分压小）*/
 volatile float    g_steer_kp_cur       = 4.5f; /* 弯道 P */
-volatile float    g_steer_kd_cur       = 16.0f;/* 弯道 D（更大 = 更早打舵）*/
+volatile float    g_steer_kd_cur       = 10.0f;/* ★ 2180：16 -> 10（微分压小）*/
 volatile float    g_steer_err          = 0.0f; /* 诊断：当前误差 */
 volatile float    g_steer_i            = 0.0f; /* 诊断：积分项 */
 volatile float    g_steer_ierr         = 0.0f; /* 诊断：积分项（对外）*/
+volatile int32_t  g_steer_target       = CTRL_SERVO_POS_CENTER; /* ★ 诊断：PID 算出来的目标位置（对比读回值）*/
 
 static   int32_t  s_steer_last         = CTRL_SERVO_POS_CENTER;
 static   float    s_e_prev             = 0.0f;
@@ -717,17 +720,46 @@ void ctrl_steer_from_cam (void)
     /* ★ 2175：**只在"接近中心"时积分**（|e|<20px），并且在偏离时缓慢泄放
        —— 不然过弯时误差很大，积分会一路顶到限幅，出弯后舵机半天回不来（实测就是这个）
        ★ 2176：积分力度放大（KI 0.1→0.5、限幅 400→600）——
-         之前那点积分根本抹不掉"安装/机械中位偏差"，车就一直歪着跑 */
-    if ((e < 20.0f) && (e > -20.0f)) { g_steer_i += e; }
-    else                             { g_steer_i *= 0.92f; }
-    if (g_steer_i >  STEER_I_LIMIT) { g_steer_i =  STEER_I_LIMIT; }
-    if (g_steer_i < -STEER_I_LIMIT) { g_steer_i = -STEER_I_LIMIT; }
+         之前那点积分根本抹不掉"安装/机械中位偏差"，车就一直歪着跑
+       ★ 2177：**条件积分抗饱和**（见下面 target 被限幅时的回退）*/
+    {
+        float i_try = g_steer_i;
 
-    u = kp * e + g_steer_ki * g_steer_i + kd * de;
-    g_steer_err = e;
-    g_steer_ierr = g_steer_i;
+        /* ★ 2180：微分限幅（用户反馈"呆在原地一点一点转过去" = 微分在反向抵消）*/
+        if (de >  STEER_DE_LIMIT) { de =  STEER_DE_LIMIT; }
+        if (de < -STEER_DE_LIMIT) { de = -STEER_DE_LIMIT; }
 
-    target = (int32_t)CTRL_SERVO_POS_CENTER + (int32_t)(g_steer_sign * u);
+        if ((e < 20.0f) && (e > -20.0f)) { i_try += e; }
+        else                             { i_try *= 0.92f; }
+        if (i_try >  STEER_I_LIMIT) { i_try =  STEER_I_LIMIT; }
+        if (i_try < -STEER_I_LIMIT) { i_try = -STEER_I_LIMIT; }
+
+        /* ★ 2180：微分项贡献限幅，别让它把 P 的力气全抵消掉 */
+        {
+            float dterm = kd * de;
+
+            if (dterm >  STEER_D_LIMIT) { dterm =  STEER_D_LIMIT; }
+            if (dterm < -STEER_D_LIMIT) { dterm = -STEER_D_LIMIT; }
+
+            u = kp * e + g_steer_ki * i_try + dterm;
+        }
+        g_steer_err = e;
+
+        target = (int32_t)CTRL_SERVO_POS_CENTER + (int32_t)(g_steer_sign * u);
+
+        /* ★ 2177：**输出已经顶到限位就不要再积分**（否则舵机被顶死、误差永远消不掉，
+           越积越死 —— 实测 I 顶到 600、舵机卡在 3024 不动）。撤掉这一次积分。*/
+        if ((target < (int32_t)CTRL_SERVO_POS_MIN) || (target > (int32_t)CTRL_SERVO_POS_MAX))
+        {
+            /* 饱和：保留旧积分，并且慢慢卸掉一点，帮它退出饱和 */
+            g_steer_i *= 0.95f;
+        }
+        else
+        {
+            g_steer_i = i_try;
+        }
+        g_steer_ierr = g_steer_i;
+    }
 
     if (target < (int32_t)CTRL_SERVO_POS_MIN) { target = (int32_t)CTRL_SERVO_POS_MIN; }
     if (target > (int32_t)CTRL_SERVO_POS_MAX) { target = (int32_t)CTRL_SERVO_POS_MAX; }
@@ -735,6 +767,7 @@ void ctrl_steer_from_cam (void)
     if (target > s_steer_last + STEER_SLEW) { target = s_steer_last + STEER_SLEW; }
     if (target < s_steer_last - STEER_SLEW) { target = s_steer_last - STEER_SLEW; }
 
-    s_steer_last = target;
+    s_steer_last   = target;
+    g_steer_target = target;
     (void)ctrl_servo_set_pos((uint16_t)target);
 }

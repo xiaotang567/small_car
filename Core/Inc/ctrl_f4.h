@@ -106,7 +106,7 @@
                                                绝对不要把这两根线并在一起（并了就是两个输出对拉）*/
 #define CTRL_SERVO_ID           1            /* 总线上那颗舵机的 ID */
 #define CTRL_SERVO_POS_MIN      1700         /* ★ 2026-11-07：按用户实测的安全行程改（原来 1048） */
-#define CTRL_SERVO_POS_MAX      3024         /* ★ 用户实测最大（4000 会顶） */
+#define CTRL_SERVO_POS_MAX      3300         /* ★ 2181：3024 -> 3300（用户改）*/
 #define CTRL_SERVO_POS_CENTER   2748         /* ★ 默认中位（开机摆到这里，原来 2048） */
 #define CTRL_SERVO_SPEED        9000         /* ★ 2177：3400 -> 9000（高速打舵，原来太慢跟不上）*/
 
@@ -150,6 +150,7 @@ extern volatile float    g_steer_kp_cur;       /* ★ 2175 弯道 P */
 extern volatile float    g_steer_kd_cur;       /* ★ 2175 弯道 D */
 extern volatile float    g_steer_err;          /* ★ 2175 诊断：当前误差(px) */
 extern volatile float    g_steer_ierr;         /* ★ 2176 诊断：积分项 */
+extern volatile int32_t  g_steer_target;       /* ★ 2178 诊断：PID 目标位置 */
 uint8_t  ctrl_imu_ok (void);                   /* 1 = MPU9250 在线 */
 uint8_t  ctrl_motor_stalled (void);            /* 1 = 堵转停机中（OLED 用）*/
 uint8_t  ctrl_motor_started (void);            /* 1 = 已经起过转（OLED 用）*/

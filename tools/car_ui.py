@@ -78,7 +78,7 @@ THRESH_MIN, THRESH_MAX, THRESH_INIT = 1, 255, 100
 # ★ 2026-11-07：画面亮度目标（SCCB R0xA5，**加减 2** 调节；越小越暗，AEC 会自动跟着调）
 EXPO_MIN, EXPO_MAX, EXPO_INIT = 1, 63, 40
 SERVO_MID = 2748                       # ★ 2026-11-07 用户实测：默认中位
-SERVO_MIN, SERVO_MAX = 1700, 3024      # ★ 安全行程（左/右快捷档就取这两个端点）
+SERVO_MIN, SERVO_MAX = 1700, 3300      # ★ 2181：上限 3024 -> 3300（用户改）
 SERVO_LEFT, SERVO_RIGHT = SERVO_MIN, SERVO_MAX
 
 
