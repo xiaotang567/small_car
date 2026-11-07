@@ -1442,20 +1442,43 @@ static void oled_pad (char *b)
     b[n] = 0;
 }
 
+/* ★ 电机巡航/堵转状态（定义在这里、给下面的 OLED 和 motor_supervisor 共用）*/
+static uint8_t  s_motor_started = 0U;      /* 0 = 还没起过转 */
+static uint8_t  s_motor_stalled = 0U;      /* 1 = 堵转停机，等 PC2 */
+static uint16_t s_below_cnt     = 0U;      /* 连续低于阈值拍数 */
+
 /* 重新生成 4 行文字（内容变了才标 dirty） */
 static void oled_text_update (void)
 {
     static const char spin[4] = { '-', '\\', '|', '/' };
     char     b[20];
+    char     w[4];
+    char     m[4];
     uint32_t now = HAL_GetTick();
 
-    if (0U != wifi_f4_is_ready()) { sprintf(b, "WiFi OK"); }
-    else if (0U == wifi_f4_last_err()) { sprintf(b, "WiFi --"); }   /* 还在初始化（模块没报错）*/
-    else                          { sprintf(b, "WiFi E%u", (unsigned)wifi_f4_last_err()); }
+    /* ---- 第 0 行：WiFi / MPU 一键看（"W:OK M:OK" 正好 10 个字符）---- */
+    if (0U != wifi_f4_is_ready())      { strcpy(w, "OK"); }
+    else if (0U == wifi_f4_last_err()) { strcpy(w, "--"); }      /* 还在初始化 */
+    else                               { sprintf(w, "E%u", (unsigned)wifi_f4_last_err()); }
+
+    if (0U != g_imu_ok) { strcpy(m, "OK"); }
+    else                { sprintf(m, "%02X", (unsigned)g_imu_who); }
+
+    sprintf(b, "W:%s M:%s", w, m);
     oled_pad(b); oled_line_set(0U, b);
 
-    if (0U != g_imu_ok) { sprintf(b, "MPU OK"); }
-    else                { sprintf(b, "MPU %02X", (unsigned)g_imu_who); }
+    /* ---- 第 1 行：★ 电机状态（2026-11-07 FW=2112 新增）----
+         RUN 500   = 闭环巡航在 500RPM
+         STALL PC2 = 堵转停机，**按 PC2 重新起转**
+         STOP      = 没在跑（目标是 0）*/
+    {
+        int16_t tgt = ctrl_speed_get_target();
+        int32_t at  = (tgt < 0) ? -(int32_t)tgt : (int32_t)tgt;
+
+        if (0U != s_motor_stalled)                { sprintf(b, "STALL PC2"); }
+        else if ((0U != s_motor_started) && (at > 0)) { sprintf(b, "RUN %4ld", (long)at); }
+        else                                      { sprintf(b, "STOP"); }
+    }
     oled_pad(b); oled_line_set(1U, b);
 
     sprintf(b, "ENC %05ld", (long)(g_enc_total % 100000L));
@@ -1570,6 +1593,68 @@ void ctrl_buzzer (uint8_t on)
 }
 
 //===================================================★ 初始化 / 控制节拍===================================================
+
+/* ★★★ 2026-11-07（FW=2112）：**电机闭环巡航 + 防堵转 + PC2 重启** ★★★
+   用户要求：
+     · 原来的"开环占空比"改成 **闭环 500 RPM**；
+     · 转速连续 **2 秒**低于目标（这里取目标的 80%）⇒ 判堵转，**停机**；
+     · 停机后 **PC2 低电平** 重新起转；
+     · OLED 显示 RUN / STALL PC2 / STOP。
+   为什么用 80% 而不是"低于目标"：PI 稳态本来就允许一点误差（比如稳在 495），
+   严格按"低于目标"会把正常工作误判成堵转。真堵转时转速基本是 0，用 80% 足够灵敏。*/
+
+static void motor_supervisor (void)
+{
+    int16_t tgt;
+    int16_t rpm;
+    int32_t a_tgt;
+    int32_t a_rpm;
+
+    /* ① 第一次进主循环：自动起转（要"上电不转"就把 CTRL_RUN_AUTO_START 改成 0）*/
+    if (0U == s_motor_started)
+    {
+        s_motor_started = 1U;
+#if CTRL_RUN_AUTO_START
+        ctrl_speed_set_target((int16_t)CTRL_RUN_RPM);
+#endif
+    }
+
+    /* ② 堵转停机后：PC2 按下（低电平有效）⇒ 解除并重新起转 */
+    if ((0U != s_motor_stalled) && (0U != ctrl_key(1U)))
+    {
+        s_motor_stalled = 0U;
+        s_below_cnt     = 0U;
+        ctrl_speed_set_target((int16_t)CTRL_RUN_RPM);
+        return;
+    }
+
+    if (0U != s_motor_stalled) { return; }
+
+    /* ③ 堵转检测（只在"有目标"时做；目标 0 = 正常停车，不算堵转）*/
+    tgt   = ctrl_speed_get_target();
+    rpm   = ctrl_speed_get_rpm();
+    a_tgt = (tgt < 0) ? -(int32_t)tgt : (int32_t)tgt;
+    a_rpm = (rpm < 0) ? -(int32_t)rpm : (int32_t)rpm;
+
+    if (0 == a_tgt) { s_below_cnt = 0U; return; }
+
+    if (a_rpm < ((a_tgt * (int32_t)CTRL_STALL_PCT) / 100))
+    {
+        if (s_below_cnt < 0xFFFFU) { s_below_cnt ++; }
+
+        if (s_below_cnt >= (uint16_t)CTRL_STALL_TICKS)
+        {
+            s_motor_stalled = 1U;
+            s_below_cnt     = 0U;
+            ctrl_speed_set_target(0);          /* ★ 停机 */
+        }
+    }
+    else
+    {
+        s_below_cnt = 0U;                      /* 转速回来了 ⇒ 计数清零 */
+    }
+}
+
 void ctrl_all_init (void)
 {
     ctrl_dwt_init();
@@ -1609,6 +1694,9 @@ void board_ctrl_tick (void)
 
     /* 2) 速度环（只在目标非 0 时才会有输出） */
     speed_tick();
+
+    /* 2.5) ★ 闭环巡航 + 防堵转 + PC2 重启（见 motor_supervisor 的说明） */
+    motor_supervisor();
 
     /* 3) IMU：每拍读一次（50Hz），读出陀螺就喂 yaw */
     imu_tick();

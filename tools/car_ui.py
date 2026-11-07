@@ -70,7 +70,7 @@ C_WAIT    = '#b8860b'      # ★ 命令"已发出、等板子回执"时按钮变
 #   'pwm' —— 直接给占空比（默认 30%，开环，不依赖编码器，用来先确认电机装反没/转不转）
 #   'rpm' —— 走速度环闭环（需要编码器读数正确）
 PWM_PRESETS = (10, 20, 30, 50)          # 占空比 %
-RPM_PRESETS = (300, 600, 1000, 1500)
+RPM_PRESETS = (500, 800, 1200, 1500)
 SERVO_MID = 2748                       # ★ 2026-11-07 用户实测：默认中位
 SERVO_MIN, SERVO_MAX = 1700, 3024      # ★ 安全行程（左/右快捷档就取这两个端点）
 SERVO_LEFT, SERVO_RIGHT = SERVO_MIN, SERVO_MAX
@@ -125,8 +125,8 @@ class App(object):
         self.req_servo = SERVO_MID
         self.running = False        # ★ 电机1 是否"启动"状态：上电默认停
         self.dir = +1               # 方向：+1 前进 / -1 后退
-        self.ctrl_mode = 'pwm'      # ★ 默认"占空比"方式，滑条默认 30%
-        self.presets = PWM_PRESETS
+        self.ctrl_mode = 'rpm'      # ★ 默认"转速闭环"（固件巡航目标 500 RPM）；可切回占空比
+        self.presets = RPM_PRESETS
         self.pending = []           # 等回执的命令（send_ack 用）
         self.txt_pend = ''          # 文本行缓冲（TCP 分包时半行先攒着）
         self.txt_ok = 0             # 板子报的文本发送成功次数（包头第10字节）
@@ -300,11 +300,11 @@ class App(object):
             b.grid(row=4, column=i, padx=3, pady=(2, 4), sticky='ew')
             self.preset_btns.append(b)
 
-        self.sld_speed = tk.Scale(f, from_=0, to=100, orient='horizontal',
+        self.sld_speed = tk.Scale(f, from_=0, to=3000, orient='horizontal',
                                   bg=C_PANEL, fg=C_FG, troughcolor='#3c3c4c',
                                   highlightbackground=C_PANEL, showvalue=False, length=250,
                                   command=lambda v: self.on_speed_slide())
-        self.sld_speed.set(30)
+        self.sld_speed.set(500)          # ★ 默认闭环 500 RPM（和固件巡航目标一致）
         self.sld_speed.grid(row=5, column=0, columnspan=4, sticky='ew', padx=6)
         self.sld_speed.bind('<ButtonRelease-1>', lambda e: self.on_speed_release())
 

@@ -58,6 +58,19 @@
 /* ---- 控制周期 ---- */
 #define CTRL_PERIOD_MS          20           /* 速度环 / 姿态积分周期（原工程 ENC_SAMPLE_PERIOD_MS = 20） */
 
+/* ---- ★★★ 2026-11-07（FW=2112）：电机闭环巡航 + 防堵转 ★★★
+   行为：
+     · 主循环一开始就**闭环跑到 CTRL_RUN_RPM**（原来是开环占空比，已废弃）；
+     · 实测转速连续 **CTRL_STALL_MS** 都低于"目标的 80%" ⇒ 判堵转，**立即停机**；
+     · 停机后**按下 PC2（低电平）**重新起转；
+     · OLED 第 2 行显示 RUN 500 / STALL PC2 / STOP。
+   把 CTRL_RUN_AUTO_START 改成 0 就回到"上电不转、等上位机命令"。*/
+#define CTRL_RUN_RPM            500          /* 巡航目标转速（RPM）*/
+#define CTRL_RUN_AUTO_START     1            /* 1 = 主循环一开始就自动起转 */
+#define CTRL_STALL_MS           2000         /* 低于阈值持续多久判堵转 */
+#define CTRL_STALL_PCT          80           /* 阈值 = 目标的 80%（500 → 400 RPM）*/
+#define CTRL_STALL_TICKS        (CTRL_STALL_MS / CTRL_PERIOD_MS)   /* 100 拍 */
+
 /* ---- 速度环（数值全部照抄原工程 speed_ctrl.h，只把电机的编号放松成可配）---- */
 #define CTRL_SPEED_MOTOR        1            /* 速度环驱动哪个电机：1 / 2（原工程是 MOTOR_1）*/
 #define CTRL_SPEED_FF_PER_1000  5000         /* 前馈：目标每 1000RPM 给多少占空比 */
