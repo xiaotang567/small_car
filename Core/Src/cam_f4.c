@@ -2071,7 +2071,7 @@ volatile uint8_t  cam_bound_r[120];
 volatile uint8_t  cam_center[120];     // 每行的亮/暗交界列（0xFF = 无）
 volatile uint8_t  cam_thresh = 0;     // 本帧实际用的二值化阈值（诊断用）
 /* ★ 2026-11-07：**手动阈值**（0 = 自动 Otsu；1..255 = 固定阈值）—— 命令 `th <n>` */
-volatile uint8_t  cam_thresh_manual = 0U;
+volatile uint8_t  cam_thresh_manual = 255U;
 
 //-------------------------------------------------------------------------------------------------------------------
 // ★★★ 帧率画进图像（**单片机自己画**，电脑只负责收）★★★
@@ -2611,6 +2611,168 @@ static void lf_dual_fixup (void)
 }
 
 //-------------------------------------------------------------------------------------------------------------------
+// ★★★ 2026-11-07（FW=2168）：**逐行白段跟踪 —— 取代八邻域爬线** ★★★
+//   【为什么换】把上位机画面（红线 = 板子算出来的边界）按行对过真实二值图，实测：
+//       行 96：红线 20.1/136.1  vs 赛道 20.6–136.1   ✓
+//       行 72：红线 38.9/**186.2** vs 赛道 38.9–**113.4** ✗ 右边缘跑到画面最右边
+//       行 66：红线 44.2/**107.1** vs 赛道 44.5–107.0    ✗ 右边缘落在赛道内部
+//     原因：八邻域爬线只认局部的"白→黑"特征，赛道右侧一出现**背景白块/黑缝**，
+//           它就会顺着别人的边走，或者干脆跑到画面边缘；
+//           后面的 `lf_dual_fixup` 又用"平均宽度"给它补边，把错误放大（77 → 186）。
+//   【现在的算法】白色 = 赛道，逐行做"白段提取"，然后**跨行锁定同一条赛道**：
+//     ① 每行提取白段，段间 ≤ LF_GAP_MERGE 的黑缝并进同一段（吃掉细黑线/噪声）
+//     ② 种子 = 从最底行往上，第一条"覆盖画面中心列、宽度 ≥ LF_MIN_RUN"的白段
+//     ③ 从种子往上一行一行走，每行只在"与上一行重叠最多、且左右都不许跳变"的白段里选；
+//        找不到就按上一行宽度估一行，连续 LF_LOST_MAX 行都找不到才放弃
+//     ⇒ 背景白块因为**和上一行没有重叠**，不会被选上；右边缘自然就贴着赛道 ✓
+//-------------------------------------------------------------------------------------------------------------------
+#define LF_GAP_MERGE    4       /* 段间黑缝 ≤4 px ⇒ 并成一段（细黑线/噪点） */
+#define LF_MIN_RUN      10      /* 赛道白段最小宽度 */
+#define LF_MAX_JUMP     20      /* 相邻两行边界允许的最大跳变（px） */
+#define LF_MAX_RUNS     12      /* 一行最多记多少白段 */
+#define LF_LOST_MAX     4       /* 连续估几行就放弃 */
+
+static uint8_t lf_rs[LF_MAX_RUNS];   /* 白段起点（列） */
+static uint8_t lf_re[LF_MAX_RUNS];   /* 白段终点（列） */
+
+/* 提取一行里的白色段（白=255），返回段数 */
+static uint8_t lf_row_runs (uint8_t r)
+{
+    const uint8_t *row = &disp_img[r][0];
+    uint8_t  n = 0U;
+    int32_t  c, s = -1, e = -1;
+
+    for (c = 0; c < (int32_t)CAM_TXW; c++)
+    {
+        if (row[c] == 255U)
+        {
+            if (s < 0) { s = c; }
+            e = c;
+        }
+        else if (s >= 0)
+        {
+            if ((n > 0U) && ((s - (int32_t)lf_re[n - 1U] - 1) <= LF_GAP_MERGE))
+            {
+                lf_re[n - 1U] = (uint8_t)e;              /* 黑缝并入前一段 */
+            }
+            else if (n < LF_MAX_RUNS)
+            {
+                lf_rs[n] = (uint8_t)s;
+                lf_re[n] = (uint8_t)e;
+                n ++;
+            }
+            s = -1;
+        }
+    }
+    if (s >= 0)
+    {
+        if ((n > 0U) && ((s - (int32_t)lf_re[n - 1U] - 1) <= LF_GAP_MERGE))
+        {
+            lf_re[n - 1U] = (uint8_t)e;
+        }
+        else if (n < LF_MAX_RUNS)
+        {
+            lf_rs[n] = (uint8_t)s;
+            lf_re[n] = (uint8_t)e;
+            n ++;
+        }
+    }
+    return n;
+}
+
+static void lf_trace_track (void)
+{
+    const int32_t cx = (int32_t)CAM_TXW / 2;
+    int32_t r, dir;
+    int32_t seed_r = -1, sl = -1, sr = -1;
+
+    for (r = 0; r < (int32_t)CAM_H; r++)
+    {
+        cam_bound[r]   = 0xFFU;
+        cam_bound_r[r] = 0xFFU;
+        lf_real_l[r]   = 0U;
+        lf_real_r[r]   = 0U;
+    }
+
+    /* ① 种子：最底行往上，第一条"穿过画面中心列 + 够宽"的白段 */
+    for (r = (int32_t)CAM_H - 2; r >= (int32_t)CAM_H / 2; r--)
+    {
+        uint8_t n = lf_row_runs((uint8_t)r);
+        uint8_t j;
+
+        for (j = 0U; j < n; j++)
+        {
+            if ((cx >= (int32_t)lf_rs[j]) && (cx <= (int32_t)lf_re[j]) &&
+                (((int32_t)lf_re[j] - (int32_t)lf_rs[j]) >= LF_MIN_RUN))
+            {
+                seed_r = r;
+                sl = (int32_t)lf_rs[j];
+                sr = (int32_t)lf_re[j];
+                cam_bound[seed_r]   = (uint8_t)sl;
+                cam_bound_r[seed_r] = (uint8_t)sr;
+                lf_real_l[seed_r]   = 1U;
+                lf_real_r[seed_r]   = 1U;
+                break;
+            }
+        }
+        if (seed_r >= 0) { break; }
+    }
+    if (seed_r < 0) { return; }
+
+    /* ②③ 从种子往上、往下各走一遍：只认同"重叠最多 + 不跳变"的白段 */
+    for (dir = -1; dir <= 1; dir += 2)
+    {
+        int32_t rr   = seed_r + dir;
+        int32_t l    = sl;
+        int32_t rg   = sr;
+        int32_t lost = 0;
+
+        while ((rr >= 0) && (rr < (int32_t)CAM_H))
+        {
+            uint8_t n     = lf_row_runs((uint8_t)rr);
+            uint8_t j, bestj = 0xFFU;
+            int32_t bestov = 0;
+
+            for (j = 0U; j < n; j++)
+            {
+                int32_t a  = (int32_t)lf_rs[j];
+                int32_t b  = (int32_t)lf_re[j];
+                int32_t ov;
+
+                /* 左右都不许跳太远（急弯由 LF_MAX_JUMP 逐步累积完成）*/
+                if ((LF_ABS(a - l) > LF_MAX_JUMP) && (LF_ABS(b - rg) > LF_MAX_JUMP)) { continue; }
+
+                ov = ((b < rg) ? b : rg) - ((a > l) ? a : l) + 1;   /* 与上一行区间重叠长度 */
+                if (ov > bestov) { bestov = ov; bestj = j; }
+            }
+
+            if ((0xFFU != bestj) && (bestov > 0))
+            {
+                l  = (int32_t)lf_rs[bestj];
+                rg = (int32_t)lf_re[bestj];
+                cam_bound[rr]   = (uint8_t)l;
+                cam_bound_r[rr] = (uint8_t)rg;
+                lf_real_l[rr]   = 1U;
+                lf_real_r[rr]   = 1U;
+                lost = 0;
+            }
+            else
+            {
+                lost ++;
+                if (lost > LF_LOST_MAX) { break; }
+                cam_bound[rr]   = (uint8_t)l;      /* 估一行：位置/宽度沿用上一行 */
+                cam_bound_r[rr] = (uint8_t)rg;
+            }
+            rr += dir;
+        }
+    }
+
+    /* 老算法留着备查，这里显式引用一下（免得"定义了没引用"的编译告警）*/
+    (void)lf_find_seed;   (void)lf_trace_left_8;
+    (void)lf_trace_right_8; (void)lf_dual_fixup;
+}
+
+//-------------------------------------------------------------------------------------------------------------------
 // ★★★ 边界的时域平滑（2026-11-03）★★★
 //   问题：二值图边缘每帧会抖 1~2 像素（阈值/噪声），八邻域爬线又会在两条候选路径之间跳
 //         ⇒ 画面里画出来的左右边"一跳一跳"，R 码也跟着乱跳。
@@ -2709,10 +2871,7 @@ void board_cam_analyze (void)
     }
 
     #if LF_USE_8NEIGHBOR
-    lf_find_seed();                           /* ★ 双边共用种子（中心列优先） */
-    lf_trace_left_8();                        /* 左边界 */
-    lf_trace_right_8();                       /* 右边界 */
-    lf_dual_fixup();                          /* ★ 双边互校正：补边 + 宽度异常剔除 */
+    lf_trace_track();                         /* ★ FW=2168：逐行白段跟踪（白=赛道）*/
     lf_temporal();                            /* ★ 时域平滑：抑制逐帧 1~2px 抖动 */
     /* 中线 = (左 + 右) / 2；任一边没找到就置 0xFF */
     for (r = 0U; r < (uint32_t)CAM_H; r++)
