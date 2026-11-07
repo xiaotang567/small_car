@@ -2851,31 +2851,55 @@ static uint8_t lf_row_center (int32_t r)
     int32_t l  = (cam_bound[r]   != 0xFFU) ? (int32_t)cam_bound[r]   : -1;
     int32_t rr = (cam_bound_r[r] != 0xFFU) ? (int32_t)cam_bound_r[r] : -1;
     int32_t lok = ((l >= 0) && (l > 1)) ? 1 : 0;
+    static int32_t s_pl = -1, s_pr = -1;      /* ★ 2182 上一行的两条边（判哪一侧跳了）*/
     int32_t rok = ((rr >= 0) && (rr < (int32_t)CAM_TXW - 2)) ? 1 : 0;
     float   w;
+    uint8_t out = 0xFFU;
 
     if ((0 != lok) && (0 != rok))
     {
         w = (float)(rr - l);
-        if ((w > 8.0f) && (w < (float)CAM_TXW - 4.0f))
+
+        /* ★★ 2182：**宽度突然大很多 ⇒ 某一侧并进了背景白**（出弯"压线回不了中线"的元凶）
+           出弯时赛道外侧和背景白连成一片，右边界一下跳到很远 ⇒ 算出来的中线也偏到外侧
+           ⇒ 控制器以为"已经很正了"，就一直贴着线跑。
+           处理：哪一侧相对上一行"跳"得多，就判定那一侧是背景，丢掉它，
+                 改用另一侧 + 宽度估计。*/
+        if ((cam_w_est > 8.0f) && (w > cam_w_est * 1.6f))
         {
-            cam_w_est = (cam_w_est < 1.0f) ? w : (cam_w_est * 0.9f + w * 0.1f);
+            int32_t dl = (s_pl >= 0) ? LF_ABS(l - s_pl)  : 9999;
+            int32_t dr = (s_pr >= 0) ? LF_ABS(rr - s_pr) : 9999;
+
+            if (dl <= dr) { rr = l  + (int32_t)cam_w_est; }   /* 左边稳 ⇒ 右边是背景 */
+            else          { l  = rr - (int32_t)cam_w_est; }   /* 右边稳 ⇒ 左边是背景 */
+
+            if (rr > l + 4) { out = (uint8_t)((l + rr) / 2); }
         }
-        return (uint8_t)((l + rr) / 2);
+        else
+        {
+            if ((w > 8.0f) && (w < (float)CAM_TXW - 4.0f))
+            {
+                cam_w_est = (cam_w_est < 1.0f) ? w : (cam_w_est * 0.9f + w * 0.1f);
+            }
+            out = (uint8_t)((l + rr) / 2);
+        }
     }
-    if ((0 != lok) && (cam_w_est > 8.0f))
+    else if ((0 != lok) && (cam_w_est > 8.0f))
     {
         int32_t c2 = l + (int32_t)(cam_w_est * 0.5f);
         if (c2 > (int32_t)CAM_TXW - 2) { c2 = (int32_t)CAM_TXW - 2; }
-        return (uint8_t)c2;
+        out = (uint8_t)c2;
     }
-    if ((0 != rok) && (cam_w_est > 8.0f))
+    else if ((0 != rok) && (cam_w_est > 8.0f))
     {
         int32_t c2 = rr - (int32_t)(cam_w_est * 0.5f);
         if (c2 < 1) { c2 = 1; }
-        return (uint8_t)c2;
+        out = (uint8_t)c2;
     }
-    return 0xFFU;
+
+    s_pl = l;
+    s_pr = rr;
+    return out;
 }
 
 void cam_track_eval (void)
