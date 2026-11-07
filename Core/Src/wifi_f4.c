@@ -524,15 +524,18 @@ static uint8_t wf_wifi_connect (const char *ssid, const char *password)
 
 //-------------------------------------------------------------------------------------------------------------------
 // 函数简介     连 TCP 服务器：报文 "TCP\r\n目标IP\r\n目标端口\r\n本机端口\r\n"
+//   wait_ms：等模块应答的上限。开机那次给 50s（模块要联网）；**重连必须给短**，
+//            否则模块还连着的时候 INT 一直是低 ⇒ 主循环被按住 50 秒 ⇒ 上位机"已连接但 0 B/s"。
 //-------------------------------------------------------------------------------------------------------------------
-static uint8_t wf_socket_connect (const char *type, const char *ip, const char *port, const char *local_port)
+static uint8_t wf_socket_connect (const char *type, const char *ip, const char *port,
+                                  const char *local_port, uint32_t wait_ms)
 {
     uint8_t buf[48];
     uint16_t len;
 
     len = (uint16_t)sprintf((char *)buf, "%s\r\n%s\r\n%s\r\n%s\r\n", type, ip, port, local_port);
 
-    if (wf_set_parameter(WF_CMD_SET_SOCKET, buf, len, WF_TO_SOCKET)) return 1;
+    if (wf_set_parameter(WF_CMD_SET_SOCKET, buf, len, wait_ms)) return 1;
     wf_get_ip();
     return 0;
 }
@@ -583,7 +586,7 @@ uint8_t wifi_f4_init (void)
     //    ⇒ 所以这里**即使握手失败，也把 wf_ready 置 1 让数据能发出去**
     //      （真没连上时模块会把数据丢掉，**无害**）。状态码照旧返回，LED/日志不受影响。
     if (wf_socket_connect(WIFI_USE_TCP ? "TCP" : "UDP",
-                          wf_pc_ip, WIFI_PC_PORT, WIFI_LOCAL_PORT))
+                          wf_pc_ip, WIFI_PC_PORT, WIFI_LOCAL_PORT, WF_TO_SOCKET))
     {
         wf_last_err      = 3;
         wifi_f4_progress = 3;
@@ -607,14 +610,23 @@ uint8_t wifi_f4_retry (void)
 {
     if (wf_ready) return 0;
 
+    /* ★★★ 2026-11-07（FW=2098）★★★
+       现场故障：上位机一直显示"已连接，但 0 B/s"，只能手动断电才好。
+       原因就在这里：`wf_socket_connect()` 用的是 **50 秒** 的等待。
+       模块一旦"揣着一个半死的 socket、缓冲一直满"（INT 长期低），这个等待就是**满的**
+       ⇒ 主循环被按住 50 秒 ⇒ 上位机那边就是"已连接 + 0 B/s"，看起来像死机。
+       ⇒ 现在重连只等 **1.5 秒**：等不到就立刻回来，让主循环继续转，
+         连续失败会更快走到"整模块硬复位"（app_loop 里 relink_n ≥ 2 就做），
+         那才是救"模块揣着半死 socket"的正解。*/
     if (wf_socket_connect(WIFI_USE_TCP ? "TCP" : "UDP",
-                          wf_pc_ip, WIFI_PC_PORT, WIFI_LOCAL_PORT) == 0)
+                          wf_pc_ip, WIFI_PC_PORT, WIFI_LOCAL_PORT, 1500U) == 0)
     {
         wifi_f4_progress = 3;
         wf_last_err      = 0;
         wf_ready         = 1;
         return 0;
     }
+
     wf_last_err = 3;
     return 1;
 }

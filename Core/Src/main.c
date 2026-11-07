@@ -82,7 +82,14 @@ int main(void)
   HAL_Init();
 
   /* USER CODE BEGIN Init */
-
+  /* ★★★ 2026-11-07（FW=2098）：**SysTick 必须是最高优先级** ★★★
+     HAL_Init() 把 SysTick 设成 15（最低），而 UART4=6、DCMI=5、DMA=6 都比它高。
+     后果：只要这几个中断密集一点（舵机 1Mbps 线的回显、噪声，摄像头行中断），
+           SysTick 就被插不进来 ⇒ **HAL_GetTick() 停止前进** ⇒
+           而整个工程里所有"超时保护"都是 `while (HAL_GetTick() - t0 < N)` ⇒
+           它们**永远不超时** ⇒ 主循环卡死，上位机看到的就是"已连接但 0 B/s"。
+     把 SysTick 提到 0，等于给所有超时兜底：谁也别想把时间基准饿死。 */
+  HAL_NVIC_SetPriority(SysTick_IRQn, 0U, 0U);
   /* USER CODE END Init */
 
   /* Configure the system clock */
