@@ -218,296 +218,98 @@ void ctrl_exti0_irq (void)
     }
 }
 
-//===================================================★ 幻尔总线舵机（UART4，1Mbps，非阻塞）===================================================
-//   原工程是**轮询死等回包**（一次可能几十 ms）—— 搬到这里会把摄像头主循环按住 ⇒ 全套改非阻塞：
-//     · 发送：9 字节指令塞进 64 字节环形缓冲，TXE 中断自己往外吐（一帧约 90µs，主循环不等）
-//     · 接收：RXNE 中断塞缓冲，20ms 节拍里解析（找不到合法帧就当没有，绝不死等）
-//   帧格式（幻尔）：FF FF ID LEN INSTR P.. CS，CS = ~(ID+LEN+INSTR+P..) & 0xFF
-#define SERVO_TX_SIZE       64U
-#define SERVO_RX_SIZE       64U
-#define SERVO_INSTR_PING    0x01U
-#define SERVO_INSTR_READ    0x02U
-#define SERVO_INSTR_WRITE   0x03U
-#define SERVO_REG_POS       0x2AU       /* 目标位置（2 字节小端） */
-#define SERVO_REG_SPEED     0x2EU       /* 目标速度（2 字节，符号-幅值） */
-#define SERVO_REG_CURPOS    0x38U       /* 当前位置（2 字节小端） */
+//===================================================★ 幻尔总线舵机（UART4，1Mbps，同步轮询）===================================================
+//   ★★★ 2026-11-07（FW=2103）：**按 MSPM0 原工程 user/src/hx_servo.c 的写法整体重写** ★★★
+//
+//   为什么换掉原来那版（中断 + 环形缓冲 + 主循环状态机）：
+//     把 PC10(TX) 和 PC11(RX) 一并起来（收发短接）后，板子会**把自己发的每一帧都收回来**
+//     ⇒ RXNE 中断不断；而 2098 以前 SysTick 是最低优先级(15)、UART4 是 6
+//     ⇒ 时间基准被饿死 ⇒ 所有 `while (HAL_GetTick() - t0 < N)` 永不超时 ⇒ 板子卡死。
+//   原工程的做法**根本不用 UART 中断**：
+//     · 发一帧 → **立刻轮询**把应答收回来（非阻塞查 RXNE）
+//     · 超时用**循环次数**数出来（SERVO_RX_WAIT_LOOPS），和 HAL_GetTick 无关
+//     · 收到的帧和"刚发出去那帧"一模一样 ⇒ 判定为回显 ⇒ 丢掉，继续等真正的应答
+//   ⇒ "中断风暴"这条路从结构上消失；并把 PC10/PC11 短接，最多只是读不到舵机，不会卡板子。
+//
+//   帧格式： FF FF ID LEN INSTR P1..Pn CHK
+//            LEN = 参数个数 + 2
+//            CHK = ~(ID + LEN + INSTR + P1..Pn) & 0xFF
+//   写位置： INSTR=0x03  addr=0x2A  2 字节小端（0~4095）
+//   读位置： INSTR=0x02  addr=0x38  2 字节
+//   速度  ： addr=0x2E，符号-幅值（负数 = 最高位 BIT15 置 1，不是补码）
+//===================================================
 
-static uint8_t  g_stx[SERVO_TX_SIZE];
-static volatile uint16_t g_stx_head = 0U, g_stx_tail = 0U;
-static uint8_t  g_srx[SERVO_RX_SIZE];
-static volatile uint16_t g_srx_head = 0U, g_srx_tail = 0U;
+#define SERVO_TX_BUF_MAX        (32U)       /* 发送缓冲上限 */
+#define SERVO_RX_BUF_MAX        (32U)       /* 接收缓冲上限（LEN 最大 32）*/
+#define SERVO_PARAM_MAX         (24U)       /* 单帧最多几个参数 */
+#define SERVO_RX_GUARD_MAX      (64U)       /* 找包头时最多空转几轮，防死等 */
 
-static uint16_t g_servo_pos     = 0xFFFFU;
-static uint8_t  g_servo_err     = 0U;
-static uint32_t g_servo_tx_cnt  = 0U;
-static uint32_t g_servo_rx_cnt  = 0U;
-static uint32_t g_servo_rx_bytes = 0U;   /* 一共收到多少字节（0 = 舵机根本没回过话）*/
-static uint32_t g_servo_tx_bytes = 0U;   /* 一共**真正发出去**多少字节（0 = TX 没工作）*/
-static uint32_t g_servo_rx_bad   = 0U;   /* 校验失败的帧数（>0 = 波特率/格式不对）*/
-static uint32_t g_servo_baud     = CTRL_SERVO_BAUD;   /* 当前使用的波特率（开机自动试）*/
-static uint8_t  g_servo_id      = CTRL_SERVO_ID;   /* ★ 开机自动扫描出来的舵机 ID */
-static uint32_t g_servo_mute_t  = 0U;   /* 噪声静默：非 0 = 静默中（起点时间戳）*/
-static uint8_t  g_servo_half    = 0U;              /* 1 = 单线半双工（数据走 PC10）*/
-static uint8_t  g_servo_last_id = 0xFFU;           /* 最近一帧合法应答的 ID（扫描用）*/
-static uint16_t g_servo_target  = CTRL_SERVO_POS_CENTER;
-static uint16_t g_servo_last_set = 0xFFFFU;     /* 0xFFFF = 还没发过 ⇒ 第一拍就把舵机摆到中位 */
-static uint8_t  g_servo_speed_ok = 0U;          /* 目标速度（0x2E）是保持型寄存器，上电写一次 */
-static uint8_t  g_servo_boot     = 0U;          /* 上电等 1 秒再跟舵机说话（它自己要初始化） */
-static uint8_t  g_last_tx[16];          /* 最近一次发出去的帧（用来丢"自己的回显"）*/
-static uint8_t  g_last_tx_len = 0U;
+/* ★ 等一个字节要空转多少圈（**不用 HAL_GetTick**，和时间基准无关）
+   168MHz 下 40000 圈约 1~2ms；1Mbps 一个字节只要 10µs，绰绰有余。
+   没应答时也就是白等这一两毫秒，绝不卡死。*/
+#define SERVO_RX_WAIT_LOOPS     (40000U)
+/* TX 等 TXE 的圈数上限（防止 UART 没使能时死等）*/
+#define SERVO_TX_WAIT_LOOPS     (100000U)
 
-static void servo_poll (void);              /* 前置声明：servo_probe_id() 扫描时要调它 */
-static void servo_set_baud (uint32_t bps);  /* 前置声明：init 里要设初始波特率 */
-static uint32_t servo_wait_ms (uint32_t nbytes, uint32_t margin);   /* 前置声明 */
-void ctrl_servo_set_half (uint8_t half);    /* 前置声明：init 里要切默认物理层 */
+/* ---- 幻尔 HX 系列：指令码 / 寄存器地址 ---- */
+#define SERVO_INST_PING         (0x01U)
+#define SERVO_INST_READ         (0x02U)
+#define SERVO_INST_WRITE        (0x03U)
+#define SERVO_REG_MODE          (0x21U)
+#define SERVO_REG_TORQUE        (0x28U)
+#define SERVO_REG_GOAL_POS      (0x2AU)
+#define SERVO_REG_GOAL_SPEED    (0x2EU)
+#define SERVO_REG_CURPOS        (0x38U)
+
+static uint8_t  g_servo_id       = CTRL_SERVO_ID;
+static uint8_t  g_servo_err      = 0U;
+static uint16_t g_servo_pos      = 0xFFFFU;         /* 最近一次**读到**的位置（0xFFFF=还没读到）*/
+static uint16_t g_servo_target   = CTRL_SERVO_POS_CENTER;
+static uint16_t g_servo_last_set = 0xFFFFU;          /* 0xFFFF = 还没下发过 ⇒ 开机第一次节拍会摆到中位 */
+static uint8_t  g_servo_boot     = 0U;
+static uint8_t  g_servo_speed_ok = 0U;
+static uint8_t  g_servo_half     = 0U;              /* 兼容旧接口；同步轮询下不再切引脚 */
+static uint32_t g_servo_baud     = CTRL_SERVO_BAUD;
+
+static uint32_t g_srv_tx_bytes = 0U;
+static uint32_t g_srv_rx_bytes = 0U;
+static uint32_t g_srv_rx_bad   = 0U;
+static uint32_t g_srv_tx_cnt   = 0U;
+static uint32_t g_srv_rx_cnt   = 0U;
+
+/* 刚发出去的那一帧（用来识别总线回显）*/
+static uint8_t  g_srv_last_tx[SERVO_TX_BUF_MAX];
+static uint8_t  g_srv_last_tx_len = 0U;
 
 static uint8_t servo_checksum (const uint8_t *p, uint8_t n)
 {
-    uint8_t s = 0U, i;
-
-    for (i = 0U; i < n; i++) { s = (uint8_t)(s + p[i]); }
-    return (uint8_t)(~s);
-}
-
-/* 把一帧塞进发送环（满了直接丢弃，绝不死等） */
-static uint8_t servo_queue (const uint8_t *frame, uint8_t n)
-{
-    uint16_t next;
+    uint32_t sum = 0U;
     uint8_t  i;
 
-    for (i = 0U; i < n; i++)
-    {
-        next = (uint16_t)((g_stx_head + 1U) % SERVO_TX_SIZE);
-        if (next == g_stx_tail) { return 1U; }        /* 环满 */
-        g_stx[g_stx_head] = frame[i];
-        g_stx_head = next;
-    }
-
-    memcpy(g_last_tx, frame, n);
-    g_last_tx_len = n;
-
-    /* ★ 软件半双工：发之前把 PC10 切回**推挽 AF**（发完 TC 中断会把它放成高阻）*/
-    if (0U != g_servo_half)
-    {
-        GPIOC->MODER = (GPIOC->MODER & ~(3UL << 20)) | (2UL << 20);
-    }
-
-    UART4->CR1 |= USART_CR1_TXEIE;
-    g_servo_tx_cnt ++;
-    return 0U;
-}
-
-void ctrl_servo_init (void)
-{
-    GPIO_InitTypeDef gi;
-
-    __HAL_RCC_UART4_CLK_ENABLE();
-    __HAL_RCC_GPIOC_CLK_ENABLE();
-
-    gi.Pin       = GPIO_PIN_10 | GPIO_PIN_11;       /* PC10=TX PC11=RX，AF8 */
-    gi.Mode      = GPIO_MODE_AF_PP;
-    gi.Pull      = GPIO_PULLUP;
-    gi.Speed     = GPIO_SPEED_FREQ_VERY_HIGH;
-    gi.Alternate = GPIO_AF8_UART4;
-    HAL_GPIO_Init(GPIOC, &gi);
-
-    UART4->CR1 = 0U;
-    UART4->CR1 = USART_CR1_UE;          /* 先开 UE（F4 要求 UE 先于 BRR/TE/RE 才能配）*/
-    servo_set_baud(CTRL_SERVO_BAUD);    /* BRR 由它算，内部会处理 OVER8（低速必须 8 倍过采样）*/
-    UART4->CR1 |= USART_CR1_RXNEIE;
-
-    HAL_NVIC_SetPriority(UART4_IRQn, 6U, 0U);
-    HAL_NVIC_EnableIRQ(UART4_IRQn);
-
-    g_stx_head = g_stx_tail = 0U;
-    g_srx_head = g_srx_tail = 0U;
-    g_servo_pos = 0xFFFFU;
-
-    /* ★★ 2026-11-06：按宏选择默认物理层 ★★
-       默认 **单线半双工**（用户要求）：UART4 开 HDSEL，数据只走 PC10，
-       PC10 改成**开漏 + 上拉**（推挽会把舵机/调试板的回包顶死）。
-       运行时仍可用 `r -1` / `r -2` 切换。*/
-    ctrl_servo_set_half((uint8_t)CTRL_SERVO_HALF_DUPLEX_DEFAULT);
-
-    /* ★ 等舵机自己初始化完（它上电要 ~1 秒），再扫 ID。总耗时最多 ~1.2 秒，
-       全在 `ctrl_all_init()` 里、WiFi 初始化之前 ⇒ 不影响主循环。*/
-    HAL_Delay(1000);
-    ctrl_oled_boot(9U);      /* ★ 开机阶段 9：正在扫舵机 ID（这一步要是卡住，屏幕就停在 BOOT 9）*/
-    ctrl_servo_scan();
-}
-
-uint8_t ctrl_servo_set_pos (uint16_t pos)
-{
-    uint8_t f[9];
-
-    if (pos < CTRL_SERVO_POS_MIN) { pos = CTRL_SERVO_POS_MIN; }
-    if (pos > CTRL_SERVO_POS_MAX) { pos = CTRL_SERVO_POS_MAX; }
-
-    f[0] = 0xFFU; f[1] = 0xFFU;
-    f[2] = g_servo_id;
-    f[3] = 5U;                                      /* Length = 参数 2 + 3 */
-    f[4] = SERVO_INSTR_WRITE;
-    f[5] = SERVO_REG_POS;
-    f[6] = (uint8_t)(pos & 0xFFU);
-    f[7] = (uint8_t)(pos >> 8);
-    f[8] = servo_checksum(&f[2], 6U);               /* ID..D1 共 6 字节 */
-
-    g_servo_target = pos;
-    if (0U == servo_queue(f, 9U))
-    {
-        g_servo_last_set = pos;
-        return 0U;
-    }
-    return 1U;                                      /* 发送环满 ⇒ 下一拍再发 */
-}
-
-/* 写目标速度（0x2E，符号-幅值：BIT15=方向）。它是**保持型寄存器**，上电写一次就够 */
-static uint8_t servo_set_speed (int16_t speed)
-{
-    uint8_t  f[9];
-    uint16_t v;
-
-    if (speed >  3400) { speed =  3400; }
-    if (speed < -3400) { speed = -3400; }
-
-    v = (speed < 0) ? (uint16_t)((uint16_t)(-speed) | 0x8000U) : (uint16_t)speed;
-
-    f[0] = 0xFFU; f[1] = 0xFFU;
-    f[2] = g_servo_id;
-    f[3] = 5U;
-    f[4] = SERVO_INSTR_WRITE;
-    f[5] = SERVO_REG_SPEED;
-    f[6] = (uint8_t)(v & 0xFFU);
-    f[7] = (uint8_t)(v >> 8);
-    f[8] = servo_checksum(&f[2], 6U);
-    return servo_queue(f, 9U);
-}
-
-uint16_t ctrl_servo_get_pos (void) { return g_servo_pos; }
-uint8_t  ctrl_servo_get_err (void) { return g_servo_err; }
-uint8_t  ctrl_servo_id      (void) { return g_servo_id; }
-uint32_t ctrl_servo_rx_bytes (void) { return g_servo_rx_bytes; }
-uint32_t ctrl_servo_tx_bytes (void) { return g_servo_tx_bytes; }
-uint32_t ctrl_servo_rx_bad  (void) { return g_servo_rx_bad; }
-uint32_t ctrl_servo_baud    (void) { return g_servo_baud; }
-uint8_t  ctrl_servo_is_half (void) { return g_servo_half; }
-
-/* ★ 全双工 ⇄ 「单线」切换（运行时，不用重烧）
-   ⚠️ 2026-11-06 改过实现：**不再用硬件 HDSEL**。
-      实测 HDSEL 下 PC10 是开漏、靠内部 40k 上拉，1Mbps（1 位 = 1µs）根本拉不高
-      ⇒ 舵机收到的是垃圾电平，表现是"发多少收多少"（只有自己的回显）。
-   现在「单线」= **软件半双工**：
-      · PC10 = 推挽 AF（发的时候有力气）
-      · 发完最后一个位（TC 中断）立刻把 PC10 改成高阻输入，把总线让给舵机
-      · PC11 始终是 UART4_RX
-      ⇒ **接线：PC10 和 PC11 一起接到总线那一根线上**（两根线并一根），GND 共地。*/
-void ctrl_servo_set_half (uint8_t half)
-{
-    GPIO_InitTypeDef gi;
-
-    UART4->CR1 &= (uint16_t)(~(USART_CR1_UE | USART_CR1_TE | USART_CR1_RE));
-    UART4->CR3 &= (uint16_t)(~USART_CR3_HDSEL);     /* 永远不用硬件 HDSEL */
-
-    gi.Pin       = GPIO_PIN_10 | GPIO_PIN_11;
-    gi.Mode      = GPIO_MODE_AF_PP;
-    gi.Pull      = GPIO_PULLUP;
-    gi.Speed     = GPIO_SPEED_FREQ_VERY_HIGH;
-    gi.Alternate = GPIO_AF8_UART4;
-    HAL_GPIO_Init(GPIOC, &gi);
-
-    g_servo_half = (0U != half) ? 1U : 0U;
-
-    UART4->CR1 |= USART_CR1_UE;
-    UART4->CR1 |= (uint16_t)(USART_CR1_TE | USART_CR1_RE);
-    UART4->CR1 |= USART_CR1_RXNEIE;
-
-    g_srx_head = g_srx_tail = 0U;
-    g_stx_head = g_stx_tail = 0U;
-    g_servo_pos = 0xFFFFU;                  /* 重新开始找舵机 */
-}
-uint8_t  ctrl_servo_rx_pin  (void)
-{
-    /* 两种模式接收都走 PC11（单线模式是 PC10/PC11 并在同一根总线上）*/
-    return (0U != (GPIOC->IDR & GPIO_PIN_11)) ? 1U : 0U;
-}
-uint32_t ctrl_servo_tx_cnt  (void) { return g_servo_tx_cnt; }
-uint32_t ctrl_servo_rx_cnt  (void) { return g_servo_rx_cnt; }
-
-/* 请求读当前位置（5Hz 调一次就够，原工程约 300ms 一次） */
-static void servo_read_pos (void)
-{
-    uint8_t f[8];
-
-    f[0] = 0xFFU; f[1] = 0xFFU;
-    f[2] = g_servo_id;
-    f[3] = 4U;
-    f[4] = SERVO_INSTR_READ;
-    f[5] = SERVO_REG_CURPOS;
-    f[6] = 2U;
-    f[7] = servo_checksum(&f[2], 5U);
-    (void)servo_queue(f, 8U);
-}
-
-/* ★★★ 2026-11-06：**开机自动扫舵机 ID** ★★★
-   原来的 ID 是宏写死的（默认 1）。舵机出厂 ID 不是 1、或者被改过，
-   就永远收不到应答 ⇒ 上位机"舵机"那行一直是 `---`。
-   做法：0~20 挨个发一条"读当前位置"，10ms 内谁回应就用谁（一只舵机最多 ~200ms）。*/
-static uint8_t servo_probe_id (uint8_t id)
-{
-    uint8_t  f[8];
-    uint32_t t0;
-
-    g_srx_head = g_srx_tail = 0U;               /* 清掉 rx 环里上一条的残留 */
-    g_servo_last_id = 0xFFU;
-
-    f[0] = 0xFFU; f[1] = 0xFFU;
-    f[2] = id;
-    f[3] = 4U;
-    f[4] = SERVO_INSTR_READ;
-    f[5] = SERVO_REG_CURPOS;
-    f[6] = 2U;
-    f[7] = servo_checksum(&f[2], 5U);
-    if (0U != servo_queue(f, 8U)) { return 0U; }
-
-    t0 = HAL_GetTick();
-    while ((HAL_GetTick() - t0) < servo_wait_ms(16U, 5U))
-    {
-        servo_poll();
-        if (id == g_servo_last_id) { return 1U; }
-    }
-    return 0U;
-}
-
-/* 发 nbytes 个字节大概要多少毫秒（10 位/字节），再加 margin。
-   低波特率下一帧就要几十毫秒，超时不放大根本等不到回包（10000bps 时 8 字节约 8ms）。*/
-static uint32_t servo_wait_ms (uint32_t nbytes, uint32_t margin)
-{
-    uint32_t us = (nbytes * 10000000UL) / g_servo_baud;   /* 10bit * 1e6 */
-
-    return (us / 1000UL) + margin;
+    for (i = 0U; i < n; i ++) { sum += (uint32_t)p[i]; }
+    return (uint8_t)((~sum) & 0xFFU);
 }
 
 /* 改波特率：F4 的 BRR = 整数分频<<4 | 小数。
-   ⚠️ 深坑：**16 倍过采样（OVER8=0）下 USARTDIV 最大 4095**（BRR 只有 16 位），
-      APB1=42MHz 时最低只能到 42000000/4095 ≈ **10255 bps** —— 用户这块舵机是 **10000 bps**，
-      正好掉在下面 ⇒ 必须切 **OVER8=1（8 倍过采样）**，此时 USARTDIV = fCK/(8×bps) = 525 ✓ */
+   ⚠️ 16 倍过采样（OVER8=0）下 USARTDIV 最大 4095，APB1=42MHz 时最低只能到 ≈10255bps；
+      更低的波特率必须切 OVER8=1（8 倍过采样）。*/
 static void servo_set_baud (uint32_t bps)
 {
     uint32_t div;
 
     if (0U == bps) { return; }
-    div = (CTRL_APB1_HZ_LOCAL + (bps / 2U)) / bps;      /* OVER8=0 时的 USARTDIV */
+    div = (CTRL_APB1_HZ_LOCAL + (bps / 2U)) / bps;
 
     UART4->CR1 &= (uint16_t)(~USART_CR1_UE);
 
     if (div <= 4095U)
     {
         UART4->CR1 &= (uint16_t)(~USART_CR1_OVER8);
-        UART4->BRR  = (uint16_t)(div << 4);             /* 整分频，小数=0 */
+        UART4->BRR  = (uint16_t)(div << 4);
     }
     else
     {
-        uint32_t d8 = (CTRL_APB1_HZ_LOCAL + (4U * bps)) / (8U * bps);   /* OVER8=1 的 USARTDIV */
+        uint32_t d8 = (CTRL_APB1_HZ_LOCAL + (4U * bps)) / (8U * bps);
         UART4->CR1 |= USART_CR1_OVER8;
         UART4->BRR  = (uint16_t)((d8 & 0x0FFFU) << 4);
     }
@@ -517,179 +319,364 @@ static void servo_set_baud (uint32_t bps)
     g_servo_baud = bps;
 }
 
+/* 非阻塞取一个字节：有数据返回 0，没有返回 1 */
+static uint8_t servo_query_byte (uint8_t *d)
+{
+    if (0U != (UART4->SR & USART_SR_RXNE))
+    {
+        *d = (uint8_t)(UART4->DR & 0xFFU);       /* 读 DR：同时清 ORE/FE/NE/PE */
+        g_srv_rx_bytes ++;
+        return 0U;
+    }
+    return 1U;
+}
+
+/* 读一个字节，**自己数圈数超时**（原工程 hx_rx_byte 的写法）*/
+static uint8_t servo_rx_byte (uint8_t *d)
+{
+    uint32_t guard = SERVO_RX_WAIT_LOOPS;
+
+    while (guard --)
+    {
+        if (0U == servo_query_byte(d)) { return 0U; }
+    }
+    return 1U;
+}
+
+/* 把 RX 里残留的字节清掉（发之前清一下，别把上一帧的尾巴当成应答）*/
+static void servo_rx_flush (void)
+{
+    uint8_t d;
+    uint8_t n = 0U;
+
+    while ((n < 64U) && (0U == servo_query_byte(&d))) { n ++; }
+}
+
+/* 组一帧发出去（原工程 hx_tx_frame）*/
+static void servo_tx_frame (uint8_t id, uint8_t inst, const uint8_t *params, uint8_t n)
+{
+    uint8_t buf[SERVO_TX_BUF_MAX];
+    uint8_t i;
+
+    buf[0] = 0xFFU;
+    buf[1] = 0xFFU;
+    buf[2] = id;
+    buf[3] = (uint8_t)(n + 2U);
+    buf[4] = inst;
+
+    for (i = 0U; i < n; i ++) { buf[5U + i] = params[i]; }
+
+    buf[5U + n] = servo_checksum(&buf[2], (uint8_t)(n + 3U));
+
+    /* 存一份，供接收端识别回显 */
+    g_srv_last_tx_len = (uint8_t)(6U + n);
+    for (i = 0U; i < g_srv_last_tx_len; i ++) { g_srv_last_tx[i] = buf[i]; }
+
+    servo_rx_flush();
+
+    for (i = 0U; i < g_srv_last_tx_len; i ++)
+    {
+        uint32_t guard = SERVO_TX_WAIT_LOOPS;
+
+        while ((0U == (UART4->SR & USART_SR_TXE)) && (0U != (-- guard))) { }
+        if (0U == guard) { break; }
+        UART4->DR = buf[i];
+        g_srv_tx_bytes ++;
+    }
+    g_srv_tx_cnt ++;
+}
+
+/* 在字节流里找包头 FF FF（带空转上限，绝不死等）*/
+static uint8_t servo_find_header (void)
+{
+    uint8_t b;
+    uint8_t guard = 0U;
+
+    for (;;)
+    {
+        if (0U != servo_rx_byte(&b)) { return 1U; }
+
+        if (0xFFU == b)
+        {
+            if (0U != servo_rx_byte(&b)) { return 1U; }
+            if (0xFFU == b) { return 0U; }              /* 连续两个 0xFF，包头确认 */
+        }
+
+        if (++ guard > SERVO_RX_GUARD_MAX) { return 1U; }
+    }
+}
+
+/* 收一帧应答（最多试 4 次：前面可能是自己发出去的回显）*/
+static uint8_t servo_recv_frame (uint8_t *rid, uint8_t *rerr, uint8_t *rdata, uint8_t *rlen)
+{
+    uint8_t  id, len, i, attempt;
+    uint8_t  tmp[SERVO_RX_BUF_MAX];
+    uint8_t  raw[SERVO_RX_BUF_MAX + 4U];                /* 整帧原样，用来和刚发那帧比对 */
+    uint32_t sum;
+
+    for (attempt = 0U; attempt < 4U; attempt ++)
+    {
+        if (0U != servo_find_header()) { return 1U; }
+
+        raw[0] = 0xFFU;
+        raw[1] = 0xFFU;
+
+        if (0U != servo_rx_byte(&id))  { return 1U; }
+        if (0U != servo_rx_byte(&len)) { return 1U; }
+        raw[2] = id;
+        raw[3] = len;
+
+        if ((0U == len) || (len > SERVO_RX_BUF_MAX)) { continue; }   /* 长度不合理，重找 */
+
+        for (i = 0U; i < len; i ++)
+        {
+            if (0U != servo_rx_byte(&tmp[i])) { return 1U; }
+            raw[4U + i] = tmp[i];
+        }
+
+        /* ★★★ 回显过滤：和刚发出去那帧一模一样 ⇒ 是我们自己的回声，丢掉继续等 */
+        if ((uint8_t)(len + 4U) == g_srv_last_tx_len)
+        {
+            uint8_t same = 1U;
+
+            for (i = 0U; i < (uint8_t)(len + 4U); i ++)
+            {
+                if (raw[i] != g_srv_last_tx[i]) { same = 0U; break; }
+            }
+            if (0U != same) { continue; }
+        }
+
+        /* 校验：~(ID + LEN + tmp[0..len-2]) == tmp[len-1] */
+        sum = (uint32_t)id + (uint32_t)len;
+        for (i = 0U; i < (uint8_t)(len - 1U); i ++) { sum += (uint32_t)tmp[i]; }
+
+        if ((uint8_t)((~sum) & 0xFFU) != tmp[len - 1U])
+        {
+            g_srv_rx_bad ++;
+            continue;
+        }
+
+        if (NULL != rid)  { *rid  = id; }
+        if (NULL != rerr) { *rerr = tmp[0]; }                    /* ERROR 是第一个字节 */
+        if (NULL != rlen) { *rlen = (uint8_t)(len - 2U); }       /* 数据 = 去掉 ERROR 和校验 */
+
+        if ((NULL != rdata) && (len > 2U))
+        {
+            for (i = 1U; i < (uint8_t)(len - 1U); i ++) { rdata[i - 1U] = tmp[i]; }
+        }
+
+        g_srv_rx_cnt ++;
+        return 0U;
+    }
+
+    return 1U;
+}
+
+/* 写若干字节到舵机内存表 */
+static uint8_t servo_write (uint8_t id, uint8_t addr, const uint8_t *data, uint8_t n)
+{
+    uint8_t p[SERVO_PARAM_MAX];
+    uint8_t err = 0xFFU;
+    uint8_t i;
+
+    if ((0U == n) || (n > (SERVO_PARAM_MAX - 1U))) { return 1U; }
+
+    p[0] = addr;
+    for (i = 0U; i < n; i ++) { p[1U + i] = data[i]; }
+
+    servo_tx_frame(id, SERVO_INST_WRITE, p, (uint8_t)(n + 1U));
+
+    if (0U != servo_recv_frame(NULL, &err, NULL, NULL)) { return 1U; }
+
+    g_servo_err = err;
+    return 0U;
+}
+
+/* 从舵机内存表读若干字节 */
+static uint8_t servo_read (uint8_t id, uint8_t addr, uint8_t n, uint8_t *out)
+{
+    uint8_t p[2];
+    uint8_t d[SERVO_RX_BUF_MAX];
+    uint8_t dlen = 0U;
+    uint8_t err  = 0xFFU;
+    uint8_t i;
+
+    if ((NULL == out) || (0U == n) || (n > SERVO_RX_BUF_MAX)) { return 1U; }
+
+    p[0] = addr;
+    p[1] = n;
+
+    servo_tx_frame(id, SERVO_INST_READ, p, 2U);
+
+    if (0U != servo_recv_frame(NULL, &err, d, &dlen)) { return 1U; }
+    if (dlen < n) { return 1U; }
+
+    for (i = 0U; i < n; i ++) { out[i] = d[i]; }
+
+    g_servo_err = err;
+    return 0U;
+}
+
+/* PING 一下（只读不写，验证"接线 + 波特率 + ID"） */
+static uint8_t servo_ping (uint8_t id, uint8_t *err)
+{
+    uint8_t e   = 0xFFU;
+    uint8_t rid = 0U;
+
+    servo_tx_frame(id, SERVO_INST_PING, NULL, 0U);
+
+    /* ★ 发完**立刻**开始收，中间不能加延时（1Mbps 下 6 字节约 60µs）*/
+    if (0U != servo_recv_frame(&rid, &e, NULL, NULL)) { return 1U; }
+
+    if (NULL != err) { *err = e; }
+    return (0U != e) ? 2U : 0U;                 /* 2 = 应答了但舵机自己报故障 */
+}
+
+/* 读当前位置（同步，成功才更新 g_servo_pos）*/
+static void servo_read_pos (void)
+{
+    uint8_t d[2];
+
+    if (0U == servo_read(g_servo_id, SERVO_REG_CURPOS, 2U, d))
+    {
+        g_servo_pos = (uint16_t)((uint16_t)d[0] | ((uint16_t)d[1] << 8));   /* 小端 */
+    }
+}
+
+/* 设目标速度（0x2E，符号-幅值：负数最高位置 1）*/
+static uint8_t servo_set_speed (int16_t speed)
+{
+    uint8_t  d[2];
+    uint16_t w;
+
+    if (speed >  (int16_t)CTRL_SERVO_SPEED) { speed =  (int16_t)CTRL_SERVO_SPEED; }
+    if (speed < -(int16_t)CTRL_SERVO_SPEED) { speed = -(int16_t)CTRL_SERVO_SPEED; }
+
+    w = (0 > speed) ? (uint16_t)((uint16_t)(-speed) | 0x8000U) : (uint16_t)speed;
+    d[0] = (uint8_t)(w & 0xFFU);
+    d[1] = (uint8_t)((w >> 8) & 0xFFU);
+
+    return servo_write(g_servo_id, SERVO_REG_GOAL_SPEED, d, 2U);
+}
+
+//===================================================对外接口===================================================
+
+uint32_t ctrl_servo_rx_bytes (void) { return g_srv_rx_bytes; }
+uint32_t ctrl_servo_tx_bytes (void) { return g_srv_tx_bytes; }
+uint32_t ctrl_servo_rx_bad   (void) { return g_srv_rx_bad; }
+uint32_t ctrl_servo_baud     (void) { return g_servo_baud; }
+uint32_t ctrl_servo_tx_cnt   (void) { return g_srv_tx_cnt; }
+uint32_t ctrl_servo_rx_cnt   (void) { return g_srv_rx_cnt; }
+uint8_t  ctrl_servo_id       (void) { return g_servo_id; }
+uint8_t  ctrl_servo_get_err  (void) { return g_servo_err; }
+uint16_t ctrl_servo_get_pos  (void) { return g_servo_pos; }
+uint8_t  ctrl_servo_is_half  (void) { return g_servo_half; }
+
+/* PC11(RX) 现在的电平：1 = 空闲高（正常），0 = 被拉低 */
+uint8_t ctrl_servo_rx_pin (void)
+{
+    return (0U != (GPIOC->IDR & GPIO_PIN_11)) ? 1U : 0U;
+}
+
+/* 运行时切换"单线/全双工"：同步轮询下两者接线都一样（PC10/PC11 并到总线），
+   这里只记一个标志供上位机显示，不再切引脚模式。*/
+void ctrl_servo_set_half (uint8_t half)
+{
+    g_servo_half = (0U != half) ? 1U : 0U;
+}
+
+void ctrl_servo_init (void)
+{
+    GPIO_InitTypeDef gi = {0};
+
+    __HAL_RCC_UART4_CLK_ENABLE();
+    __HAL_RCC_GPIOC_CLK_ENABLE();
+
+    /* PC10 = UART4_TX (AF8)，PC11 = UART4_RX (AF8)，上拉 */
+    gi.Pin       = GPIO_PIN_10 | GPIO_PIN_11;
+    gi.Mode      = GPIO_MODE_AF_PP;
+    gi.Pull      = GPIO_PULLUP;
+    gi.Speed     = GPIO_SPEED_FREQ_VERY_HIGH;
+    gi.Alternate = GPIO_AF8_UART4;
+    HAL_GPIO_Init(GPIOC, &gi);
+
+    UART4->CR1 = 0U;
+    UART4->CR1 = USART_CR1_UE;
+    servo_set_baud(CTRL_SERVO_BAUD);
+    UART4->CR1 |= (uint16_t)(USART_CR1_TE | USART_CR1_RE);
+
+    /* ★★★ 关键改动：**不打开 RXNE 中断、不让 NVIC 管 UART4** ★★★
+       整个驱动改成同步轮询（和 MSPM0 原工程一样）⇒ 没有任何中断，
+       "中断风暴把时间基准饿死"这条路从结构上消失。*/
+    UART4->CR1 &= (uint16_t)(~USART_CR1_RXNEIE);
+    UART4->CR3 &= (uint16_t)(~USART_CR3_EIE);
+    HAL_NVIC_DisableIRQ(UART4_IRQn);
+
+    g_srv_tx_bytes = 0U;
+    g_srv_rx_bytes = 0U;
+    g_srv_rx_bad   = 0U;
+    g_srv_tx_cnt   = 0U;
+    g_srv_rx_cnt   = 0U;
+    g_servo_pos      = 0xFFFFU;
+    g_servo_err      = 0U;
+    g_servo_boot     = 0U;
+    g_servo_speed_ok = 0U;
+
+    /* 等舵机上电初始化（原工程 system_delay_ms(300)；用 DWT 延时，不依赖 SysTick）*/
+    ctrl_delay_us(300000UL);
+
+    ctrl_servo_scan();
+}
+
+/* 扫 0~20 号，谁应答就用谁（原工程 hx_servo_scan；一次 PING 最多 ~2ms，扫完约 40ms）*/
 void ctrl_servo_scan (void)
 {
-    /* ★★★ 2026-11-06 按官方文档恢复**多波特率扫描** ★★★
-       幻尔文档自己就矛盾：
-         · 《HX-10HM 使用手册》第 1 页：「串口波特率为 **115200**」
-         · 同手册第 4 页规格表 ：「通信波特率 **1000000**」
-         · 《HX-10HM 通信协议文档》 ：「通信速度为 **1 Mbps**」
-       官方 STM32 例程用的是 1M + `rx_timeout = 10ms`。
-       既然文档不一致，就别猜了 —— 开机把两档都试一遍，收到谁的回包就用谁的。
-       顺序：1M（最可能）→ 115200（手册第 1 页说的）→ 其余常见档。
-       每档扫 ID 0~20；等待时间按波特率自动放大（servo_wait_ms）。*/
-    static const uint32_t bauds[] = { 1000000UL, 115200UL, 500000UL, 250000UL,
-                                      57600UL, 38400UL, 19200UL, 9600UL, 10000UL, 4800UL };
-    uint8_t  bi, id;
-    uint32_t t_scan = HAL_GetTick();
+    uint8_t id;
 
-    for (bi = 0U; bi < (uint8_t)(sizeof(bauds) / sizeof(bauds[0])); bi++)
+    ctrl_oled_boot(9U);
+
+    for (id = 0U; id <= 20U; id ++)
     {
-        servo_set_baud(bauds[bi]);
-        HAL_Delay(2);
+        uint8_t err = 0U;
+        uint8_t r   = servo_ping(id, &err);
 
-        for (id = 0U; id <= 20U; id++)
+        /* 0 = 正常，2 = 应答了但报故障 —— 两者都算"找到了" */
+        if ((0U == r) || (2U == r))
         {
-            /* ★★★ 2026-11-07（FW=2101）：**整个扫描的硬上限 6 秒** ★★★
-               现场：把 PC10/PC11 并起来（= 收发短接）后开机就卡死。
-               这一段是开机唯一碰 UART4 的地方：每发一帧都会立刻收到自己的回显，
-               RX 中断 + `servo_probe_id` 里那个 `while (HAL_GetTick()-t0 < 5ms)` 一旦
-               遇到时间基准不前进（2098 以前 SysTick 是最低优先级！）就**永远不出来**
-               ⇒ 开机卡死、WiFi 永远不初始化、断电也没用（短接线还在）。
-               现在：不管什么原因，6 秒一到立刻放弃扫描，把开机让出来。*/
-            if ((HAL_GetTick() - t_scan) > 6000UL) { bi = 99U; break; }
-
-            if (0U != servo_probe_id(id)) { g_servo_id = id; return; }
+            g_servo_id  = id;
+            g_servo_err = err;
+            return;
         }
     }
 
-    /* 一个都没找到 ⇒ 恢复默认波特率（别停在最后一档）*/
-    servo_set_baud(CTRL_SERVO_BAUD);
+    g_servo_id = CTRL_SERVO_ID;             /* 一个都没应答：用配置的 ID，后面还能再试 */
 }
 
-/* 收包解析：在 20ms 节拍里跑，**绝不 while 等** */
-static void servo_poll (void)
+/* 走到目标位置（写 0x2A 两个字节，同步等应答）*/
+uint8_t ctrl_servo_set_pos (uint16_t pos)
 {
-    static uint8_t buf[40];
-    static uint8_t n = 0U;
-    uint8_t len, cs;
-    uint16_t budget = 0U;                       /* ★ 每次最多处理多少字节（防噪声把 CPU 吃光）*/
+    uint8_t d[2];
 
-    /* ★★ 噪声静默：上一轮发现"收得比舵机可能发的多得多" ⇒ 直接关掉 RX 中断 500ms。
-       这条线是 1Mbps，悬空时噪声能让 RXNE 每秒中断十万次，主循环就被吃干了。*/
-    if (0U != g_servo_mute_t)
-    {
-        if ((HAL_GetTick() - g_servo_mute_t) < 500U) { return; }
-        g_servo_mute_t = 0U;
-        g_srx_head = g_srx_tail = 0U;
-        UART4->CR1 |= USART_CR1_RXNEIE;         /* 解除静默，继续找舵机 */
-    }
+    if (pos < CTRL_SERVO_POS_MIN) { pos = CTRL_SERVO_POS_MIN; }
+    if (pos > CTRL_SERVO_POS_MAX) { pos = CTRL_SERVO_POS_MAX; }
 
-    /* ★★★ 2026-11-06：**噪声防护** ★★★
-       舵机没接好 / RX 悬空时，这条 1Mbps 的线会收到**连续噪声**：
-         · RXNE 中断 100k 次/秒
-         · 这个函数每次要逐字节解析 + memmove（还经常从头扫）
-       ⇒ 主循环被吃光 ⇒ 遥测发不出去、命令处理不过来、图像也开始掉帧
-       —— 这正是"实时数据在改单线之后就没有了"的真正原因（用户判断是对的）。
-       对策：一次最多处理 256 字节；剩下的直接**丢掉**。
-       舵机正常回包是 8 字节/次、5Hz 才 40 字节/秒，256 字节的预算绰绰有余。*/
-    while (g_srx_tail != g_srx_head)
-    {
-        if (budget >= 256U)
-        {
-            g_srx_tail = g_srx_head;            /* 丢掉剩下的噪声 */
-            n = 0U;
-            g_servo_mute_t = HAL_GetTick();     /* 静默 500ms，别再让中断风暴吃 CPU */
-            UART4->CR1 &= (uint16_t)(~USART_CR1_RXNEIE);
-            break;
-        }
-        budget ++;
+    g_servo_target = pos;
 
-        if (n < sizeof(buf)) { buf[n++] = g_srx[g_srx_tail]; }
-        g_srx_tail = (uint16_t)((g_srx_tail + 1U) % SERVO_RX_SIZE);
+    d[0] = (uint8_t)(pos & 0xFFU);
+    d[1] = (uint8_t)((pos >> 8) & 0xFFU);
 
-        /* 找帧头 FF FF */
-        while ((n >= 2U) && !((0xFFU == buf[0]) && (0xFFU == buf[1])))
-        {
-            memmove(buf, buf + 1, (size_t)(n - 1U));
-            n --;
-        }
-        if (n < 4U) { continue; }
+    if (0U != servo_write(g_servo_id, SERVO_REG_GOAL_POS, d, 2U)) { return 1U; }
 
-        len = buf[3];
-        if ((len < 2U) || (len > 32U)) { memmove(buf, buf + 1, (size_t)(n - 1U)); n --; continue; }
-        if (n < (uint8_t)(len + 4U)) { continue; }   /* 还没收全 */
-
-        cs = servo_checksum(&buf[2], (uint8_t)(len + 1U));   /* ID..最后一个数据字节 */
-        if (cs != buf[len + 3U])
-        {
-            g_servo_rx_bad ++;                    /* 校验错 ⇒ 波特率/噪声/格式不对 */
-            memmove(buf, buf + 1, (size_t)(n - 1U));
-            n --;
-            continue;
-        }
-
-        /* ★ 丢掉自己的回显：和刚发出去的帧一模一样就跳过 */
-        if ((n >= g_last_tx_len) && (0 == memcmp(buf, g_last_tx, g_last_tx_len)))
-        {
-            memmove(buf, buf + (len + 4U), (size_t)(n - (len + 4U)));
-            n = (uint8_t)(n - (len + 4U));
-            continue;
-        }
-
-        g_servo_err     = buf[4];
-        g_servo_last_id = buf[2];                  /* 扫描/诊断用：这一帧是谁回的 */
-        g_servo_id      = buf[2];                  /* ★ 自动锁定：谁回应就用谁的 ID */
-        g_servo_rx_cnt ++;
-
-        /* 读位置应答有两种固件格式，都认：
-             A) FF FF ID 04 ERR P_lo P_hi CS             ← 幻尔标准（LEN=4，不带地址）
-             B) FF FF ID 05 ERR 38 P_lo P_hi CS          ← 有的固件把寄存器地址也回了（LEN=5）
-           ⇒ 判据：LEN>=4 且 ERR==0；LEN==5 时跳过 buf[5] 那个地址字节 */
-        if (buf[4] == 0U)
-        {
-            if (5U == len)      { g_servo_pos = (uint16_t)((uint16_t)buf[6] | ((uint16_t)buf[7] << 8)); }
-            else if (len >= 4U) { g_servo_pos = (uint16_t)((uint16_t)buf[5] | ((uint16_t)buf[6] << 8)); }
-        }
-
-        memmove(buf, buf + (len + 4U), (size_t)(n - (len + 4U)));
-        n = (uint8_t)(n - (len + 4U));
-    }
+    g_servo_pos      = pos;
+    g_servo_last_set = pos;         /* 记下来 ⇒ 主循环节拍不会重复下发同一目标 */
+    return 0U;
 }
 
-/* stm32f4xx_it.c 的 UART4_IRQHandler 转发到这里 */
+/* UART4 中断：同步轮询驱动已经把它关掉了，这里只保留符号（stm32f4xx_it.c 还在调）*/
 void ctrl_uart4_irq (void)
 {
-    uint32_t sr = UART4->SR;
-
-    if (0U != (sr & USART_SR_RXNE))
-    {
-        uint8_t  b    = (uint8_t)(UART4->DR & 0xFFU);
-        uint16_t next = (uint16_t)((g_srx_head + 1U) % SERVO_RX_SIZE);
-
-        g_servo_rx_bytes ++;                       /* ★ 诊断：舵机到底回没回字节 */
-        if (next != g_srx_tail) { g_srx[g_srx_head] = b; g_srx_head = next; }
-    }
-
-    if (0U != (sr & USART_SR_TXE))
-    {
-        if (g_stx_tail != g_stx_head)
-        {
-            UART4->DR = g_stx[g_stx_tail];
-            g_stx_tail = (uint16_t)((g_stx_tail + 1U) % SERVO_TX_SIZE);
-            g_servo_tx_bytes ++;                   /* ★ 诊断：真正发出去的字节数 */
-        }
-        else
-        {
-            UART4->CR1 &= (uint16_t)(~USART_CR1_TXEIE);
-            /* ★ 发完了：打开 TC 中断，等最后一个位真的移出去好释放总线 */
-            UART4->CR1 |= USART_CR1_TCIE;
-        }
-    }
-
-    /* ★★ 软件半双工：最后一个位发完 ⇒ **立刻把 PC10 放开（改成高阻输入）**，
-       总线交给舵机说话。再发下一帧前 `servo_queue()` 会把它切回推挽 AF。
-       🔥 为什么不用硬件 HDSEL：HDSEL 下 PC10 是开漏，靠内部 40k 上拉在 1Mbps
-          根本拉不高（一个位才 1µs，上升沿要 2µs）⇒ 舵机看到的是垃圾电平，
-          现象就是"发多少收多少"（只有自己回显）。推挽 + 主动释放才靠谱。*/
-    if (0U != (sr & USART_SR_TC))
-    {
-        UART4->CR1 &= (uint16_t)(~USART_CR1_TCIE);
-        if (0U != g_servo_half)
-        {
-            GPIOC->MODER &= ~(3UL << 20);          /* PC10 -> 输入（高阻），总线让给舵机 */
-        }
-    }
+    UART4->CR1 &= (uint16_t)(~USART_CR1_RXNEIE);
+        (void)UART4->DR;
 }
 
 //===================================================★ MPU9250（软 I2C：PB8=SCL PB9=SDA）===================================================
@@ -1535,14 +1522,11 @@ void board_ctrl_tick (void)
         yaw_tick();
     }
 
-    /* 4) 舵机
-          · 上电先等 1 秒（50 拍）—— 总线舵机自己也要初始化，太早说话它不理
-          · 然后先写一次目标速度（0x2E 是保持型寄存器），再把舵机摆到中位
-          · **还没找到舵机（位置一直是 0xFFFF）时：每拍换一个 ID 发“读位置”**
-            ⇒ 不用重启板子，你把线接好/换好，最多 420ms 它就会自己发现并锁定 ID
-            （`servo_poll()` 收到谁的回包就把 g_servo_id 改成谁的）
-          · 之后：目标变了才发；空闲时每 10 拍（200ms）读一次位置
-          ⚠️ 读写不要挤在同一拍：总线是半双工的，一问一答挨太近会打架 */
+    /* 4) 舵机（★ 2026-11-07 改成和 MSPM0 原工程一样的**同步轮询**，没有中断）
+          · 上电先等 50 拍（1 秒）—— 总线舵机自己也要初始化，太早说话它不理
+          · 然后写一次目标速度（0x2E 是保持型寄存器），再摆到目标位置
+          · 之后：目标变了才发（发完立刻等应答，约 1~2ms）；空闲时每 10 拍（200ms）读一次位置
+          ⚠️ 一处失败（没应答）不会重试 —— 与原来的行为一致；下一次目标变化还会再发。*/
     if (g_servo_boot < 50U)
     {
         g_servo_boot ++;
@@ -1551,38 +1535,16 @@ void board_ctrl_tick (void)
     {
         if (0U == servo_set_speed((int16_t)CTRL_SERVO_SPEED)) { g_servo_speed_ok = 1U; }
     }
-    else if (0xFFFFU == g_servo_pos)
-    {
-        /* 还没找到舵机：**每 100ms** 换一个 ID 问一次（原来每 20ms 问一次太凶了，
-           线接得不对时会在 1Mbps 上刷一堆无效帧，还引出噪声/CPU 占用问题）*/
-        static uint8_t  sid = 0U;
-        static uint8_t  div = 0U;
-
-        div ++;
-        if (div >= 5U)
-        {
-            uint8_t f[8];
-
-            div = 0U;
-            f[0] = 0xFFU; f[1] = 0xFFU;
-            f[2] = sid; f[3] = 4U;
-            f[4] = SERVO_INSTR_READ; f[5] = SERVO_REG_CURPOS; f[6] = 2U;
-            f[7] = servo_checksum(&f[2], 5U);
-            (void)servo_queue(f, 8U);
-            sid = (uint8_t)((sid + 1U) % 21U);      /* 0~20 轮着问 */
-        }
-    }
     else if (g_servo_target != g_servo_last_set)
     {
         (void)ctrl_servo_set_pos(g_servo_target);
+        g_servo_last_set = g_servo_target;      /* 无论成功与否都记下来，别每拍重发 */
     }
     else
     {
         srv_div ++;
         if (srv_div >= 10U) { srv_div = 0U; servo_read_pos(); }
     }
-
-    servo_poll();
 
     /* 5) OLED 状态页（没有 OLED 就整个跳过） */
     ctrl_oled_status();

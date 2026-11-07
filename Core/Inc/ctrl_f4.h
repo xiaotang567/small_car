@@ -25,7 +25,7 @@
 *     motor.c/motor.h        -> ctrl_motor_*（占空比 ±10000、DIR 电平同原工程、17kHz）
 *     encoder.c/encoder.h    -> ctrl_encoder_*（原工程用"脉冲+方向"，新板是 A/B 正交 ⇒ 4 倍频）
 *     speed_ctrl.c/.h        -> ctrl_speed_*（PI + 比例前馈 + 斜坡 + 极性自动识别，参数照抄）
-*     hx_servo.c/h           -> ctrl_servo_*（1Mbps 幻尔协议；**改成非阻塞**，不再死等回包）
+*     hx_servo.c/h           -> ctrl_servo_*（1Mbps 幻尔协议；**同步轮询、不用中断**，写法同原工程）
 *     mpu9250.c/h + yaw.c/h  -> ctrl_imu_* / ctrl_yaw_*（软 I2C + 4 点滑动平均 + 20ms 积分）
 *
 * 修改记录
