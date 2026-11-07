@@ -700,16 +700,6 @@ void ctrl_steer_from_cam (void)
 
         e = e_near * (1.0f - w) + e_far * w;
     }
-
-    /* ★★ 2198：**环岛 / 开阔区 ⇒ 直走**（2026-11-07，用户明确要求"直走"）
-       那种画面里"赛道中线"根本不存在：白地一直铺到画面外，右边贴边、中间还夹着一块黑岛，
-       拟合出来的线是假的（实测 en=-42 ef=+44、res=27，还被判成弯道 cv=1）⇒ 千万别跟着它打舵。
-       这里改成：偏差 = cam_wide_err（通常就是 0 ⇒ 保持直走），
-       只有岛离车中线太近时相机那边才给一个"往远离岛方向"的小偏差。*/
-    if (0U != cam_wide)
-    {
-        e = (float)cam_wide_err;
-    }
     if (e >  STEER_E_LIMIT) { e =  STEER_E_LIMIT; }
     if (e < -STEER_E_LIMIT) { e = -STEER_E_LIMIT; }
 
@@ -767,8 +757,7 @@ void ctrl_steer_from_cam (void)
 
                 if (ff >  500.0f) { ff =  500.0f; }
                 if (ff < -500.0f) { ff = -500.0f; }
-                /* ★ 2198：环岛/开阔区里斜率是假的（那块白地没有中线）⇒ 前馈一律不用 */
-                if (0U == cam_wide) { u += ff; }
+                u += ff;
             }
         }
         g_steer_err = e;

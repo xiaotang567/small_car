@@ -983,7 +983,7 @@ void app_loop (void)
     g_loop_mark = 10U;
     if (wifi_f4_is_ready() && ((HAL_GetTick() - t_tel) >= 200U))
     {
-      static char tb[256];
+      static char tb[192];
       static uint16_t tel_seq = 0U;
       int16_t ax, ay, az, gx, gy, gz;
       int32_t y10, yi, yf;
@@ -998,7 +998,7 @@ void app_loop (void)
       yf  = (y10 < 0) ? -(y10 % 10) : (y10 % 10);
 
       /* n = 序号：上位机用它算丢包率 —— "板子没发"和"链路丢了"一下子就分开了 */
-      sprintf(tb, "T n=%u r=%d ax=%d ay=%d az=%d gx=%d gy=%d gz=%d y=%ld.%ld s=%u m=%u e=%ld cv=%u iv=%ld tg=%ld en=%ld ef=%ld nc=%ld d1=%d d2=%d si=%u sr=%u sb=%u st=%u sba=%lu sl=%u k1=%u k2=%u ol=%u rb=%u iw=%ld ih=%ld ir=%ld wn=%ld\r\n",
+      sprintf(tb, "T n=%u r=%d ax=%d ay=%d az=%d gx=%d gy=%d gz=%d y=%ld.%ld s=%u m=%u e=%ld cv=%u iv=%ld tg=%ld en=%ld ef=%ld nc=%ld d1=%d d2=%d si=%u sr=%u sb=%u st=%u sba=%lu sl=%u k1=%u k2=%u ol=%u\r\n",
               (unsigned)tel_seq,
               (int)ctrl_speed_get_rpm(),
               (int)ax, (int)ay, (int)az, (int)gx, (int)gy, (int)gz,
@@ -1010,8 +1010,7 @@ void app_loop (void)
               (unsigned)(ctrl_servo_rx_bytes() & 0xFFFFU), (unsigned)(ctrl_servo_rx_bad() & 0xFFFFU),
               (unsigned)(ctrl_servo_tx_bytes() & 0xFFFFU),
               (unsigned long)ctrl_servo_baud(), (unsigned)ctrl_servo_rx_pin(),
-              (unsigned)ctrl_key(1U), (unsigned)ctrl_key(2U), (unsigned)ctrl_is_open_loop(),
-              (unsigned)cam_wide, (long)cam_hole_w, (long)cam_hole_h, (long)cam_hole_row, (long)cam_w_norm);
+              (unsigned)ctrl_key(1U), (unsigned)ctrl_key(2U), (unsigned)ctrl_is_open_loop());
       /* ★ 遥测走**不重试**的发送：10Hz × 每次重试最多 7ms 会按住主循环，
          把摄像头收割和图像发送都拖慢（实测就是"数据一会有一会没有"）。
          丢一条遥测没关系，下一条 100ms 后就来。 */
@@ -1042,7 +1041,7 @@ void app_loop (void)
         //     MD  = 当前采集模式（0 = 752 宽 / 1 = 188 宽）
         //     BIN = 188×120 配置是否成功（1 = 已写并回读一致）
         //     R0D/R0E = 两个 Read Mode 寄存器的**回读值**（列 bin 在 R0D[3:2]、行 bin 在 R0E[1:0]）
-        sprintf(buf, "S f=%lu V=%lu VS=%lu LG=%lu TO=%lu F=%u FL=%u P=%u RX=%lu CAM=%u ID=%04X N=%u MD=%u BIN=%u R0D=%04X W=%u E=%u K=%lu R=%04lX IE=%04lX MI=%04lX CR=%08lX ND=%lu DC=%08lX HE=%lu VE=%lu LW=%lu GP=%lu FW=2200 LM=%lu RST=%02lX PC=%08lX CF=%04lX BA=%08lX\r\n",
+        sprintf(buf, "S f=%lu V=%lu VS=%lu LG=%lu TO=%lu F=%u FL=%u P=%u RX=%lu CAM=%u ID=%04X N=%u MD=%u BIN=%u R0D=%04X W=%u E=%u K=%lu R=%04lX IE=%04lX MI=%04lX CR=%08lX ND=%lu DC=%08lX HE=%lu VE=%lu LW=%lu GP=%lu FW=2197 LM=%lu RST=%02lX PC=%08lX CF=%04lX BA=%08lX\r\n",
                 (unsigned long)cam_frame_cnt, (unsigned long)cam_vsync_isr_cnt,
                 (unsigned long)cam_vs_cap_cnt,
                 (unsigned long)disp_lag_max,

@@ -164,21 +164,6 @@ extern volatile float    cam_line_b;           /* ★ 2175 中线拟合截距 */
 extern volatile float    cam_w_est;            /* ★ 2177 赛道宽度估计（像素）*/
 extern volatile float    cam_line_kn;          /* ★ 2189 近处斜率（前馈用）*/
 void cam_track_eval (void);                    /* ★ 2174 算直道/弯道 + 舵机偏差 */
-
-/* ★★★ 2198：**环岛 / 开阔区**（2026-11-07）
-   用户现场：车正前方是环岛（中间一块**黑岛**，车要绕过去），再往前还有一面白墙被拍进来。
-   那片白地比赛道宽得多（实测 155px vs 正常 120px），还会一直宽到画面外 ⇒ 旧代码把中线算歪 65px、
-   还误判成弯道 ⇒ 车会朝白区/岛冲过去。现在单独认出来，进 cam_wide 就**直走**。*/
-extern volatile uint8_t  cam_island;      /* 1 = 本帧白区里夹着一个黑岛 */
-extern volatile uint8_t  cam_wide;        /* 1 = 环岛/开阔区模式（舵机直走） */
-extern volatile int32_t  cam_hole_w;      /* 本帧最大黑缝宽度（px） */
-extern volatile int32_t  cam_hole_row;    /* 那块"岛"最下面一行 */
-extern volatile int32_t  cam_hole_h;      /* 那块"岛"垂直方向有多少行（★ 单行黑缝不算岛）*/
-extern volatile int32_t  cam_hole_l;      /* 缝的左边界列 */
-extern volatile int32_t  cam_hole_r;      /* 缝的右边界列 */
-extern volatile int32_t  cam_wide_err;    /* 开阔区模式给舵机的偏差（0 ⇒ 直走） */
-extern volatile float    cam_w_norm;      /* 记住的"正常赛道宽度"（开阔区里不更新） */
-extern volatile uint8_t  cam_rb_enable;   /* 命令 `rb 0/1`：这套环岛逻辑的总开关 */
 extern volatile uint8_t  cam_now;
 extern volatile uint8_t  cam_ahead;
 extern volatile uint16_t cam_fps10;
