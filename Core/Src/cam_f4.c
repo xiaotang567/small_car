@@ -1997,7 +1997,7 @@ uint8_t cam_sccb_set_bin4 (void)
     return cam_bin_ok;
 }
 
-volatile uint8_t cam_shutter = 100U;  // ★★ 曝光 R0x0B（行数）—— **必须 < 一帧行数（行 bin4 后 = 120）**
+volatile uint8_t cam_shutter = 100U;  // ★★ 曝光 R0x0B（行数）：范围 1..110，1 = 最暗，110 = 最亮
                                       //   ⚠️ 原来写 150：150 > 120 ⇒ 传感器**永远完不成一帧**
                                       //      ⇒ PCLK 一直在跑（PF 有值）但 VSYNC/HREF 一个边沿都没有
                                       //      ⇒ DCMI 的 SR/RIS 全 0、DMA 的 NDTR 一动不动 ✓ 实测完全吻合
