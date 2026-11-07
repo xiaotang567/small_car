@@ -628,28 +628,29 @@ void ctrl_servo_init (void)
     ctrl_servo_scan();
 }
 
-/* 扫 0~20 号，谁应答就用谁（原工程 hx_servo_scan；一次 PING 最多 ~2ms，扫完约 40ms）*/
+/* ★★★ 2026-11-07（FW=2104）：**不再扫描** ★★★
+   用户明确：总线舵机 **ID = 1、波特率 = 1000000**，固定值，不用找。
+   ⇒ 原来的"0~20 号挨个 PING"整个去掉，只：
+     ① 把 ID / 波特率设成固定值；② PING 一次，只为把"通没通/报没报错"填进诊断量。
+   好处：开机不再为了找 ID 反复发帧（那条路径在收发短接时会一直空转），
+        现在固定一次 PING 就完事（约 1~2ms）。*/
 void ctrl_servo_scan (void)
 {
-    uint8_t id;
+    uint8_t err = 0xFFU;
 
     ctrl_oled_boot(9U);
 
-    for (id = 0U; id <= 20U; id ++)
+    g_servo_id = CTRL_SERVO_ID;                 /* ★ 固定 = 1 */
+    servo_set_baud(CTRL_SERVO_BAUD);            /* ★ 固定 = 1000000 */
+
+    if (0U == servo_ping(g_servo_id, &err))     /* 0 = 应答正常；2 = 应答但报故障 */
     {
-        uint8_t err = 0U;
-        uint8_t r   = servo_ping(id, &err);
-
-        /* 0 = 正常，2 = 应答了但报故障 —— 两者都算"找到了" */
-        if ((0U == r) || (2U == r))
-        {
-            g_servo_id  = id;
-            g_servo_err = err;
-            return;
-        }
+        g_servo_err = err;
     }
-
-    g_servo_id = CTRL_SERVO_ID;             /* 一个都没应答：用配置的 ID，后面还能再试 */
+    else
+    {
+        g_servo_err = 0xFFU;                    /* 没应答：留着给上位机显示 */
+    }
 }
 
 /* 走到目标位置（写 0x2A 两个字节，同步等应答）*/
