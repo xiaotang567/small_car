@@ -480,7 +480,12 @@ uint8_t board_cam_pol_index (void)
                                     //      188×120×50），DCMI 在消隐期采不到 VSYNC/HSYNC，
                                     //      所以分帧本来就不稳 —— 先固定极性，再解决硬件（见文档）。
 #define CAM_POL_MODE        4       // （仅在 CAM_POL_ROTATE=1 时起作用）0 = 普查；4 = 轮转一圈停在目标组
-#define CAM_POL_PRIMER      1U      // ★ 起始组 = **1**（= 当前实测能出图的那一组，原文是 0）
+#define CAM_POL_PRIMER      3U      /* ★★ 2026-11-07（FW=2156）：**1 -> 3** ★★
+                                       位映射：bit0=PCKPOL  bit1=HSPOL  bit2=VSPOL
+                                       实测 CR=0x4021 = PCKPOL=1 / HSPOL=**0** / VSPOL=0
+                                       => HREF 极性反了 => DCMI 一个字节都不搬（ND 不动）
+                                       本文件注释早就写明能出图的是 PCKPOL=1/HSPOL=1/VSPOL=0
+                                       = bit0|bit1 = **组 3**（CR=0x4061）*/
 #define CAM_POL_STORE       1U      // ★ 目标组：**第 1 组**（实测图最清晰的那组）
 #define CAM_POL_STEP_MS     800UL   // 8 步 × 0.8s ≈ 6.4 秒收敛完
 #define CAM_POL_MIN_STEPS   8U      // ★ **必须走满一整圈（8 步）之后**才允许停下来
