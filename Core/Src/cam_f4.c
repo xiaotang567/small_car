@@ -2836,6 +2836,7 @@ volatile uint8_t cam_curved   = 0U;      /* 1 = 本帧判为弯道 */
 volatile uint8_t cam_track_ok = 0U;      /* 1 = 本帧有可用赛道 */
 volatile float   cam_line_k   = 0.0f;    /* ★ 2175 中线拟合：c(r) = k*r + b（r=行号）*/
 volatile float   cam_line_b   = 0.0f;
+volatile float   cam_line_kn  = 0.0f;    /* ★ 2189 近处(车头前 20 行)斜率，前馈用 */
 volatile float   cam_w_est    = 120.0f;  /* ★ 2183 赛道宽度估计（像素）：**给初值**，否则整幅赛道"左侧被裁掉"时永远算不出宽度 ⇒ 不打舵 */
 
 //-------------------------------------------------------------------------------------------------------------------
@@ -2962,6 +2963,41 @@ void cam_track_eval (void)
     cam_line_b   = b;
     cam_curved   = (res > 1.6f) ? 1U : 0U;
     cam_track_ok = 1U;
+
+    /* ★★★ 2189：**近处斜率**（只用车头前方这 20 行做拟合）★★★
+       用户反馈"还没到弯就提前转弯、压内弯线"：
+       用整条赛道的斜率做前馈，弯还没到车跟前，前馈就已经很大了 ⇒ 提前打舵。
+       改成只用**离车最近的 20 行**的斜率 ⇒ 弯真正到车跟前时前馈才起来。*/
+    {
+        int32_t r0 = (r_hi - 20 > r_lo) ? (r_hi - 20) : r_lo;
+        int32_t nn = 0;
+        float   nx = 0.0f, ny = 0.0f, nxx = 0.0f, nxy = 0.0f, nd, nk;
+
+        for (r = r0; r <= r_hi; r++)
+        {
+            if (0xFFU != cam_center[r])
+            {
+                float c = (float)cam_center[r];
+
+                nx  += (float)r;
+                ny  += c;
+                nxx += (float)r * (float)r;
+                nxy += (float)r * c;
+                nn ++;
+            }
+        }
+        nd = (float)nn * nxx - nx * nx;
+
+        if ((nn >= 6) && ((nd > 0.5f) || (nd < -0.5f)))
+        {
+            nk = ((float)nn * nxy - nx * ny) / nd;
+            cam_line_kn = nk;
+        }
+        else
+        {
+            cam_line_kn = k;        /* 行数不够就退回整条赛道的斜率 */
+        }
+    }
 }
 
 void board_cam_analyze (void)

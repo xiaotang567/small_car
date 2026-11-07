@@ -646,9 +646,9 @@ volatile float    g_steer_sign         = 1.0f; /* ★ 方向：+1 / -1 */
 volatile float    g_steer_kp           = 5.0f; /* 直道 P */
 volatile float    g_steer_ki           = 0.50f;/* 直道 I（2176：0.1 → 0.5）*/
 volatile float    g_steer_kd           = 6.0f; /* ★ 2180：10 -> 6（微分压小）*/
-volatile float    g_steer_kp_cur       = 6.0f; /* ★ 2182：4.5 -> 6.0（弯道打舵幅度加大）*/
+volatile float    g_steer_kp_cur       = 5.0f; /* ★ 2188：6.0 -> 5.0（配合前馈减小，别切内弯）*/
 volatile float    g_steer_kd_cur       = 10.0f;/* ★ 2180：16 -> 10（微分压小）*/
-volatile float    g_steer_kff          = 220.0f;/* ★ 2187：走向前馈系数（sc 命令第 3 个参数可调）*/
+volatile float    g_steer_kff          = 200.0f;/* ★ 2188：220 -> 120（弯前打舵过大、压内弯）*/
 volatile float    g_steer_err          = 0.0f; /* 诊断：当前误差 */
 volatile float    g_steer_i            = 0.0f; /* 诊断：积分项 */
 volatile float    g_steer_ierr         = 0.0f; /* 诊断：积分项（对外）*/
@@ -753,7 +753,7 @@ void ctrl_steer_from_cam (void)
                （实测那组数据：k≈1.67、en=+11、ef=-89，只靠偏差只有 239 步，
                  加上前馈后舵量明显变大）*/
             {
-                float ff = -g_steer_kff * (cam_line_k * 60.0f) / 100.0f;
+                float ff = -g_steer_kff * (cam_line_kn * 60.0f) / 100.0f;   /* ★ 2189：用近处斜率，别提前打舵 */
 
                 if (ff >  500.0f) { ff =  500.0f; }
                 if (ff < -500.0f) { ff = -500.0f; }
