@@ -1982,6 +1982,17 @@ uint8_t cam_sccb_set_bin4 (void)
         HAL_Delay(1);
     }
 
+    /* ★★★ 2026-11-07（FW=2145）：**把 AEC 的曝光上限钉在 110 行以内** ★★★
+       本文件早就记着这个坑：曝光 > 一帧行数（行 bin4 后 = 120）时，
+       传感器**永远完不成一帧**，症状是"PIXCLK 一直在跑，但 VSYNC/HREF 一个边沿都没有"。
+       现场实测正是这样：K=4089（PCLK 在跑）、VS=0（没有 VSYNC）、W=0、R=0000。
+       而 R0xAF 现在是 0x0003 ⇒ **AEC 开着**，它会自己把曝光往上调（画面一暗就超 120 行）。
+       ⇒ 手册 Table 8：R0xAD = AEC Maximum Exposure。
+          把它限制到 cam_shutter（100，且 ≤110），AEC 再怎么调也超不过一帧。*/
+    (void)cam_sccb_write_reg(0xACU, 0x0001U);          /* AEC 最小曝光 = 1 */
+    (void)cam_sccb_write_reg(0xADU, (uint16_t)cam_shutter);   /* ★ AEC 最大曝光 ≤ 110 */
+    HAL_Delay(2);
+
     // 🔥🔥🔥 2026-10-20 重大更正：**R0x0D 是 Context A 的 Read Mode，R0x0E 是 Context B 的！**
     //   （手册 P29 原文：`0x0E (14)  Read Mode Context B`）
     //   传感器默认跑在 **Context A** ⇒ **行 bin 也必须写在 R0x0D 里**！
