@@ -1936,6 +1936,18 @@ uint8_t cam_sccb_set_bin4 (void)
     uint16_t v   = 0U;
     uint8_t  err = 0U;
 
+    /* ★★★ 2026-11-07（FW=2140）：**先把传感器从"复位保持"里放出来** ★★★
+       现场抓包：ID=1324（SCCB 正常）、BIN=1、R0D=030A（bin4 已写入），
+                 但 V=0 / VS=0 / F=0 —— **完全没有 VSYNC**，也就是"配置得上、就是不出帧"。
+       这个组合最典型的原因是传感器**被按在复位里**：
+       2136/2137 我给 R0x0C（Reset）写过 1，却**从来没有写过 0 释放**，
+       而寄存器在断电前不会自己恢复 ⇒ 一直 reset 着 ⇒ 不出帧（但 SCCB 仍可读）。
+       ⇒ 这里做一个标准的复位脉冲：先 1 保持 2ms，再写 0 释放，等 50ms 再配置。*/
+    (void)cam_sccb_write_reg(0x0CU, 0x0001U);       /* 复位有效 */
+    HAL_Delay(2);
+    (void)cam_sccb_write_reg(0x0CU, 0x0000U);       /* ★ 释放复位 */
+    HAL_Delay(50);
+
     // 🔥🔥🔥 2026-10-20 重大更正：**R0x0D 是 Context A 的 Read Mode，R0x0E 是 Context B 的！**
     //   （手册 P29 原文：`0x0E (14)  Read Mode Context B`）
     //   传感器默认跑在 **Context A** ⇒ **行 bin 也必须写在 R0x0D 里**！
