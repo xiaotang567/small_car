@@ -86,7 +86,7 @@
 #define CTRL_SPEED_FF_OFFSET    1200         /* ★ 2193：前馈"死区补偿"：只要不是停机就给 12% 起步占空比
                                                 （100RPM 时原来只有 5% ⇒ 电机根本转不起来）*/
 #define CTRL_SPEED_KICK_DUTY    4000         /* ★ 2195：**踹的力度 40%**（原来 26%）*/
-#define CTRL_SPEED_KICK_WIN_MS  800          /* ★ 2195：**只在起转后这 800ms 内踹**，之后不再踹 */
+#define CTRL_SPEED_KICK_WIN_MS  2400         /* ★ 2196：800 -> 2400ms（用户要求加长 3 倍）*/
 #define CTRL_SPEED_KICK_RPM     30           /* ★ 2193：转速低于它就算"没转起来" */
 #define CTRL_SPEED_KICK_MS      400          /* ★ 2193：持续这么久才踹 */
 #define CTRL_SPEED_RAMP_RPM_S   3000         /* 设定值斜坡：每秒允许升多少 RPM */
