@@ -2704,11 +2704,12 @@ static void lf_trace_track (void)
         lf_real_r[r]   = 0U;
     }
 
-    /* ① 种子 = **最下面一行**（FW=2170）
+    /* ① 种子 = **最下面一行往上数第 5 行**（FW=2173）
           · 左边界：从左边数，第一个白点
           · 右边界：从右边数，第一个白点
-       （不再要求"穿过画面中心""宽度≥10"——就是最底行白区间的最左白和最右白）*/
-    r = (int32_t)CAM_H - 1;
+       最底那几行常被车头/阴影压成全黑，所以取倒数第 5 行更稳。*/
+    r = (int32_t)CAM_H - 5;                  /* CAM_H-1 是最底行 ⇒ 往上数第 5 行 = 索引 CAM_H-5 */
+    if (r < 0) { r = 0; }
 
     for (c = 0; c < (int32_t)CAM_TXW; c++)
     {
@@ -2718,17 +2719,17 @@ static void lf_trace_track (void)
     {
         if (disp_img[r][c] == 255U) { rg = c; break; }
     }
-    if ((l < 0) || (rg < 0) || (rg <= l)) { return; }   /* 最底行没有白 ⇒ 这一帧没有线 */
+    if ((l < 0) || (rg < 0) || (rg <= l)) { return; }   /* 该行没有白 ⇒ 这一帧没有线 */
 
     cam_bound[r]   = (uint8_t)l;
     cam_bound_r[r] = (uint8_t)rg;
     lf_real_l[r]   = 1U;
     lf_real_r[r]   = 1U;
 
-    /* ② **只往上走，不往下走**（FW=2170）
+    /* ② **只往上走，不往下走**（种子下面那 4 行不画）
        每一行只认同"和上一行区间有重叠"的白段（8 邻域意义上相连）；
        找不到 ⇒ 立刻结束，剩下的行留空（不猜、不外推）*/
-    for (r = (int32_t)CAM_H - 2; r >= 0; r--)
+    for (r = r - 1; r >= 0; r--)
     {
         uint8_t n = lf_row_runs((uint8_t)r);
         uint8_t j;
