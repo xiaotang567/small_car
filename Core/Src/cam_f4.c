@@ -1988,6 +1988,24 @@ uint8_t cam_sccb_set_bin4 (void)
         else                                    { cam_bright_rd = 0xFFU; }
     }
 
+    /* ★★★ 2026-11-07（FW=2134）：**把 AEC 的最大曝光钉死，否则它会自己把帧搞死** ★★★
+       现场数据（抓包）：CAM=1 MD=1 BIN=1 R0D=030A SH=100 —— 配置全对、SCCB 通，
+       但 EDG=0（一帧边缘包都没有）、DST/SELF 一直涨（在反复自愈重启）。
+       根因：把目标亮度调低后，AEC 为了"变暗"其实会**加长曝光**；
+             而一帧只有 120 行（行 bin4），**曝光 ≥120 行 ⇒ 传感器永远完不成一帧** ⇒ 没图。
+       （这正是本文件上面记过的老坑：出厂 443 行就卡死过。）
+       ⇒ 手册 Table 8：0xAD = **AEC Maximum Exposure**（默认 0x01E0=480）
+          ⇒ 把它限制到 ≤110 行，AEC 再怎么调也超不过一帧，帧就一定能完成。*/
+    {
+        uint16_t cap = (uint16_t)cam_shutter;
+
+        if (cap < 1U)   { cap = 1U; }
+        if (cap > 110U) { cap = 110U; }
+        (void)cam_sccb_write_reg(0xADU, cap);                /* AEC 最大曝光 = 110 行以内 */
+        if (0U == cam_sccb_read_reg(0xADU, &v)) { cam_expcap_rd = v; }
+        else                                    { cam_expcap_rd = 0xFFFFU; }
+    }
+
     if (0U == cam_sccb_read_reg(0x0BU, &v))
     {
         {   /* ★ 硬上限：行 bin4 后一帧只有 120 行，快门一旦 ≥ 它，帧永远结束不了 */
@@ -2021,6 +2039,7 @@ uint8_t cam_sccb_set_bin4 (void)
 
 volatile uint8_t  cam_bright = 40U;      /* ★ AEC 目标亮度 0xA5（默认 58，越小越暗）*/
 volatile uint8_t  cam_bright_rd = 0xFFU; /* ★ 0xA5 回读值（诊断）*/
+volatile uint16_t cam_expcap_rd  = 0xFFFFU; /* ★ 0xAD(AEC 最大曝光) 回读值：应 = cam_shutter */
 volatile uint8_t cam_shutter = 100U;  // ★★ 曝光 R0x0B（行数）：范围 1..110，1 = 最暗，110 = 最亮
                                       //   ⚠️ 原来写 150：150 > 120 ⇒ 传感器**永远完不成一帧**
                                       //      ⇒ PCLK 一直在跑（PF 有值）但 VSYNC/HREF 一个边沿都没有

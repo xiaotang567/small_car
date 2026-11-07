@@ -160,6 +160,7 @@ extern volatile float    lf_dbg_a, lf_dbg_b, lf_dbg_c, lf_dbg_dev;     // 每行
 extern volatile uint8_t  cam_thresh;         // 本帧实际用的二值化阈值
 extern volatile uint8_t  cam_bright;         // ★ AEC 目标亮度(0xA5)：越小画面越暗
 extern volatile uint8_t  cam_bright_rd;      // ★ 0xA5 回读值
+extern volatile uint16_t cam_expcap_rd;       // ★ 0xAD(AEC 最大曝光) 回读值
 extern volatile uint8_t  cam_thresh_manual;  // ★ 0 = 自动(Otsu)；1..255 = 手动固定阈值
 extern volatile uint8_t  cam_shutter;        // 曝光 R0x0B（行数，`e <n>` 可调）
 void     cam_sccb_apply_flip (void);         // ★ 按 cam_flip 重写 R0x0D 的翻转位（bit5=左右镜像 bit4=上下）
