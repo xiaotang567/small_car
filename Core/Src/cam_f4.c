@@ -2829,12 +2829,14 @@ static void lf_temporal (void)
 //                   （直道上它≈0，弯道上它正比于弯的急缓 ⇒ 天然的"提前打舵"项）
 //-------------------------------------------------------------------------------------------------------------------
 volatile int32_t cam_err_near = 0;
+volatile int32_t cam_err_far  = 0;   /* ★ 2185 诊断：远处(第95行)偏差 */
+volatile int32_t cam_rows_n   = 0;   /* ★ 2185 诊断：本帧有效行数 */
 volatile int32_t cam_err_dir  = 0;
 volatile uint8_t cam_curved   = 0U;      /* 1 = 本帧判为弯道 */
 volatile uint8_t cam_track_ok = 0U;      /* 1 = 本帧有可用赛道 */
 volatile float   cam_line_k   = 0.0f;    /* ★ 2175 中线拟合：c(r) = k*r + b（r=行号）*/
 volatile float   cam_line_b   = 0.0f;
-volatile float   cam_w_est    = 0.0f;    /* ★ 2177 赛道宽度估计（像素）*/
+volatile float   cam_w_est    = 120.0f;  /* ★ 2183 赛道宽度估计（像素）：**给初值**，否则整幅赛道"左侧被裁掉"时永远算不出宽度 ⇒ 不打舵 */
 
 //-------------------------------------------------------------------------------------------------------------------
 // 函数简介     ★ FW=2177：**取某一行的赛道中心**，支持"只看见单边"
@@ -2850,9 +2852,9 @@ static uint8_t lf_row_center (int32_t r)
 {
     int32_t l  = (cam_bound[r]   != 0xFFU) ? (int32_t)cam_bound[r]   : -1;
     int32_t rr = (cam_bound_r[r] != 0xFFU) ? (int32_t)cam_bound_r[r] : -1;
-    int32_t lok = ((l >= 0) && (l > 1)) ? 1 : 0;
+    int32_t lok = ((l >= 0) && (l >= 6)) ? 1 : 0;      /* ★ 2183：<6 列算"被画面裁掉"，不可信 */
     static int32_t s_pl = -1, s_pr = -1;      /* ★ 2182 上一行的两条边（判哪一侧跳了）*/
-    int32_t rok = ((rr >= 0) && (rr < (int32_t)CAM_TXW - 2)) ? 1 : 0;
+    int32_t rok = ((rr >= 0) && (rr <= (int32_t)CAM_TXW - 6)) ? 1 : 0;   /* ★ 2183：>181 列同理 */
     float   w;
     uint8_t out = 0xFFU;
 
@@ -2877,9 +2879,11 @@ static uint8_t lf_row_center (int32_t r)
         }
         else
         {
-            if ((w > 8.0f) && (w < (float)CAM_TXW - 4.0f))
+            /* ★ 2183：宽度只在"和估计差不多"时才更新，避免被裁边的行把估计带跑 */
+            if ((w > 20.0f) && (w < (float)CAM_TXW - 4.0f) &&
+                ((w > cam_w_est * 0.6f) && (w < cam_w_est * 1.4f)))
             {
-                cam_w_est = (cam_w_est < 1.0f) ? w : (cam_w_est * 0.9f + w * 0.1f);
+                cam_w_est = cam_w_est * 0.9f + w * 0.1f;
             }
             out = (uint8_t)((l + rr) / 2);
         }
@@ -2951,6 +2955,8 @@ void cam_track_eval (void)
 
     /* 行号越大 = 画面越靠下 = 离车越近 ⇒ "近处"用 r_hi */
     cam_err_near = (int32_t)(k * (float)r_hi + b - (float)(CAM_TXW / 2));
+    cam_err_far  = (int32_t)(k * (float)r_lo + b - (float)(CAM_TXW / 2));
+    cam_rows_n   = n;
     cam_err_dir  = (int32_t)(k * (float)(r_lo - r_hi));
     cam_line_k   = k;            /* ★ 2175：给舵机 PID 用的直线拟合参数 */
     cam_line_b   = b;

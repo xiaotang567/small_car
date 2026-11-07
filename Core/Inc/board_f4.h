@@ -155,6 +155,8 @@ extern volatile uint8_t  cam_bound_r[120];    /* 右边界 */
 extern volatile uint8_t  cam_center[120];     /* 中线 = (左+右)/2 */
 extern volatile int32_t  cam_err_near;         /* ★ 2174 近处中线偏差（像素，右正）*/
 extern volatile int32_t  cam_err_dir;          /* ★ 2174 远处相对近处的横向偏移（右正）*/
+extern volatile int32_t  cam_err_far;          /* ★ 2185 诊断：远处偏差 */
+extern volatile int32_t  cam_rows_n;           /* ★ 2185 诊断：有效行数 */
 extern volatile uint8_t  cam_curved;           /* ★ 2174 1 = 弯道（残差大）*/
 extern volatile uint8_t  cam_track_ok;         /* ★ 2174 1 = 本帧有赛道 */
 extern volatile float    cam_line_k;           /* ★ 2175 中线拟合斜率 */

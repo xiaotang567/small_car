@@ -627,10 +627,11 @@ void ctrl_servo_tick (void)
 //        `sc <kp×10> <kd×10>`           弯道增益
 //        `vs 0/1`          关/开视觉打舵
 //-------------------------------------------------------------------------------------------------------------------
-#define STEER_R_AHEAD    95       /* 前瞻行号（0=最远，119=最近）*/
+#define STEER_R_AHEAD    75       /* ★ 2186：95 -> 75（看更远，弯道才会提前、大幅打舵）*/
 #define STEER_R_NEAR     112      /* 近处行号：决定回不回中线 */
 #define STEER_W_STR      0.20f    /* 直道：近处权重 0.8 ⇒ 一定回到中线 */
-#define STEER_W_CUR      0.60f    /* 弯道：远处权重 0.6 ⇒ 提前打舵 */
+#define STEER_W_CUR      0.80f    /* ★ 2186：0.6 -> 0.8（弯道主要看远处 ⇒ 打舵幅度大）*/
+
 #define STEER_I_LIMIT    200.0f   /* ★ 2180：600 -> 200（积分只做微调，不许把舵机顶到限位）*/
 #define STEER_I_LEAK     0.985f   /* 没线时积分泄放系数 */
 #define STEER_E_LIMIT    90.0f    /* 误差限幅（像素），防跑飞 */
@@ -647,6 +648,7 @@ volatile float    g_steer_ki           = 0.50f;/* 直道 I（2176：0.1 → 0.5�
 volatile float    g_steer_kd           = 6.0f; /* ★ 2180：10 -> 6（微分压小）*/
 volatile float    g_steer_kp_cur       = 6.0f; /* ★ 2182：4.5 -> 6.0（弯道打舵幅度加大）*/
 volatile float    g_steer_kd_cur       = 10.0f;/* ★ 2180：16 -> 10（微分压小）*/
+volatile float    g_steer_kff          = 220.0f;/* ★ 2187：走向前馈系数（sc 命令第 3 个参数可调）*/
 volatile float    g_steer_err          = 0.0f; /* 诊断：当前误差 */
 volatile float    g_steer_i            = 0.0f; /* 诊断：积分项 */
 volatile float    g_steer_ierr         = 0.0f; /* 诊断：积分项（对外）*/
@@ -742,6 +744,21 @@ void ctrl_steer_from_cam (void)
             if (dterm < -STEER_D_LIMIT) { dterm = -STEER_D_LIMIT; }
 
             u = kp * e + g_steer_ki * i_try + dterm;
+
+            /* ★★ 2187：**走向前馈**（弯道舵量主要靠它）
+               纯靠"偏差"不行：稳态过弯时偏差可能≈0（车正好压在弯的切线上），
+               但轮子必须一直打着才能沿圆弧走。
+               这里的 k = 中线拟合斜率(px/行)：k>0 表示"越远越偏左" ⇒ 要往左打。
+               取 60 行的横向变化量当输入，再乘系数。
+               （实测那组数据：k≈1.67、en=+11、ef=-89，只靠偏差只有 239 步，
+                 加上前馈后舵量明显变大）*/
+            {
+                float ff = -g_steer_kff * (cam_line_k * 60.0f) / 100.0f;
+
+                if (ff >  500.0f) { ff =  500.0f; }
+                if (ff < -500.0f) { ff = -500.0f; }
+                u += ff;
+            }
         }
         g_steer_err = e;
 
