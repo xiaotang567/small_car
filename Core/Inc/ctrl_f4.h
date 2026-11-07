@@ -213,7 +213,7 @@ void     ctrl_oled_boot (uint8_t stage);
 
 /* ---------- 按键 / 蜂鸣器 ---------- */
 void     ctrl_io_init (void);
-uint8_t  ctrl_key (uint8_t idx);           /* idx = 1/2，返回 1 = 按下（低电平有效） */
+uint8_t  ctrl_key (uint8_t idx);           /* idx = 1=PC2 / 2=PC3，返回 1 = **按下**（高电平有效，接 3.3V） */
 void     ctrl_buzzer (uint8_t on);
 
 /* ---------- 控制节拍（主循环每轮调一次，内部 20ms 节流）---------- */

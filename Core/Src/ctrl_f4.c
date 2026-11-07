@@ -1605,9 +1605,13 @@ void ctrl_io_init (void)
 
     __HAL_RCC_GPIOC_CLK_ENABLE();
 
-    gi.Pin       = GPIO_PIN_2 | GPIO_PIN_3;         /* 按键：输入上拉，按下 = 低 */
+    gi.Pin       = GPIO_PIN_2 | GPIO_PIN_3;         /* 按键：**高电平有效（接 3.3V）**
+                                                       ★ 2026-11-07（FW=2122）：用户确认按键按下去是 3.3V，
+                                                         所以配**下拉**：松开=0，按下=1。
+                                                         （原来按"接 GND/上拉"写，实测 k1 恒为 0，
+                                                           正好说明板上就是下拉、按键给高。）*/
     gi.Mode      = GPIO_MODE_INPUT;
-    gi.Pull      = GPIO_PULLUP;
+    gi.Pull      = GPIO_PULLDOWN;
     gi.Speed     = GPIO_SPEED_FREQ_LOW;
     gi.Alternate = 0;
     HAL_GPIO_Init(GPIOC, &gi);
@@ -1619,10 +1623,11 @@ void ctrl_io_init (void)
     HAL_GPIO_WritePin(GPIOC, GPIO_PIN_1, GPIO_PIN_RESET);
 }
 
+/* ★ 2026-11-07（FW=2122）：按键**高电平有效**（按下 = 3.3V）⇒ 返回 1 = 按下 */
 uint8_t ctrl_key (uint8_t idx)
 {
-    if (1U == idx) { return (0U == (GPIOC->IDR & GPIO_PIN_2)) ? 1U : 0U; }
-    if (2U == idx) { return (0U == (GPIOC->IDR & GPIO_PIN_3)) ? 1U : 0U; }
+    if (1U == idx) { return (0U != (GPIOC->IDR & GPIO_PIN_2)) ? 1U : 0U; }
+    if (2U == idx) { return (0U != (GPIOC->IDR & GPIO_PIN_3)) ? 1U : 0U; }
     return 0U;
 }
 
