@@ -75,8 +75,8 @@ RPM_PRESETS = (500, 800, 1200, 1500)
 
 # ★ 2026-11-07：二值化阈值（手动，**加减 1** 调节；0 在固件里仍是自动 Otsu）
 THRESH_MIN, THRESH_MAX, THRESH_INIT = 1, 255, 100
-# ★ 2026-11-07：曝光（SCCB R0x0B 行数，**加减 5** 调节；越小越暗，运行时立即生效）
-EXPO_MIN, EXPO_MAX, EXPO_INIT = 1, 110, 50
+# ★ 2026-11-07：画面亮度目标（SCCB R0xA5，**加减 2** 调节；越小越暗，AEC 会自动跟着调）
+EXPO_MIN, EXPO_MAX, EXPO_INIT = 1, 63, 40
 SERVO_MID = 2748                       # ★ 2026-11-07 用户实测：默认中位
 SERVO_MIN, SERVO_MAX = 1700, 3024      # ★ 安全行程（左/右快捷档就取这两个端点）
 SERVO_LEFT, SERVO_RIGHT = SERVO_MIN, SERVO_MAX
@@ -254,12 +254,12 @@ class App(object):
 
         # ★★ 2026-11-07：**曝光（加减 5）** —— 固件 `e <n>` 是**运行时生效**的
         #   （直接写 SCCB R0x0B，不用重配摄像头）。范围 10..110 行，越小越暗。
-        self.btn_ex_dn = self._btn(f, '曝光 −5', lambda: self.do_expo(-5), w=7, h=1)
+        self.btn_ex_dn = self._btn(f, '亮度 −2', lambda: self.do_expo(-2), w=7, h=1)
         self.btn_ex_dn.grid(row=3, column=0, padx=6, pady=(0, 6), sticky='w')
-        self.lbl_ex = self._lbl(f, '曝光 %d' % EXPO_INIT, fg=C_ACCENT,
+        self.lbl_ex = self._lbl(f, '亮度 %d' % EXPO_INIT, fg=C_ACCENT,
                                 font=('Consolas', 12, 'bold'))
         self.lbl_ex.grid(row=3, column=1, columnspan=2, sticky='ew')
-        self.btn_ex_up = self._btn(f, '曝光 +5', lambda: self.do_expo(+5), w=7, h=1)
+        self.btn_ex_up = self._btn(f, '亮度 +2', lambda: self.do_expo(+2), w=7, h=1)
         self.btn_ex_up.grid(row=3, column=3, padx=6, pady=(0, 6), sticky='e')
 
         self.lbl_mode = self._lbl(f, '当前：二值图 188×120', fg=C_DIM, font=('Microsoft YaHei', 9))
@@ -666,8 +666,8 @@ class App(object):
         if (v < EXPO_MIN): v = EXPO_MIN
         if (v > EXPO_MAX): v = EXPO_MAX
         self.expo_val = v
-        self.lbl_ex.configure(text='曝光 %d' % v)
-        self.send_ack('e %d' % v, 'ACK e', '曝光 → %d 行' % v,
+        self.lbl_ex.configure(text='亮度 %d' % v)
+        self.send_ack('e %d' % v, 'ACK e', '画面亮度 → %d' % v,
                       self.btn_ex_up if d > 0 else self.btn_ex_dn)
 
     def do_servo(self, pos, btn=None):

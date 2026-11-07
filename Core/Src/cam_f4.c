@@ -1966,22 +1966,27 @@ uint8_t cam_sccb_set_bin4 (void)
     //         （SR=0000 / RIS=0000）** ✗✗ —— DCMI 这边怎么重启都没用，因为根本没帧可同步 ✓
     //   ⇒ 必须把快门压到帧内（120 行以内，取 100 行 ≈ 3.7ms 曝光）✓
     //   （想更亮/更暗：后续可以做成命令，动态改 R0x0B ✓）
-    /* ★★★ 2026-11-07（FW=2132）：**按 MT9V034 数据手册关掉 AEC/AGC，曝光才归我们管** ★★★
-       依据：《MT9V034-数据手册》Table 8 / 第 39 页 / 第 61 页
-         · R0xAF = "AEC/AGC Enable"（bit0=AEC, bit1=AGC），**上电默认 0x0003（两个都开）**
-         · 手册原文："When AEC is disabled (R0xAF[0] = 0), the sensor uses the manual
-           exposure value in coarse and fine shutter width registers."
-       ⇒ 这就是"写 R0x0B 没反应"的根本原因：AEC 开着，每帧都会把曝光改回去。
-       ⇒ 必须先 R0xAF = 0（AEC + AGC 都关），再写 R0x0B，才真正是手动曝光。
-       ⚠️ 上次 2128 关掉 AEC 后"看不到图"，其实是**画面变暗 + 手动阈值 100 把二值图刷黑**，
-          不是传感器坏了（这次同时把默认阈值改成"自动 Otsu"，就不会再全黑）。*/
-    if (0U == cam_sccb_read_reg(0xAFU, &v))
+    /* ★★★ 2026-11-07（FW=2133）：**亮度改由 AEC 的"目标亮度"寄存器控制，绝不碰 R0xAF** ★★★
+       手册依据（《MT9V034-数据手册》Table 8）：
+         0xA5 = **AEC/AGC Desired Bin**，默认 0x003A(58) —— 自动曝光**瞄准的画面亮度**
+         0xAB = Max Analog Gain     默认 0x0040
+         0xAC = AEC Minimum Exposure 默认 0x0001
+         0xAD = AEC Maximum Exposure 默认 0x01E0
+         0xAF = AEC/AGC Enable      默认 0x0003（上电就是开的）
+       ⇒ 为什么写 0x0B（快门）没用：AEC 开着，每帧都按"目标亮度"重算曝光把它改掉；
+       ⇒ 为什么写 0xAF=0 会**没图**：这颗模组上动它会让器件进未知状态（手册也警告过
+         乱写保留位会让器件异常），所以**永远不要碰 0xAF**；
+       ⇒ 正确做法：**保持 AEC 开着**，只改它瞄准的目标亮度 `0xA5` —— 数值越小画面越暗。
+          默认 58（≈92% 亮度，几乎全白），我们用 cam_bright(默认 40) 覆盖它。*/
     {
-        (void)cam_sccb_write_reg(0xAFU, 0x0000U);        /* AEC=0, AGC=0 ⇒ 纯手动 */
-        if (0U != cam_sccb_read_reg(0xAFU, &v)) { v = 0xFFFFU; }
-        cam_ae = v;                                      /* 正常应回读 0 */
+        uint16_t br = (uint16_t)cam_bright;
+
+        if (br < 1U)   { br = 1U; }
+        if (br > 63U)  { br = 63U; }
+        (void)cam_sccb_write_reg(0xA5U, br);                 /* AEC 目标亮度 */
+        if (0U == cam_sccb_read_reg(0xA5U, &v)) { cam_bright_rd = (uint8_t)v; }
+        else                                    { cam_bright_rd = 0xFFU; }
     }
-    else { cam_ae = 0xFFFFU; }
 
     if (0U == cam_sccb_read_reg(0x0BU, &v))
     {
@@ -2014,7 +2019,8 @@ uint8_t cam_sccb_set_bin4 (void)
     return cam_bin_ok;
 }
 
-volatile uint16_t cam_ae = 0xFFFFU;     /* ★ R0xAF 回读：0 = AEC/AGC 已关闭（正常）*/
+volatile uint8_t  cam_bright = 40U;      /* ★ AEC 目标亮度 0xA5（默认 58，越小越暗）*/
+volatile uint8_t  cam_bright_rd = 0xFFU; /* ★ 0xA5 回读值（诊断）*/
 volatile uint8_t cam_shutter = 100U;  // ★★ 曝光 R0x0B（行数）：范围 1..110，1 = 最暗，110 = 最亮
                                       //   ⚠️ 原来写 150：150 > 120 ⇒ 传感器**永远完不成一帧**
                                       //      ⇒ PCLK 一直在跑（PF 有值）但 VSYNC/HREF 一个边沿都没有
