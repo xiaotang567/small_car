@@ -1446,6 +1446,7 @@ static void oled_pad (char *b)
 static uint8_t  s_motor_started = 0U;      /* 0 = 还没起过转 */
 static uint8_t  s_motor_stalled = 0U;      /* 1 = 堵转停机，等 PC2 */
 static uint16_t s_below_cnt     = 0U;      /* 连续低于阈值拍数 */
+static uint16_t s_grace_cnt     = 0U;      /* 起转宽限拍数 */
 
 /* 重新生成 4 行文字（内容变了才标 dirty） */
 static void oled_text_update (void)
@@ -1614,6 +1615,7 @@ static void motor_supervisor (void)
     if (0U == s_motor_started)
     {
         s_motor_started = 1U;
+        s_grace_cnt     = 0U;
 #if CTRL_RUN_AUTO_START
         ctrl_speed_set_target((int16_t)CTRL_RUN_RPM);
 #endif
@@ -1624,13 +1626,22 @@ static void motor_supervisor (void)
     {
         s_motor_stalled = 0U;
         s_below_cnt     = 0U;
+        s_grace_cnt     = 0U;
         ctrl_speed_set_target((int16_t)CTRL_RUN_RPM);
         return;
     }
 
     if (0U != s_motor_stalled) { return; }
 
-    /* ③ 堵转检测（只在"有目标"时做；目标 0 = 正常停车，不算堵转）*/
+    /* ③ 起转宽限：刚起步转速天然是 0，这几秒里不做堵转判断 */
+    if (s_grace_cnt < (uint16_t)(CTRL_STALL_GRACE_MS / CTRL_PERIOD_MS))
+    {
+        s_grace_cnt ++;
+        s_below_cnt = 0U;
+        return;
+    }
+
+    /* ④ 堵转检测（只在"有目标"时做；目标 0 = 正常停车，不算堵转）*/
     tgt   = ctrl_speed_get_target();
     rpm   = ctrl_speed_get_rpm();
     a_tgt = (tgt < 0) ? -(int32_t)tgt : (int32_t)tgt;

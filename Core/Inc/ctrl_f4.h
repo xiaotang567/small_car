@@ -69,6 +69,7 @@
 #define CTRL_RUN_AUTO_START     1            /* 1 = 主循环一开始就自动起转 */
 #define CTRL_STALL_MS           2000         /* 低于阈值持续多久判堵转 */
 #define CTRL_STALL_PCT          80           /* 阈值 = 目标的 80%（500 → 400 RPM）*/
+#define CTRL_STALL_GRACE_MS     3000         /* ★ 起转后的宽限期：这段时间不做堵转判断 */
 #define CTRL_STALL_TICKS        (CTRL_STALL_MS / CTRL_PERIOD_MS)   /* 100 拍 */
 
 /* ---- 速度环（数值全部照抄原工程 speed_ctrl.h，只把电机的编号放松成可配）---- */
