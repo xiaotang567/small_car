@@ -149,7 +149,7 @@ static void cam_cmd_status (void)
        DRP = 发送看门狗**主动放弃**的帧数（一直飙 ⇒ 链路/模块发不动）✓
        DST = DMA 停摆看门狗重启采集的次数（>0 ⇒ 采集链卡过，但已经自己救回来了）✓
        SELF= 连续 2 秒没有完整帧 ⇒ 重启采集的次数（和 DST 一起看）✓ */
-    sprintf(b, "CFG f=%u g=%u x=%u y=%u (%ux%u) d=%u CST=%u RV=%06lX LINE=%u FW=2197 EDG=%lu EL=%u ER=%u DRP=%lu DST=%lu SELF=%lu TH=%u\r\n",
+    sprintf(b, "CFG f=%u g=%u x=%u y=%u (%ux%u) d=%u CST=%u RV=%06lX LINE=%u FW=2198 EDG=%lu EL=%u ER=%u DRP=%lu DST=%lu SELF=%lu TH=%u\r\n",
             (unsigned)cam_cmd_fps, (unsigned)cam_cmd_gap_ms,
             (unsigned)cam_cmd_dx, (unsigned)cam_cmd_dy,
             (unsigned)(CAM_TXW / cam_cmd_dx), (unsigned)(CAM_H / cam_cmd_dy),
@@ -589,6 +589,20 @@ static void cam_cmd_line (char *s)
             {
                 int32_t p = cam_cmd_snum(s + 1);
 
+                /* ★ 2198：`rb 0` / `rb 1` = 环岛/宽白区"直走"模式 关 / 开（默认开）
+                   用法：想对比"开/关"两种识别效果时，直接发命令切换，不用重新烧录。*/
+                if ((s[1] == 'b') || (s[1] == 'B'))
+                {
+                    int32_t on = cam_cmd_snum(&s[2]);
+
+                    cam_rb_enable = (0 == on) ? 0U : 1U;
+                    sprintf(b, "ACK rb: roundabout-mode=%s (wide=%u island=%u hole=%ld@%ld wn=%ld)\r\n",
+                            (0U != cam_rb_enable) ? "ON" : "OFF",
+                            (unsigned)cam_wide, (unsigned)cam_island,
+                            (long)cam_hole_w, (long)cam_hole_row, (long)cam_w_norm);
+                    cmd_txt(b);
+                    return;
+                }
                 if (-1 == p)                        /* r -1 = 切单线半双工 */
                 {
                     ctrl_servo_set_half(1U);

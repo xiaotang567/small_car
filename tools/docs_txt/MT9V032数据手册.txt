@@ -1,0 +1,5974 @@
+
+===== PAGE 1 =====
+ MT9V032: 1/3-Inch Wide-VGA Digital Image Sensor
+Features
+‡
+MT9V022_DS Rev. G  6/15 EN
+1
+©Semiconductor Components Industries, LLC  2015,
+1/3-Inch Wide-VGA CMOS Digital Image Sensor
+MT9V032 Data Sheet, Rev. G
+For the latest data sheet revision, please visit www.onsemi.com
+Features
+• Array format: Wide-VGA, active 752H x 480V 
+(360,960 pixels)
+• Global shutter photodiode pixels; simultaneous 
+integration and readout
+• Monochrome or color: Near_IR enhanced 
+performance for use with non-visible NIR 
+illumination
+• Readout modes: progressive or interlaced
+• Shutter efficiency: >99%
+• Simple two-wire serial interface
+• Register Lock capability
+• Window Size: User programmable to any smaller 
+format (QVGA, CIF, QCIF, etc.). Data rate can be 
+maintained independent of window size
+• Binning: 2 x 2 and 4 x 4 of the full resolution
+• ADC: On-chip, 10-bit column-parallel (option to 
+operate in 12-bit to 10-bit companding mode)
+• Automatic Controls: Auto exposure control (AEC) 
+and auto gain control (AGC); variable regional and 
+variable weight AEC/AGC
+• Support for four unique serial control register IDs to 
+control multiple imagers on the same bus
+• Data output formats: 
+– Single sensor mode:
+10-bit parallel/stand-alone
+8-bit or 10-bit serial LVDS
+– Stereo sensor mode:
+Interspersed 8-bit serial LVDS
+Applications
+• Security
+• High dynamic range imaging
+• Unattended surveillance
+• Stereo vision 
+• Video as input
+• Machine vision
+• Automation
+Table 1: 
+Key Performance Parameters
+Parameter
+Value
+Optical format
+1/3-inch 
+Active imager size
+4.51mm(H) x 2.88mm(V)
+5.35mm diagonal
+Active pixels
+752H x 480V
+Pixel size
+6.0 m x 6.0 m
+Color filter array
+Monochrome or color RGB Bayer 
+pattern
+Shutter type
+Global shutter
+Maximum data rate/ 
+master clock
+26.6 MPS/26.6 MHz
+Full resolution
+752 x 480
+Frame rate
+60 fps (at full resolution)
+ADC resolution
+10-bit column-parallel
+Responsivity
+4.8 V/lux-sec (550 nm)
+Dynamic range
+>55 dB linear; 
+>80 dB100 dB in HDR mode
+Supply voltage
+3.3 V +0.3 Vall supplies)
+Power consumption
+<320 mW at maximum data rate; 
+100 W standby power
+Operating temperature
+ –30°C to +70°C
+Packaging
+48-pin CLCC 
+
+===== PAGE 2 =====
+MT9V022_DS Rev. G  6/15 EN
+2
+©Semiconductor Components Industries, LLC, 2015.
+ MT9V032: 1/3-Inch Wide-VGA Digital Image Sensor
+Ordering Information
+Ordering Information
+See the ON Semiconductor Device Nomenclature document (TND310/D) for a full 
+description of the naming convention used for image sensors. For reference documenta-
+tion, including information on evaluation kits, please visit our web site at 
+www.onsemi.com.
+Table 2: 
+Available Part Numbers
+Part Number
+Product Description
+Orderable Product Attribute Description
+MT9V032C12STCD3-GEVK
+48-pin CLCC demo3 kit (color)
+MT9V032C12STCD-GEVK
+48-pin CLCC demo kit (color)
+MT9V032C12STC-DP
+48-pin CLCC (color)
+Dry Pack with Protective Film
+MT9V032C12STC-DR
+48-pin CLCC (color)
+Dry Pack without Protective Film
+MT9V032C12STCH-GEVB
+48-pin CLCC headboard only (color)
+MT9V032C12STC-TP
+48-pin CLCC (color)
+Tape & Reel with Protective Film
+MT9V032C12STMD-GEVK
+48-pin CLCC demo kit (mono)
+MT9V032C12STM-DP
+48-pin CLCC (mono)
+Dry Pack with Protective Film
+MT9V032C12STM-DR
+48-pin CLCC (mono)
+Dry Pack without Protective Film
+MT9V032C12STMH-GEVB
+48-pin CLCC headboard only (mono)
+MT9V032C12STM-TP
+48-pin CLCC (mono)
+Tape & Reel with Protective Film
+
+===== PAGE 3 =====
+MT9V022_DS Rev. G  6/15 EN
+1
+©Semiconductor Components Industries, LLC, 2015.
+ MT9V032: 1/3-Inch Wide-VGA Digital Image Sensor
+Table of Contents
+Table of Contents
+Features. . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .1
+Applications . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .1
+Ordering Information. . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .2
+General Description . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .7
+Pin Descriptions . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .9
+Pixel Data Format . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .11
+Color Device Limitations. . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .12
+Output Data Format . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .13
+Serial Bus Description . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .16
+Two-Wire Serial Interface Sample Read and Write Sequences . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .18
+Registers . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .21
+Feature Description . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .38
+Electrical Specifications. . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .60
+Package Dimensions . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .69
+Appendix A – Serial Configurations. . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .70
+Appendix B – Power-On Reset and Standby Timing . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .73
+Revision History. . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .75
+
+===== PAGE 4 =====
+MT9V022_DS Rev. G  6/15 EN
+1
+©Semiconductor Components Industries, LLC, 2015.
+ MT9V032: 1/3-Inch Wide-VGA Digital Image Sensor
+List of Figures
+List of Figures
+Figure 1:
+Block Diagram. . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .7
+Figure 2:
+48-Pin CLCC Package Pinout Diagram . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .8
+Figure 3:
+Typical Configuration (Connection)—Parallel Output Mode. . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .10
+Figure 4:
+Pixel Array Description . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .11
+Figure 5:
+Pixel Color Pattern Detail (Top Right Corner) . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .11
+Figure 6:
+Spatial Illustration of Image Readout. . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .13
+Figure 7:
+Timing Example of Pixel Data . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .14
+Figure 8:
+Row Timing and FRAME_VALID/LINE_VALID Signals . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .14
+Figure 9:
+Timing Diagram Showing a Write to R0x09 with the Value 0x0284 . . . . . . . . . . . . . . . . . . . . . . . . . . . . .18
+Figure 10:
+Timing Diagram Showing a Read from R0x09; Returned Value 0x0284 . . . . . . . . . . . . . . . . . . . . . . . . .18
+Figure 11:
+Timing Diagram Showing a Bytewise Write to R0x09 with the Value 0x0284 . . . . . . . . . . . . . . . . . . . .19
+Figure 12:
+Timing Diagram Showing a Bytewise Read from R0x09; Returned Value 0x0284 . . . . . . . . . . . . . . . .19
+Figure 13:
+Simultaneous Master Mode Synchronization Waveforms #1. . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .38
+Figure 14:
+Simultaneous Master Mode Synchronization Waveforms #2. . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .39
+Figure 15:
+Sequential Master Mode Synchronization Waveforms . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .39
+Figure 16:
+Snapshot Mode Interface Signals . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .40
+Figure 17:
+Snapshot Mode Frame Synchronization Waveforms . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .40
+Figure 18:
+Slave Mode Operation . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .41
+Figure 19:
+Signal Path . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .41
+Figure 20:
+Latency When Changing Integration . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .44
+Figure 21:
+Sequence of Control Voltages at the HDR Gate . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .45
+Figure 22:
+Sequence of Voltages in a Piecewise Linear Pixel Response . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .45
+Figure 23:
+12- to 10-Bit Companding Chart . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .46
+Figure 24:
+Latency of Analog Gain Change When AGC Is Disabled . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .47
+Figure 25:
+Tiled Sample . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .48
+Figure 26:
+Black Level Calibration Flow Chart. . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .49
+Figure 27:
+Controllable and Observable AEC/AGC Registers. . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .51
+Figure 28:
+Readout of 6 Pixels in Normal and Column Flip Output Mode . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .53
+Figure 29:
+Readout of 6 Rows in Normal and Row Flip Output Mode . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .53
+Figure 30:
+Readout of 8 Pixels in Normal and Row Bin Output Mode . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .54
+Figure 31:
+Readout of 8 Pixels in Normal and Column Bin Output Mode. . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .55
+Figure 32:
+Spatial Illustration of Interlaced Image Readout. . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .56
+Figure 33:
+Different LINE_VALID Formats. . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .57
+Figure 34:
+Serial Output Format for a 6x2 Frame . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .58
+Figure 35:
+Propagation Delays for PIXCLK and Data Out Signals . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .62
+Figure 36:
+Propagation Delays for FRAME_VALID and LINE_VALID Signals. . . . . . . . . . . . . . . . . . . . . . . . . . . . . .62
+Figure 37:
+Serial Host Interface Start Condition Timing . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .65
+Figure 38:
+Serial Host Interface Stop Condition Timing . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .65
+Figure 39:
+Serial Host Interface Data Timing for WRITE. . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .65
+Figure 40:
+Serial Host Interface Data Timing for READ. . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .65
+Figure 41:
+Acknowledge Signal Timing After an 8-Bit WRITE to the Sensor. . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .66
+Figure 42:
+Acknowledge Signal Timing After an 8-Bit READ from the Sensor . . . . . . . . . . . . . . . . . . . . . . . . . . . . .66
+Figure 43:
+Typical Quantum Efficiency—Color. . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .67
+Figure 44:
+Typical Quantum Efficiency—Monochrome . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .68
+Figure 45:
+48-Pin CLCC Package Outline Drawing. . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .69
+Figure 46:
+Stand-Alone Topology. . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .70
+Figure 47:
+Stereoscopic Topology . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .71
+Figure 48:
+Two-Wire Serial Interface Configuration in Stereoscopic Mode . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .72
+Figure 49:
+Power-up, Reset, Clock and Standby Sequence. . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .73
+Figure 50:
+STANDBY Restricted Location. . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .74
+
+===== PAGE 5 =====
+MT9V022_DS Rev. G  6/15 EN
+1
+©Semiconductor Components Industries, LLC, 2015.
+ MT9V032: 1/3-Inch Wide-VGA Digital Image Sensor
+List of Tables
+List of Tables
+Table 1:
+Key Performance Parameters. . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .1
+Table 2:
+Available Part Numbers. . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .2
+Table 3:
+Pin Descriptions . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .9
+Table 4:
+Frame Time . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .14
+Table 5:
+Frame Time—Long Integration Time . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .15
+Table 6:
+Slave Address Modes . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .17
+Table 7:
+Default Register Descriptions . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .21
+Table 8:
+Register Descriptions. . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .25
+Table 9:
+LVDS Packet Format in Stand-Alone Mode . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .58
+Table 10:
+LVDS Packet Format in Stereoscopy Mode (Stereoscopy Mode Bit Asserted) . . . . . . . . . . . . . . . . . . .59
+Table 11:
+Reserved Words in the Pixel Data Stream . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .59
+Table 12:
+DC Electrical Characteristics . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .60
+Table 13:
+Absolute Maximum Ratings . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .61
+Table 14:
+AC Electrical Characteristics . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .61
+Table 15:
+Performance Specifications . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .63
+
+===== PAGE 6 =====
+MT9V022_DS Rev. G  6/15 EN
+1
+©Semiconductor Components Industries, LLC, 2015.
+ MT9V032: 1/3-Inch Wide-VGA Digital Image Sensor
+General Description
+General Description
+The ON Semiconductor MT9V032 is a 1/3-inch wide-VGA format CMOS active-pixel 
+digital image sensor with global shutter and high dynamic range (HDR) operation. The 
+sensor has specifically been designed to support the demanding interior and exterior 
+surveillance imaging needs, which makes this part ideal for a wide variety of imaging 
+applications in real-world environments.
+This wide-VGA CMOS image sensor features ON Semiconductor’s breakthrough low-
+noise CMOS imaging technology that achieves CCD image quality (based on signal-to-
+noise ratio and low-light sensitivity) while maintaining the inherent size, cost, and inte-
+gration advantages of CMOS.
+The active imaging pixel array is 752H x 480V. It incorporates sophisticated camera func-
+tions on-chip—such as binning 2 x 2 and 4 x 4, to improve sensitivity when operating in 
+smaller resolutions—as well as windowing, column and row mirroring. It is program-
+mable through a simple two-wire serial interface. 
+The MT9V032 can be operated in its default mode or be programmed for frame size, 
+exposure, gain setting, and other parameters. The default mode outputs a wide-VGA-
+size image at 60 frames per second (fps). 
+An on-chip analog-to-digital converter (ADC) provides 10 bits per pixel. A 12-bit resolu-
+tion companded for 10 bits for small signals can be alternatively enabled, allowing more 
+accurate digitization for darker areas in the image.
+In addition to a traditional, parallel logic output the MT9V032 also features a serial low-
+voltage differential signaling (LVDS) output. The sensor can be operated in a stereo-
+camera, and the sensor, designated as a stereo-master, is able to merge the data from 
+itself and the stereo-slave sensor into one serial LVDS stream. 
+ 
+Figure 1: 
+ Block Diagram
+Parallel
+Video
+Data Out
+Serial
+Register
+I/O
+Control Register
+ADCs
+Active-Pixel
+Sensor (APS)
+Array
+752H x 480V
+Timing and Control
+Digital Processing
+Analog Processing
+Serial Video
+LVDS Out
+Slave Video LVDS In
+ (for stereo applications only)
+
+===== PAGE 7 =====
+MT9V022_DS Rev. G  6/15 EN
+2
+©Semiconductor Components Industries, LLC, 2015.
+ MT9V032: 1/3-Inch Wide-VGA Digital Image Sensor
+General Description
+Figure 2: 
+ 48-Pin CLCC Package Pinout Diagram
+ 
+1
+2
+3
+4
+5
+6
+44
+43
+19
+20
+21
+22
+23
+24
+25
+26
+27
+28
+29
+30
+7
+8
+9
+10
+11
+12
+13
+14
+15
+16
+17
+18
+42
+41
+40
+39
+38
+37
+36
+35
+34
+33
+32
+31
+LVDSGND
+BYPASS_CLKIN_N
+BYPASS_CLKIN_P
+SER_DATAIN_N
+SER_DATAIN_P
+LVDSGND
+DGND
+VDD
+DOUT5
+DOUT6
+DOUT7
+DOUT8
+DOUT3
+DOUT4
+VAAPIX
+VAA
+AGND
+NC
+NC
+VAA
+AGND
+STANDBY
+RESET#
+S_CTRL_ADR1
+DOUT9
+LINE_VALID
+FRAME_VALID
+STLN_OUT
+EXPOSURE
+SDATA
+SCLK
+STFRM_OUT
+LED_OUT
+OE
+RSVD
+S_CTRL_ADR0
+VDDLVDS
+SER_DATAOUT_N
+SER_DATAOUT_P
+SHFT_CLKOUT_N
+SHFT_CLKOUT_P
+VDD
+DGND
+SYSCLK
+PIXCLK
+DOUT0
+DOUT1
+DOUT2
+48
+47
+46
+45
+
+===== PAGE 8 =====
+MT9V022_DS Rev. G  6/15 EN
+3
+©Semiconductor Components Industries, LLC, 2015.
+ MT9V032: 1/3-Inch Wide-VGA Digital Image Sensor
+Pin Descriptions
+Pin Descriptions
+Table 3: 
+Pin Descriptions
+Only pins DOUT0 through DOUT9 may be tri-stated.
+48-Pin LLCC 
+Numbers
+Symbol
+Type
+Description
+Note
+29
+RSVD
+Input 
+Connect to DGND.
+1
+10
+SER_DATAIN_N
+Input
+Serial data in for stereoscopy (differential negative). Tie to 1k 
+pull-up (to 3.3V) in non-stereoscopy mode.
+11
+SER_DATAIN_P
+Input
+Serial data in for stereoscopy (differential positive). Tie to DGND 
+in non-stereoscopy mode.
+8
+BYPASS_CLKIN_N
+Input
+Input bypass shift-CLK (differential negative). Tie to 1K pull-
+up (to 3.3V) in non-stereoscopy mode.
+9
+BYPASS_CLKIN_P
+Input
+Input bypass shift-CLK (differential positive). Tie to DGND in 
+non-stereoscopy mode.
+23
+EXPOSURE
+Input
+Rising edge starts exposure in slave mode.
+25
+SCLK
+Input
+Two-wire serial interface clock. Connect to VDD with 1.5K 
+resistor even when no other two-wire serial interface 
+peripheral is attached.
+28
+OE
+Input
+DOUT enable pad, active HIGH.
+2
+30
+S_CTRL_ADR0
+Input
+Two-wire serial interface slave address bit 3.
+31
+S_CTRL_ADR1
+Input
+Two-wire serial interface slave address bit 5. 
+32
+RESET#
+Input
+Asynchronous reset. All registers assume defaults.
+33
+STANDBY
+Input
+Shut down sensor operation for power saving.
+47
+SYSCLK
+Input
+Master clock (26.6 MHz).
+24
+SDATA
+I/O
+Two-wire serial interface data. Connect to VDD with 1.5K 
+resistor even when no other two-wire serial interface 
+peripheral is attached.
+22
+STLN_OUT
+I/O
+Output in master mode—start line sync to drive slave chip in-
+phase; input in slave mode.
+26
+STFRM_OUT
+I/O
+Output in master mode—start frame sync to drive a slave chip 
+in-phase; input in slave mode.
+20
+LINE_VALID
+Output
+Asserted when DOUT data is valid.
+21
+FRAME_VALID
+Output
+Asserted when DOUT data is valid.
+15
+DOUT5
+Output
+Parallel pixel data output 5.
+16
+DOUT6
+Output
+Parallel pixel data output 6.
+17
+DOUT7
+Output
+Parallel pixel data output 7.
+18
+DOUT8
+Output
+Parallel pixel data output 8
+19
+DOUT9
+Output
+Parallel pixel data output 9.
+27
+LED_OUT
+Output
+LED strobe output.
+41
+DOUT4
+Output
+Parallel pixel data output 4.
+42
+DOUT3
+Output
+Parallel pixel data output 3.
+43
+DOUT2
+Output
+Parallel pixel data output 2.
+44
+DOUT1
+Output
+Parallel pixel data output 1.
+45
+DOUT0
+Output
+Parallel pixel data output 0.
+46
+PIXCLK
+Output
+Pixel clock out. DOUT is valid on rising edge of this clock.
+2
+SHFT_CLKOUT_N
+Output
+Output shift CLK (differential negative).
+
+===== PAGE 9 =====
+MT9V022_DS Rev. G  6/15 EN
+4
+©Semiconductor Components Industries, LLC, 2015.
+ MT9V032: 1/3-Inch Wide-VGA Digital Image Sensor
+Pin Descriptions
+Notes:
+1. Pin 29 (RSVD) must be tied to GND.
+2. Output Enable (OE) tri-states signals DOUT0–DOUT9. No other signals are tri-stated with OE.
+3. No connect. These pins must be left floating for proper operation.
+Figure 3: 
+ Typical Configuration (Connection)—Parallel Output Mode
+Note:
+LVDS signals are to be left floating.
+3
+SHFT_CLKOUT_P
+Output
+Output shift CLK (differential positive).
+4
+SER_DATAOUT_N
+Output
+Serial data out (differential negative).
+5
+SER_DATAOUT_P
+Output
+Serial data out (differential positive).
+1, 14
+VDD
+Supply
+Digital power 3.3V.
+35, 39
+VAA
+Supply
+Analog power 3.3V.
+40
+VAAPIX
+Supply
+Pixel power 3.3V. 
+6
+VDDLVDS
+Supply
+Dedicated power for LVDS pads.
+7, 12
+LVDSGND
+Ground
+Dedicated GND for LVDS pads.
+13, 48
+DGND
+Ground
+Digital GND.
+34, 38
+AGND
+Ground
+Analog GND.
+36, 37
+NC
+NC
+No connect.
+3
+Table 3: 
+Pin Descriptions (continued)
+Only pins DOUT0 through DOUT9 may be tri-stated.
+48-Pin LLCC 
+Numbers
+Symbol
+Type
+Description
+Note
+SYSCLK
+LINE_VALID
+FRAME_VALID
+PIXCLK
+      DOUT(9:0) 
+STANDBY
+EXPOSURE
+RSVD
+S_CTRL_ADR0
+S_CTRL_ADR1
+LVDSGND
+LED_OUT
+ERROR
+SDATA
+SCLK
+RESET#
+OE
+VDDLVDS
+AGND
+DGND
+VDD
+VAA
+VAAPIX
+Master Clock
+0.1μF
+To Controller
+STANDBY from
+Controller or
+Digital GND
+Two-Wire
+Serial Interface
+VDD
+VAA 
+VAAPIX 
+To LED output
+10KΩ
+1.5KΩ
+
+===== PAGE 10 =====
+MT9V022_DS Rev. G  6/15 EN
+5
+©Semiconductor Components Industries, LLC, 2015.
+ MT9V032: 1/3-Inch Wide-VGA Digital Image Sensor
+Pixel Data Format
+Pixel Data Format
+Pixel Array Structure
+The MT9V032 pixel array is configured as 782 columns by 492 rows, shown in Figure 4. 
+The left 26 columns and the top eight rows of pixels are optically black and can be used 
+to monitor the black level. The black row data is used internally for the automatic black 
+level adjustment. However, the middle four black rows can also be read out by setting the 
+sensor to raw data output mode. There are 753 columns by 481 rows of optically active 
+pixels. The active area is surrounded with optically transparent dummy columns and 
+rows to improve image uniformity within the active area. One additional active column 
+and active row are used to allow horizontally and vertically mirrored readout to also start 
+on the same color pixel. 
+Figure 4: 
+ Pixel Array Description
+Figure 5: 
+ Pixel Color Pattern Detail (Top Right Corner)
+(782,492)
+2 dummy
+columns
+2 dummy rows
+8 dark, 1 light dummy rows
+(0,0)
+26 dark,  1 light 
+dummy columns
+Pixel 
+(2,9)
+Row Readout Direction
+B
+G
+B
+G
+B
+G
+G
+R
+G
+R
+G
+R
+G
+R
+G
+R
+G
+R
+G
+R
+G
+R
+G
+R
+G
+R
+G
+R
+G
+R
+B
+G
+B
+G
+B
+G
+B
+G
+B
+G
+B
+G
+B
+G
+B
+G
+B
+G
+Column Resdout Direction
+
+===== PAGE 11 =====
+MT9V022_DS Rev. G  6/15 EN
+6
+©Semiconductor Components Industries, LLC, 2015.
+ MT9V032: 1/3-Inch Wide-VGA Digital Image Sensor
+Color Device Limitations
+Color Device Limitations
+The color version of the MT9V032 does not support or offers reduced performance for 
+the following functionalities. 
+Pixel Binning
+Pixel binning is done on immediate neighbor pixels only; no facility is provided to skip 
+pixels according to a Bayer pattern. Therefore, the result of binning combines pixels of 
+different colors. For more information, see “Pixel Binning” on page 47.
+Interlaced Readout
+Interlaced readout yields one field consisting only of red and green pixels and another 
+consisting only of blue and green pixels. This is due to the Bayer pattern of the CFA.
+Automatic Black Level Calibration
+When the color bit is set (R0x0F[2]=1), the sensor uses GREEN1 pixels black level correc-
+tion value, which is applied to all colors. To use calibration value based on all dark pixels 
+offset values, the color bit should be cleared.
+Other Limiting Factors
+Black level correction and row-wise noise correction are applied uniformly to each color. 
+Automatic exposure and gain control calculations are made based on all three colors, 
+not just the green luma channel. High dynamic range does operate; however, ON Semi-
+conductor strongly recommends limiting use to linear operation if good color fidelity is 
+required.
+
+===== PAGE 12 =====
+MT9V022_DS Rev. G  6/15 EN
+7
+©Semiconductor Components Industries, LLC, 2015.
+ MT9V032: 1/3-Inch Wide-VGA Digital Image Sensor
+Output Data Format
+Output Data Format
+The MT9V032 image data can be read out in a progressive scan or interlaced scan mode. 
+Valid image data is surrounded by horizontal and vertical blanking, as shown in Figure 6. 
+The amount of horizontal and vertical blanking is programmable through R0x05 and 
+R0x06, respectively. LINE_VALID is HIGH during the shaded region of the figure. See  
+“Output Data Timing” on page 8 for the description of FRAME_VALID timing. 
+Figure 6: 
+ Spatial Illustration of Image Readout
+P0,0 P0,1 P0,2.....................................P0,n-1 P0,n
+P1,0 P1,1 P1,2.....................................P1,n-1 P1,n
+00 00 00 .................. 00 00 00
+00 00 00 .................. 00 00 00
+Pm-1,0 Pm-1,1.....................................Pm-1,n-1 Pm-1,n
+Pm,0 Pm,1.....................................Pm,n-1 Pm,n
+00 00 00 .................. 00 00 00
+00 00 00 .................. 00 00 00
+00 00 00 .................. 00 00 00
+00 00 00 .................. 00 00 00
+00 00 00 .................. 00 00 00
+00 00 00 .................. 00 00 00
+00 00 00 ..................................... 00 00 00
+00 00 00 ..................................... 00 00 00
+00 00 00 ..................................... 00 00 00
+00 00 00 ..................................... 00 00 00
+VALID IMAGE
+HORIZONTAL
+BLANKING 
+VERTICAL BLANKING
+VERTICAL/HORIZONTAL
+BLANKING 
+
+===== PAGE 13 =====
+MT9V022_DS Rev. G  6/15 EN
+8
+©Semiconductor Components Industries, LLC, 2015.
+ MT9V032: 1/3-Inch Wide-VGA Digital Image Sensor
+Output Data Format
+Output Data Timing
+The data output of the MT9V032 is synchronized with the PIXCLK output. When 
+LINE_VALID is HIGH, one 10-bit pixel datum is output every PIXCLK period. 
+Figure 7: 
+ Timing Example of Pixel Data
+The PIXCLK is a nominally inverted version of the master clock (SYSCLK). This allows 
+PIXCLK to be used as a clock to latch the data. However, when column bin 2 is enabled, 
+the PIXCLK is HIGH for one complete master clock master period and then LOW for one 
+complete master clock period; when column bin 4 is enabled, the PIXCLK is HIGH for 
+two complete master clock periods and then LOW for two complete master clock 
+periods. It is continuously enabled, even during the blanking period. Setting R0x74 
+bit[4] = 1 causes the MT9V032 to invert the polarity of the PIXCLK.
+The parameters P1, A, Q, and P2 in Figure 8 are defined in Table 4. 
+Figure 8: 
+ Row Timing and FRAME_VALID/LINE_VALID Signals
+ 
+Table 4: 
+Frame Time
+Parameter
+Name
+Equation
+Default Timing at 26.66 MHz
+A
+Active data time
+R0x04 
+752 pixel clocks
+= 752 master
+= 28.20s
+P1
+Frame start blanking
+R0x05 - 23
+71 pixel clocks
+= 71master
+= 2.66s
+P2
+Frame end blanking
+23 (fixed)
+23 pixel clocks
+= 23 master
+= 0.86s
+Q
+Horizontal blanking 
+ R0x05
+94 pixel clocks
+= 94 master
+= 3.52s
+LINE_VALID
+PIXCLK
+    DOUT(9:0)
+P0
+(9:0)
+P1
+(9:0)
+P2
+(9:0)
+P3
+(9:0)
+P4
+(9:0)
+Pn-1
+(9:0)
+Pn
+(9:0)
+Valid Image Data
+Blanking
+Blanking
+...
+...
+...
+...
+P1
+A
+ Q
+A
+ Q
+A
+P2
+Number of master clocks
+FRAME_VALID
+LINE_VALID
+...
+...
+...
+
+===== PAGE 14 =====
+MT9V022_DS Rev. G  6/15 EN
+9
+©Semiconductor Components Industries, LLC, 2015.
+ MT9V032: 1/3-Inch Wide-VGA Digital Image Sensor
+Output Data Format
+Sensor timing is shown above in terms of pixel clock and master clock cycles (refer to 
+Figure 7 on page 8). The recommended master clock frequency is 26.66 MHz. The 
+vertical blanking and total frame time equations assume that the number of integration 
+rows (bits 11 through 0 of R0x0B) is less than the number of active rows plus blanking 
+rows minus overhead rows (R0x03 + R0x06 - 2). If this is not the case, the number of inte-
+gration rows must be used instead to determine the frame time, as shown in Table 5. In 
+this example it is assumed that R0x0B is programmed with 523 rows. For Simultaneous 
+Mode, if the exposure time register (0x0B) exceeds the total readout time, then vertical 
+blanking is internally extended automatically to adjust for the additional integration 
+exposure time required. This extended value is not written back to R0x06 (vertical 
+blanking). R0x06 can be used to adjust frame to frame readout time. This register does 
+not affect the exposure time but it may extend the readout time.
+ 
+Notes:
+1. The MT9V032 uses column parallel analog-to-digital converters, thus short row timing is not possi-
+ble. The minimum total row time is 660 columns (horizontal width + horizontal blanking). The min-
+imum horizontal blanking is 43. When the window width is set below 617, horizontal blanking 
+must be increased. The frame rate will not increase for row times less than 660 columns.
+A+Q
+Row time
+R0x04 + R0x05
+846 pixel clocks 
+= 846 master
+= 31.72s
+V
+Vertical blanking
+(R0x06) x (A + Q) + 4
+38,074 pixel clocks
+= 38,074 master
+= 1.43ms
+Nrows x (A + Q)
+Frame valid time
+(R0x03) × (A + Q)
+406,080 pixel clocks
+= 406,080 master
+= 15.23ms
+F
+Total frame time
+V + (Nrows x (A + Q))
+444,154 pixel clocks
+= 444,154 master 
+= 16.66ms
+Table 5: 
+Frame Time—Long Integration Time
+Parameter
+Name
+Equation
+(Number of Master Clock Cycles)
+Default Timing
+at 26.66 MHz
+V’
+Vertical blanking (long 
+integration time)
+(R0x0B + 2 - R0x03) × (A + Q) + 4
+38,074 pixel clocks
+= 38,074 master
+= 1.43ms
+F”
+Total frame time (long 
+integration exposure time)
+(R0x0B + 2) × (A + Q) + 4
+444,154 pixel clocks
+= 444,154 master 
+= 16.66ms
+Table 4: 
+Frame Time (continued)
+Parameter
+Name
+Equation
+Default Timing at 26.66 MHz
+
+===== PAGE 15 =====
+MT9V022_DS Rev. G  6/15 EN
+10
+©Semiconductor Components Industries, LLC, 2015.
+ MT9V032: 1/3-Inch Wide-VGA Digital Image Sensor
+Serial Bus Description
+Serial Bus Description
+Registers are written to and read from the MT9V032 through the two-wire serial inter-
+face bus. The MT9V032 is a serial interface slave with four possible IDs (0x90, 0x98, 
+0xB0,and 0xB8) determined by the S_CTRL_ADR0 and S_CTRL_ADR1 input pins. Data is 
+transferred into the MT9V032 and out through the serial data (SDATA) line. The SDATA 
+line is pulled up to VDD off-chip by a 1.5K resistor. Either the slave or master device can 
+pull the SDATA line down—the serial interface protocol determines which device is 
+allowed to pull the SDATA line down at any given time. The registers are 16-bit wide, and 
+can be accessed through 16- or 8-bit two-wire serial interface sequences.
+Protocol
+The two-wire serial interface defines several different transmission codes, as follows:
+• a start bit
+• the slave device 8-bit address
+• a(n) (no) acknowledge bit
+• an 8-bit message
+• a stop bit
+Sequence
+A typical read or write sequence begins by the master sending a start bit. After the start 
+bit, the master sends the slave device’s 8-bit address. The last bit of the address deter-
+mines if the request is a read or a write, where a “0” indicates a write and a “1” indicates 
+a read. The slave device acknowledges its address by sending an acknowledge bit back to 
+the master. 
+If the request was a write, the master then transfers the 8-bit register address to which a 
+write should take place. The slave sends an acknowledge bit to indicate that the register 
+address has been received. The master then transfers the data 8 bits at a time, with the 
+slave sending an acknowledge bit after each 8 bits. The MT9V032 uses 16-bit data for its 
+internal registers, thus requiring two 8-bit transfers to write to one register. After 16 bits 
+are transferred, the register address is automatically incremented, so that the next 16 bits 
+are written to the next register address. The master stops writing by sending a start or 
+stop bit.
+A typical read sequence is executed as follows. First the master sends the write mode 
+slave address and 8-bit register address, just as in the write request. The master then 
+sends a start bit and the read mode slave address. The master then clocks out the register 
+data 8 bits at a time. The master sends an acknowledge bit after each 8-bit transfer. The 
+register address is auto-incremented after every 16 bits is transferred. The data transfer 
+is stopped when the master sends a no-acknowledge bit. The MT9V032 allows for 8-bit 
+data transfers through the two-wire serial interface by writing (or reading) the most 
+significant 8 bits to the register and then writing (or reading) the least significant 8 bits to 
+R0xF0 (240).
+Bus Idle State
+The bus is idle when both the data and clock lines are HIGH. Control of the bus is initi-
+ated with a start bit, and the bus is released with a stop bit. Only the master can generate 
+the start and stop bits.
+
+===== PAGE 16 =====
+MT9V022_DS Rev. G  6/15 EN
+11
+©Semiconductor Components Industries, LLC, 2015.
+ MT9V032: 1/3-Inch Wide-VGA Digital Image Sensor
+Serial Bus Description
+Start Bit
+The start bit is defined as a HIGH-to-LOW transition of the data line while the clock line 
+is HIGH.
+Stop Bit
+The stop bit is defined as a LOW-to-HIGH transition of the data line while the clock line 
+is HIGH.
+Slave Address
+The 8-bit address of a two-wire serial interface device consists of 7 bits of address and 1 
+bit of direction. A “0” in the LSB of the address indicates write mode, and a “1” indicates 
+read mode. As indicated above, the MT9V032 allows four possible slave addresses deter-
+mined by the two input pins, S_CTRL_ADR0 and S_CTRL_ADR1.
+Data Bit Transfer
+One data bit is transferred during each clock pulse. The two-wire serial interface clock 
+pulse is provided by the master. The data must be stable during the HIGH period of the 
+serial clock—it can only change when the two-wire serial interface clock is LOW. Data is 
+transferred 8 bits at a time, followed by an acknowledge bit.
+Acknowledge Bit
+The master generates the acknowledge clock pulse. The transmitter (which is the master 
+when writing, or the slave when reading) releases the data line, and the receiver indi-
+cates an acknowledge bit by pulling the data line LOW during the acknowledge clock 
+pulse.
+No-Acknowledge Bit
+The no-acknowledge bit is generated when the data line is not pulled down by the 
+receiver during the acknowledge clock pulse. A no-acknowledge bit is used to terminate 
+a read sequence.
+Table 6: 
+Slave Address Modes
+{S_CTRL_ADR1, S_CTRL_ADR0}
+Slave Address
+Write/Read Mode
+00
+0x90
+Write
+0x91
+Read
+01
+0x98
+Write
+0x99
+Read
+10
+0xB0
+Write
+0xB1
+Read
+11
+0xB8
+Write
+0xB9
+Read
+
+===== PAGE 17 =====
+MT9V022_DS Rev. G  6/15 EN
+12
+©Semiconductor Components Industries, LLC, 2015.
+ MT9V032: 1/3-Inch Wide-VGA Digital Image Sensor
+Two-Wire Serial Interface Sample Read and Write Sequences
+Two-Wire Serial Interface Sample Read and Write Sequences
+16-Bit Write Sequence
+A typical write sequence for writing 16 bits to a register is shown in Figure 9. A start bit 
+given by the master, followed by the write address, starts the sequence. The image sensor 
+then gives an acknowledge bit and expects the register address to come first, followed by 
+the 16-bit data. After each 8-bit word is sent, the image sensor gives an acknowledge bit. 
+All 16 bits must be written before the register is updated. After 16 bits are transferred, the 
+register address is automatically incremented, so that the next 16 bits are written to the 
+next register. The master stops writing by sending a start or stop bit.
+Figure 9: 
+ Timing Diagram Showing a Write to R0x09 with the Value 0x0284
+16-Bit Read Sequence
+A typical read sequence is shown in Figure 10. First the master has to write the register 
+address, as in a write sequence. Then a start bit and the read address specify that a read 
+is about to happen from the register. The master then clocks out the register data 8 bits 
+at a time. The master sends an acknowledge bit after each 8-bit transfer. The register 
+address is auto-incremented after every 16 bits is transferred. The data transfer is 
+stopped when the master sends a no-acknowledge bit.
+Figure 10: 
+ Timing Diagram Showing a Read from R0x09; Returned Value 0x0284
+SCLK
+SDATA
+START
+ACK
+0xB8 ADDR
+ACK
+ACK
+ACK
+STOP
+R0x09
+1000 0100
+0000 0010
+SCLK
+SDATA
+START
+ACK
+0xB8 ADDR
+0xB9  ADDR
+0000 0010
+R0x09
+ACK
+ACK
+ACK
+STOP
+1000  0100
+NACK
+
+===== PAGE 18 =====
+MT9V022_DS Rev. G  6/15 EN
+13
+©Semiconductor Components Industries, LLC, 2015.
+ MT9V032: 1/3-Inch Wide-VGA Digital Image Sensor
+Two-Wire Serial Interface Sample Read and Write Sequences
+8-Bit Write Sequence
+To be able to write 1 byte at a time to the register, a special register address is added. The 
+8-bit write is done by first writing the upper 8 bits to the desired register and then writing 
+the lower 8 bits to the special register address (R0xF0). The register is not updated until 
+all 16 bits have been written. It is not possible to just update half of a register. In 
+Figure 11 on page 13, a typical sequence for 8-bit writing is shown. The second byte is 
+written to the special register (R0xF0).
+Figure 11: 
+ Timing Diagram Showing a Bytewise Write to R0x09 with the Value 0x0284
+8-Bit Read Sequence
+To read one byte at a time the same special register address is used for the lower byte. 
+The upper 8 bits are read from the desired register. By following this with a read from the 
+special register (R0xF1) the lower 8 bits are accessed (Figure 12). The master sets the no-
+acknowledge bits shown.
+Figure 12: 
+ Timing Diagram Showing a Bytewise Read from R0x09; Returned Value 0x0284
+STOP
+ 
+R0xF0
+ACK
+START
+0xB8 ADDR
+ 
+ACK
+SDATA 
+SCLK
+ACK
+ACK
+ACK
+ACK
+R0x09
+0xB8 ADDR
+0000 0010
+1000 0100
+ 
+START
+START
+0xB9 ADDR
+SDATA
+SCLK
+STOP
+NACK
+ACK
+ACK
+ACK
+R0x09
+START
+0xB8 ADDR
+0000 0010
+START
+0xB9 ADDR
+SDATA
+SCLK
+NACK
+ACK
+ACK
+ACK
+R0xF0
+START
+0xB8 ADDR
+1000 0100
+
+===== PAGE 19 =====
+MT9V022_DS Rev. G  6/15 EN
+14
+©Semiconductor Components Industries, LLC, 2015.
+ MT9V032: 1/3-Inch Wide-VGA Digital Image Sensor
+Two-Wire Serial Interface Sample Read and Write Sequences
+Register Lock
+Included in the MT9V032 is a register lock (R0xFE) feature that can be used as a solution 
+to reduce the probability of an inadvertent noise-triggered two-wire serial interface 
+write to the sensor. All registers (or read mode register—register 13 only) can be locked.
+At power-up, the register lock defaults to a value of 0xBEEF, which implies that all 
+registers are unlocked and any two-wire serial interface writes to the register get 
+committed.
+Lock All Registers
+If a unique pattern (0xDEAD) to R0xFE is programmed, any subsequent two-wire serial 
+interface writes to registers (except R0xFE) are NOT committed. Alternatively, if the user 
+writes a 0xBEEF to the register lock register, all registers are unlocked and any 
+subsequent two-wire serial interface writes to the register are committed.
+Lock Read Mode Register Only (R0x0D) 
+If a unique pattern (0xDEAF) to R0xFE is programmed, any subsequent two-wire serial 
+interface writes to register 13 are NOT committed. Alternatively, if the user writes a 
+0xBEEF to register lock register, register 13 is unlocked and any subsequent two-wire 
+serial interface writes to this register are committed.
+
+===== PAGE 20 =====
+MT9V022_DS Rev. G  6/15 EN
+15
+©Semiconductor Components Industries, LLC, 2015.
+ MT9V032: 1/3-Inch Wide-VGA Digital Image Sensor
+Registers
+Registers
+Caution
+Writing and changing the value of a reserved register (word or bit) puts the device in an 
+unknown state and may damage the device.
+Table 7 provides default register descriptions of the registers. 
+Table 8 on page 19 provides detailed descriptions of the registers. 
+Table 7: 
+Default Register Descriptions
+1 = always 1; 0 = always 0; d = programmable; ? = read only
+Register # (Hex)
+Description
+Data Format (Binary)
+Default Value (Hex)
+0x00
+Chip Version
+0001 0011 0001 00001 (LSB)
+Iter. 1: 0x1311
+Iter. 2: 0x1311
+Iter. 3: 0x1313
+0x01
+Column Start
+0000 00dd dddd dddd
+0x0001
+0x02
+Row Start
+0000 000d dddd dddd
+0x0004
+0x03
+Window Height
+0000 000d dddd dddd
+0x01E0
+0x04
+Window Width
+0000 00dd dddd dddd
+0x02F0
+0x05
+Horizontal Blanking
+0000 00dd dddd dddd
+0x005E
+0x06
+Vertical Blanking
+0ddd dddd dddd dddd
+0x002D
+0x07
+Chip Control
+0000 dddd dddd dddd
+0x0388
+0x08
+Shutter Width 1
+0ddd dddd dddd dddd
+0x01BB
+0x09
+Shutter Width 2
+0ddd dddd dddd dddd
+0x01D9
+0x0A
+Shutter Width Ctrl
+0000 00dd dddd dddd
+0x0164
+0x0B
+Total Shutter Width
+0ddd dddd dddd dddd
+0x01E0
+0x0C
+Reset
+0000 0000 0000 00dd
+0x0000
+0x0D
+Read Mode
+0000 0011 dddd dddd
+0x0300
+0x0E
+Monitor Mode
+0000 0000 0000 000d
+0x0000
+0x0F
+Pixel Operation Mode
+0000 0000 dddd dddd
+0x0011
+0x10
+Reserved
+–
+0x0040
+0x11
+Reserved
+–
+0x8042
+0x12
+Reserved
+–
+0x0022
+0x13
+Reserved
+–
+0x2D32
+0x14
+Reservedl
+–
+0x0E02
+0x15
+Reserved
+–
+0x7F32
+0x16
+Reserved
+–
+0x2802
+0x17
+Reserved
+–
+0x3E38
+0x18
+Reserved
+–
+0x3E38
+0x19
+Reserved
+–
+0x2802
+0x1A
+Reserved
+–
+0x0428
+0x1B
+LED_OUT Ctrl
+0000 0000 0000 00dd
+0x0000
+0x1C
+ADC Mode Control
+0000 0000 0000 00dd
+0x0002
+0x1D
+Reserved
+–
+0x0000
+0x1E
+Reserved
+–
+0x0000
+0x1F
+Reserved
+–
+0x0000
+0x20
+Reserved 
+–
+0x01D1
+0x21
+Reserved
+–
+0x0020
+0x22
+Reserved
+–
+0x0020
+
+===== PAGE 21 =====
+MT9V022_DS Rev. G  6/15 EN
+16
+©Semiconductor Components Industries, LLC, 2015.
+ MT9V032: 1/3-Inch Wide-VGA Digital Image Sensor
+Registers
+0x23
+Reserved
+–
+0x0010
+0x24
+Reserved
+–
+0x0010
+0x25
+Reserved
+–
+0x0020
+0x26
+Reserved
+–
+0x0010
+0x27
+Reserved
+–
+0x0010
+0x28
+Reserved
+–
+0x0010
+0x29
+Reserved
+–
+0x0010
+0x2A
+Reserved
+–
+0x0020
+0x2B
+Reserved
+–
+0x0004
+0x2C
+VREF_ADC Control
+0000 0000 0000 0ddd
+0x0840
+0x2D
+Reserved
+–
+0x0004
+0x2E
+Reserved
+–
+0x0007
+0x2F
+Reserved
+–
+0x0004
+0x30
+Reserved
+–
+0x0003
+0x31
+V1
+0000 0000 000d dddd
+0x001D
+0x32
+V2
+0000 0000 000d dddd
+0x0018
+0x33
+V3
+0000 0000 000d dddd
+0x0015
+0x34
+V4
+0000 0000 000d dddd
+0x0004
+0x35
+Analog Gain
+0000 0000 0ddd dddd
+0x0010
+0x36
+Max Analog Gain
+0000 0000 0ddd dddd
+0x0040
+0x37
+Reserved
+–
+0x0000
+0x38
+Reserved
+–
+0x0000
+0x42
+Frame Dark Average
+0000 0000 ???? ????
+RO
+0x46
+Dark Avg Thresholds
+dddd dddd dddd dddd
+0x231D
+0x47
+BL Calib Control
+1000 0000 ddd0 000d
+0x8080
+0x48 
+BL Calibration Value
+0000 0000 dddd dddd
+0x0000
+0x4C 
+BL Calib Step Size
+0000 0000 000d dddd
+0x0002
+0x60
+Reserved
+–
+0x0000
+0x61
+Reserved
+–
+0x0000
+0x62
+Reserved
+–
+0x0000
+0x63
+Reserved
+–
+0x0000
+0x64
+Reserved
+–
+0x0000
+0x65
+Reserved
+–
+0x0000
+0x66
+Reserved
+–
+0x0000
+0x67
+Reserved
+–
+0x0000
+0x68
+Reserved
+–
+RO
+0x69
+Reserved
+–
+RO
+0x6A
+Reserved
+–
+RO
+0x6B
+Reserved
+–
+RO
+0x6C
+Reserved
+–
+0x0000
+0x70
+Row Noise Corr Ctrl 1
+0000 d000 00d1 dddd
+0x0034
+0x71
+Reserved
+–
+0x0000
+0x72
+Row Noise Constant
+0000 0000 dddd dddd
+0x002A
+0x73
+Row Noise Corr Ctrl 2
+0000 00dd dddd dddd
+0x02F7
+0x74
+Pixclk, FV, LV
+0000 0000 000d dddd
+0x0000
+Table 7: 
+Default Register Descriptions (continued)
+1 = always 1; 0 = always 0; d = programmable; ? = read only
+Register # (Hex)
+Description
+Data Format (Binary)
+Default Value (Hex)
+
+===== PAGE 22 =====
+MT9V022_DS Rev. G  6/15 EN
+17
+©Semiconductor Components Industries, LLC, 2015.
+ MT9V032: 1/3-Inch Wide-VGA Digital Image Sensor
+Registers
+0x7F
+Digital Test Pattern
+0ddd ddd dddd dddd
+0x0000
+0x80
+Tile Weight/Gain X0_Y0
+0000 0000 dddd dddd
+0x00F4
+0x81
+Tile Weight/Gain X1_Y0
+0000 0000 dddd dddd
+0x00F4
+0x82
+Tile Weight/Gain X2_Y0
+0000 0000 dddd dddd
+0x00F4
+0x83
+Tile Weight/Gain X3_Y0
+0000 0000 dddd dddd
+0x00F4
+0x84
+Tile Weight/Gain X4_Y0
+0000 0000 dddd dddd
+0x00F4
+0x85
+Tile Weight/Gain X0_Y1
+0000 0000 dddd dddd
+0x00F4
+0x86
+Tile Weight/Gain X1_Y1
+0000 0000 dddd dddd
+0x00F4
+0x87
+Tile Weight/Gain X2_Y1
+0000 0000 dddd dddd
+0x00F4
+0x88
+Tile Weight/Gain X3_Y1
+0000 0000 dddd dddd
+0x00F4
+0x89
+Tile Weight/Gain X4_Y1
+0000 0000 dddd dddd
+0x00F4
+0x8A
+Tile Weight/Gain X0_Y2
+0000 0000 dddd dddd
+0x00F4
+0x8B
+Tile Weight/Gain X1_Y2
+0000 0000 dddd dddd
+0x00F4
+0x8C
+Tile Weight/Gain X2_Y2
+0000 0000 dddd dddd
+0x00F4
+0x8D
+Tile Weight/Gain X3_Y2
+0000 0000 dddd dddd
+0x00F4
+0x8E
+Tile Weight/Gain X4_Y2
+0000 0000 dddd dddd
+0x00F4
+0x8F
+Tile Weight/Gain X0_Y3
+0000 0000 dddd dddd
+0x00F4
+0x90
+Tile Weight/Gain X1_Y3
+0000 0000 dddd dddd
+0x00F4
+0x91
+Tile Weight/Gain X2_Y3
+0000 0000 dddd dddd
+0x00F4
+0x92
+Tile Weight/Gain X3_Y3
+0000 0000 dddd dddd
+0x00F4
+0x93
+Tile Weight/Gain X4_Y3
+0000 0000 dddd dddd
+0x00F4
+0x94
+Tile Weight/Gain X0_Y4
+0000 0000 dddd dddd
+0x00F4
+0x95
+Tile Weight/Gain X1_Y4
+0000 0000 dddd dddd
+0x00F4
+0x96
+Tile Weight/Gain X2_Y4
+0000 0000 dddd dddd
+0x00F4
+0x97
+Tile Weight/Gain X3_Y4
+0000 0000 dddd dddd
+0x00F4
+0x98
+Tile Weight/Gain X4_Y4
+0000 0000 dddd dddd
+0x00F4
+0x99
+Tile Coord. X 0/5
+0000 00dd dddd dddd
+0x0000
+0x9A
+Tile Coord. X 1/5
+0000 00dd dddd dddd
+0x0096
+0x9B
+Tile Coord. X 2/5
+0000 00dd dddd dddd
+0x012C
+0x9C
+Tile Coord. X 3/5
+0000 00dd dddd dddd
+0x01C2
+0x9D
+Tile Coord. X 4/5
+0000 00dd dddd dddd
+0x0258
+0x9E
+Tile Coord. X 5/5
+0000 00dd dddd dddd
+0x02F0
+0x9F
+Tile Coord. Y 0/5
+0000 000d dddd dddd
+0x0000
+0xA0
+Tile Coord. Y 1/5
+0000 000d dddd dddd
+0x0060
+0xA1
+Tile Coord. Y 2/5
+0000 000d dddd dddd
+0x00C0
+0xA2
+Tile Coord. Y 3/5
+0000 000d dddd dddd
+0x0120
+0xA3
+Tile Coord. Y 4/5
+0000 000d dddd dddd
+0x0180
+0xA4
+Tile Coord. Y 5/5
+0000 000d dddd dddd
+0x01E0
+0XA5
+AEC/AGC Desired Bin
+0000 0000 00dd dddd
+0x003A
+0xA6
+AEC Update Frequency
+0000 0000 0000 dddd
+0x0002
+0xA7
+Reserved
+–
+0x0000
+0xA8
+AEC LPF
+0000 0000 0000 00dd
+0x0000
+0xA9
+AGC Update Frequency
+0000 0000 0000 dddd
+0x0002
+0xAA
+Reserved
+–
+0x0000
+0xAB
+AGC LPF
+0000 0000 0000 00dd
+0x0002
+Table 7: 
+Default Register Descriptions (continued)
+1 = always 1; 0 = always 0; d = programmable; ? = read only
+Register # (Hex)
+Description
+Data Format (Binary)
+Default Value (Hex)
+
+===== PAGE 23 =====
+MT9V022_DS Rev. G  6/15 EN
+18
+©Semiconductor Components Industries, LLC, 2015.
+ MT9V032: 1/3-Inch Wide-VGA Digital Image Sensor
+Registers
+Shadowed Registers
+Some sensor settings cannot be changed during frame readout. For example, changing 
+the register Window Width (R0x04) part way through frame readout results in inconsis-
+tent LINE_VALID behavior. To avoid this, the MT9V032 double buffers many registers by 
+implementing a “pending” and a “live” version. Two-wire serial interface reads and 
+writes access the pending register. The live register controls the sensor operation. The 
+value in the pending register is transferred to a live register at a fixed point in the frame 
+timing, called “frame-start.” Frame-start is defined as the point at which the first dark 
+row is read out. By default, this occurs four row times before FRAME_VALID goes HIGH. 
+To determine which registers or register fields are double-buffered in this way, see the 
+“Shadowed” column in Table 8.
+Notation used in the register description table:
+• Shadowed
+N = No. The register value is updated and used immediately.
+Y = Yes. The register value is updated at next frame start. Frame start is defined as 
+0xAF
+AEC/AGC Enable
+0000 0000 0000 00dd
+0x0003
+0xB0
+AEC/AGC Pix Count
+dddd dddd dddd dddd
+0xABE0
+0xB1
+LVDS Master Ctrl
+0000 0000 0000 dddd
+0x0002
+0xB2
+LVDS Shift Clk Ctrl
+0000 0000 000d 0ddd
+0x0010
+0xB3
+LVDS Data Ctrl
+0000 0000 000d 0ddd
+0x0010
+0xB4
+Data Stream Latency
+0000 0000 0000 00dd
+0x0000
+0xB5
+LVDS Internal Sync
+0000 0000 0000 000d
+0x0000
+0xB6
+LVDS Payload Control
+0000 0000 0000 000d
+0x0000
+0xB7
+Stereoscop. Error Ctrl
+0000 0000 0000 0ddd
+0x0000
+0xB8
+Stereoscop. Error Flag
+0000 0000 0000 000?
+RO
+0xB9
+LVDS Data Output
+???? ???? ???? ????
+RO
+0xBA
+AGC Gain Output
+0000 0000 0??? ????
+RO
+0XBB
+AEC Gain Output
+???? ???? ???? ????
+RO
+0xBC
+AGC/AEC Current Bin
+0000 0000 00?? ????
+RO
+0xBD
+Maximum Shutter Width
+dddd dddd dddd dddd
+0x01E0
+0xBE
+AGC/AEC Bin Difference Threshold
+0000 0000 dddd dddd
+0x0014
+0xBF
+Field Blank
+0000 000d dddd dddd
+0x0016
+0xC0
+Mon Mode Capture Ctrl
+0000 0000 dddd dddd
+0x000A
+0xC1
+Temperature
+0000 00?? ???? ????
+RO
+0xC2
+Analog Controls
+dddd dddd dddd dddd
+0x0840
+0xC3
+NTSC FV & LV Ctrl
+0000 0000 0000 00dd
+0x03840
+0xC4
+NTSC Horiz Blank Ctrl
+dddd dddd dddd dddd
+0x4416
+0xC5
+NTSC Vert Blank Ctrl
+dddd dddd dddd dddd
+0x4421
+0xF0
+Bytewise Addr
+–
+0x0000
+0xF1
+Reserved
+–
+Reserved
+0xFE
+Register Lock
+dddd dddd dddd dddd
+0xBEEF
+0xFF
+Chip Version
+0001 0011 0000 0000
+Iter. 1: 0x1311
+Iter. 2 : 0x1311
+Iter. 3: 0x1313
+Table 7: 
+Default Register Descriptions (continued)
+1 = always 1; 0 = always 0; d = programmable; ? = read only
+Register # (Hex)
+Description
+Data Format (Binary)
+Default Value (Hex)
+
+===== PAGE 24 =====
+MT9V022_DS Rev. G  6/15 EN
+19
+©Semiconductor Components Industries, LLC, 2015.
+ MT9V032: 1/3-Inch Wide-VGA Digital Image Sensor
+Registers
+when the first dark row is read out. By default this is four rows before FRAME_VALID 
+goes HIGH.
+• Read/Write
+R = Read-only register/bit.
+W = Read/Write register/bit.
+Table 8 provides a detailed description of the registers. Bit fields that are not identified in 
+the table are read only.
+Table 8: 
+Register Descriptions
+Bit
+Bit Name
+Bit Description
+Default in 
+Hex (Dec)
+Shadowed
+Legal 
+Values 
+(Dec)
+Read/
+Write
+0x00/0xFF (0/255) Chip Version
+15:0
+Chip Version
+Chip version—read-only
+Iter. 1: 
+0x1311 
+(4881)
+Iter. 2: 
+0x1311 
+(4881)
+Iter. 3: 
+0x1313
+(4883)
+R
+0x01 (1) Column Start
+9:0
+Column Start
+The first column to be read out (not counting dark 
+columns that may be read). To window the image 
+down, set this register to the starting X value. 
+Readable/active columns are 1–752.
+1
+Y
+1–752
+W
+0x02 (2) Row Start
+8:0
+Row Start
+The first row to be read out (not counting any dark 
+rows that may be read). To window the image down, 
+set this register to the starting Y value. Setting a 
+value less than four is not recommended since the 
+dark rows should be read using R0x0D. 
+4
+Y
+4–482
+W
+0x03 (3) Window Height
+8:0
+Window Height
+Number of rows in the image to be read out (not 
+counting any dark rows or border rows that may be 
+read). 
+1E0
+(480)
+Y
+1–480
+W
+0x04 (4) Window Width
+9:0
+Window Width
+Number of columns in image to be read out (not 
+counting any dark columns or border columns that 
+may be read).
+2F0
+(752)
+Y
+1–752
+W
+0x05 (5) Horizontal Blanking
+9:0
+Horizontal 
+Blanking
+Number of blank columns in a row. Minimum 
+horizontal blanking is 43 columns.
+05E
+(94)
+Y
+43–1023
+W
+0x06 (6) Vertical Blanking
+14:0
+Vertical Blanking
+Number of blank rows in a frame. This number must 
+be equal to or larger than four.
+002D
+(45)
+Y
+4–3000
+W
+
+===== PAGE 25 =====
+MT9V022_DS Rev. G  6/15 EN
+20
+©Semiconductor Components Industries, LLC, 2015.
+ MT9V032: 1/3-Inch Wide-VGA Digital Image Sensor
+Registers
+0x07 (7) Chip Control
+2:0
+Scan Mode
+0 = Progressive scan.
+1 = Not valid.
+2 = Two-field Interlaced scan. Even-numbered rows 
+are read first, and followed by odd-numbered rows.
+3 = Single-field Interlaced scan. If start address is 
+even number, only even-numbered rows are read 
+out; if start address is odd number, only odd-
+numbered rows are read out. Effective image size is 
+decreased by half.
+0
+Y
+0, 2, 3
+W
+3
+Sensor Master/
+Slave Mode
+0 = Slave mode. Initiating exposure and readout is 
+allowed.
+1 = Master mode. Sensor generates its own exposure 
+and readout timing according to simultaneous/
+sequential mode control bit.
+1
+Y
+0,1
+W
+4
+Sensor Snapshot 
+Mode
+0 = Snapshot disabled.
+1 = Snapshot mode enabled. The start of frame is 
+triggered by providing a pulse at EXPOSURE pin. 
+Sensor master/slave mode should be set to logic 1 to 
+turn on this mode.
+0
+Y
+0,1
+W
+5
+Stereoscopy 
+Mode
+0 = Stereoscopy disabled. Sensor is stand-alone and 
+the PLL generates a 320 MHz (x12) clock.
+1 = Stereoscopy enabled. The PLL generates a 
+480 MHz (x18) clock.
+0
+Y
+0,1
+W
+6
+Stereoscopic 
+Master/Slave 
+mode
+0 = Stereoscopic master.
+1 = Stereoscopic slave. Stereoscopy mode should be 
+enabled when using this bit.
+0
+Y
+0,1
+W
+7
+Parallel Output 
+Enable
+0 = Disable parallel output. DOUT(9:0) are in High-Z.
+1= Enable parallel output.
+1
+Y
+0,1
+W
+8
+Simultaneous/
+Sequential Mode
+0 = Sequential mode. Pixel and column readout takes 
+place only after exposure is complete. 
+1 = Simultaneous mode. Pixel and column readout 
+takes place in conjunction with exposure.
+1
+Y
+0,1
+W
+0x08 (8) Shutter Width 1
+14:0
+Shutter Width 1
+The row number in which the first knee occurs. This 
+may be used only when high dynamic range option 
+(bit 6 of R0x0F) is enabled and exposure knee point 
+auto adjust control bit is disabled. This register is not 
+shadowed, but any change made does not take effect 
+until the following new frame. 
+1BB
+(443)
+N
+1–32767
+W
+Table 8: 
+Register Descriptions (continued)
+Bit
+Bit Name
+Bit Description
+Default in 
+Hex (Dec)
+Shadowed
+Legal 
+Values 
+(Dec)
+Read/
+Write
+
+===== PAGE 26 =====
+MT9V022_DS Rev. G  6/15 EN
+21
+©Semiconductor Components Industries, LLC, 2015.
+ MT9V032: 1/3-Inch Wide-VGA Digital Image Sensor
+Registers
+0x09 (9) Shutter Width 2
+14:0
+Shutter Width 2
+The row number in which the second knee occurs. 
+This may be used only when high dynamic range 
+option (bit 6 of R0x0F) is enabled and exposure knee 
+point auto adjust control bit is disabled. This register 
+is not shadowed, but any change made does not take 
+effect until the following new frame.
+Shutter width 2 = (bits 14:0)
+Note: 
+t1 = Shutter width 1;
+t2 = Shutter width 2 – Shutter 1;
+t3 = Total integration – Shutter width 2.
+1D9
+(473)
+N
+1–32767
+W
+0x0A (10) Shutter Width Control
+3:0
+T2 Ratio
+One-half to the power of this value indicates the 
+ratio of duration time t2, when saturation control 
+gate is adjusted to level V2 to total integration when 
+exposure knee point auto adjust control bit is 
+enabled. This register is not shadowed, but any 
+change made does not take effect until the following 
+new frame. 
+t2 = Total integration × (½)t2_ratio. 
+4
+N
+0–15
+W
+7:4
+T3 Ratio
+One-half to the power of this value indicates the 
+ratio of duration time t3, when saturation control 
+gate is adjusted to level V3 to total integration when 
+exposure knee point auto adjust control bit is 
+enabled. This register is not shadowed, but any 
+change made does not take effect until the following 
+new frame. 
+t3 = Total integration × (½)t3_ratio.
+Note: t1 = Total integration - t2 - t3.
+6
+N
+0–15
+W
+8
+Exposure Knee 
+Point Auto Adjust 
+Enable
+0 = Auto adjust disabled.
+1 = Auto adjust enabled.
+1
+N
+0,1
+W
+9
+Single Knee 
+Enable
+0 = Single knee disabled.
+1 = Single knee enabled. 
+0
+N
+0,1
+W
+0x0B (11) Total Shutter Width
+14:0
+Total Shutter 
+Width
+Total integration time in number of rows. This value 
+is used only when AEC is disabled only (bit 0 of 
+Register 175). This register is not shadowed, but any 
+change made does not take effect until the following 
+new frame.
+1E0
+(480)
+N
+1–32767
+W
+0x0C (12) Reset
+0
+Soft Reset
+Setting this bit causes the sensor to abandon the 
+current frame by resetting all digital logic except 
+two-wire serial interface configuration. This is a self-
+resetting register bit and should always read “0.” 
+(This bit de-asserts internal active LOW reset signal 
+for 15 clock cycles.)
+0
+N
+0, 1
+W
+Table 8: 
+Register Descriptions (continued)
+Bit
+Bit Name
+Bit Description
+Default in 
+Hex (Dec)
+Shadowed
+Legal 
+Values 
+(Dec)
+Read/
+Write
+
+===== PAGE 27 =====
+MT9V022_DS Rev. G  6/15 EN
+22
+©Semiconductor Components Industries, LLC, 2015.
+ MT9V032: 1/3-Inch Wide-VGA Digital Image Sensor
+Registers
+1
+Auto Block Soft 
+Reset
+Setting this bit causes the sensor to reset the 
+automatic gain and exposure control logic. This is a 
+self-resetting register bit and should always read “0.” 
+(This bit de-asserts internal active LOW reset signal 
+for 15 clock cycles.)
+0
+Y
+0, 1
+W
+0x0D (13) Read Mode
+1:0
+Row Bin 
+0 = Normal operation.
+1 = Row bin 2. Two pixel rows are read per row 
+output. Image size is effectively reduced by a factor 
+of 2 vertically while data rate and pixel clock are not 
+affected. Resulting frame rate is increased by 2.
+2 = Row bin 4. Four pixel rows are read per row 
+output. Image size is effectively reduced by a factor 
+of 4 vertically while data rate and pixel clock are not 
+affected. Resulting frame rate is increased by 4.
+3 = Not valid.
+0
+Y
+0, 1, 2
+W
+3:2
+Column Bin
+0 = Normal operation.
+1 = Column bin 2. When set, image size is reduced by 
+a factor of 2 horizontally. Frame rate is not affected 
+but data rate and pixel clock are reduced by one-half 
+that of master clock.
+2 = Column bin 4. When set, image size is reduced by 
+a factor of 4 horizontally. Frame rate is not affected 
+but data rate and pixel clock are reduced by one-
+fourth that of master clock.
+3 = Not valid.
+0
+Y
+0, 1, 2
+W
+4
+Row Flip
+Read out rows from bottom to top (upside down). 
+When set, row readout starts from row (Row 
+Start + Window Height) and continues down to (Row 
+Start + 1). When clear, readout starts at Row Start 
+and continues to (Row Start + Window Height - 1). 
+This ensures that the starting color is maintained.
+0
+Y
+0, 1
+W
+5
+Column Flip
+Read out columns from right to left (mirrored). When 
+set, column readout starts from column (Col Start + 
+Window Width) and continues down to (Col Start + 
+1). When clear, readout starts at Col Start and 
+continues to (Col Start + Window Width - 1). This 
+ensures that the starting color is maintained.
+0
+Y
+0, 1
+W
+6
+Show Dark Rows
+When set, the programmed dark rows is output 
+before the active window. Frame valid is thus 
+asserted earlier than normal. This has no effect on 
+integration time or frame rate. Whether the dark 
+rows are shown in the image or not the definition 
+frame start is before the dark rows are read out.
+0
+Y
+0, 1
+W
+7
+Show Dark 
+Columns
+When set, the programmed dark columns are output 
+before the active pixels in a line. Line valid is thus 
+asserted earlier than normal, and the horizontal 
+blank time gets shorter by 18 pixel clocks.
+0
+Y
+0, 1
+W
+9:8
+Reserved
+Reserved.
+3
+Table 8: 
+Register Descriptions (continued)
+Bit
+Bit Name
+Bit Description
+Default in 
+Hex (Dec)
+Shadowed
+Legal 
+Values 
+(Dec)
+Read/
+Write
+
+===== PAGE 28 =====
+MT9V022_DS Rev. G  6/15 EN
+23
+©Semiconductor Components Industries, LLC, 2015.
+ MT9V032: 1/3-Inch Wide-VGA Digital Image Sensor
+Registers
+0x0E (14) Monitor Mode
+0
+Monitor Mode 
+Enable
+Setting this bit puts the sensor into a cycle of 
+sleeping for five minutes, and waking up to capture a 
+programmable number of frames (R0xC0). Clearing 
+this bit resumes normal operation.
+0
+Y
+0, 1
+W
+0x0F (15) Pixel Operation Mode
+2
+Color/Mono
+Should be set according to sensor type:
+0 = Monochrome.
+1 = Color.
+0
+Y
+0, 1
+W
+6
+High Dynamic 
+Range
+0 = Linear operation.
+1 = High Dynamic Range. Voltage and shutter width 
+must be correctly set for saturation control to 
+operate.
+0
+Y
+0, 1
+W
+0x1B (27) LED_OUT Control
+0
+Disable LED_OUT
+Disable LED_OUT output. When cleared, the output 
+pin LED_OUT is pulsed high when the sensor is 
+undergoing exposure.
+0
+Y
+0, 1
+W
+1
+Invert LED_OUT
+Invert polarity of LED_OUT output. When set, the 
+output pin LED_OUT is pulsed low when the sensor is 
+undergoing exposure.
+0
+Y
+0, 1
+W
+0x1C (28) ADC Resolution Control
+1:0
+ADC Mode
+0 = Invalid.
+1 = Invalid.
+2 = 10-bit linear.
+3 = 12-to10-bit companding.
+2
+Y
+2, 3
+W
+0x2C (44) VREF_ADC Control
+2:0
+VREF_ADC 
+Voltage Level
+0 = VREF_ADC = 1.0V.
+1 = VREF_ADC = 1.1V.
+2 = VREF_ADC = 1.2V.
+3 = VREF_ADC = 1.3V.
+4 = VREF_ADC = 1.4V. 
+5 = VREF_ADC = 1.5V.
+6 = VREF_ADC = 1.6V.
+7 = VREF_ADC = 2.1V.
+Range: 1.0–2.1V; Default: 1.4V
+VREF_ADC for ADC.
+4
+N
+0–7
+W
+0x31 (49) V1 Control
+4:0
+V1 voltage level
+V_Step = bits (4:0) x 62.5mV + 0.5625V.
+Range: 0.5625 - 2.5V; Default: 2.375V.
+Usage: V_Step1 HiDy voltage.
+1D
+(29)
+N
+0–31
+W
+0x32 (50) V2 Control
+4:0
+V2 voltage level
+V_Step = bits (4:0) x 62.5mV + 0.5625V.
+Range: 0.5625 - 2.5V; Default: 2.0625V.
+Usage: V_Step2 HiDy voltage.
+18
+(24)
+N
+0–31
+W
+0x33 (51) V3 Control
+4:0
+V3 voltage level
+V_Step = bits (4:0) x 62.5mV + 0.5625V.
+Range: 0.5625 - 2.5V; Default: 1.875V.
+Usage: V_Step3 HiDy voltage.
+15
+(21)
+N
+0–31
+W
+Table 8: 
+Register Descriptions (continued)
+Bit
+Bit Name
+Bit Description
+Default in 
+Hex (Dec)
+Shadowed
+Legal 
+Values 
+(Dec)
+Read/
+Write
+
+===== PAGE 29 =====
+MT9V022_DS Rev. G  6/15 EN
+24
+©Semiconductor Components Industries, LLC, 2015.
+ MT9V032: 1/3-Inch Wide-VGA Digital Image Sensor
+Registers
+0x34 (52) V4 Control
+4:0
+V4 voltage level
+V_Step = bits (4:0) x 62.5mV + 0.5625V.
+Range: 0.5625 - 2.5V; Default: 0.8125V.
+Usage: V_Step HiDy parking voltage, also provides 
+anti-blooming when V_Step is disabled.
+4
+N
+0–31
+W
+0x35 (53) Analog Gain
+6:0
+Analog Gain
+Analog gain = bits (6:0) x 0.0625 for values 16–31:
+Analog gain = bits (6:0)/2 x 0.125 for values 32–64
+For values 16–31: each LSB increases analog gain 
+0.0625v/v. A value of 16 = 1X gain. Range: 1X to 
+1.9375X.
+For values 32–64: each 2 LSB increases analog gain 
+0.125v/v. Range: 2X to 4X. An LSB increase of 1 will 
+not increase the gain; the value must be incremented 
+by 2.
+No exception detection is installed and caution 
+should be taken when programming.
+10
+(16)
+Y
+16–64
+W
+0x36 (54) Maximum Analog Gain
+6:0
+Maximum 
+Analog Gain
+This register is used by the automatic gain control 
+(AGC) as the upper threshold of gain. This ensures 
+the new calibrated gain value does not exceed that 
+which the MT9V032 supports.
+Range: 16dec–64dec for 1X–4X respectively. Note: No 
+exception detection is installed; caution should be 
+taken when programming.
+40
+(64)
+Y
+16–64
+W
+0x42 (66) Frame Dark Average
+7:0
+Frame Dark 
+Average
+The value read is the frame averaged black level, that 
+is, used in the black level algorithm calculations.
+0
+R
+0x46 (70) Dark Average Thresholds
+7:0
+Lower threshold
+Lower threshold for targeted black level in ADC LSBs.
+1D
+(29)
+N
+0–255
+W
+15:8
+Upper threshold
+Upper threshold for targeted black level in ADC LSBs.
+23
+(35)
+N
+0–255
+W
+0x47 (71) Black Level Calibration Control
+0
+Manual Override
+Manual override of black level correction.
+1 = Override automatic black level correction with 
+programmed values. (R0x48).
+0 = Normal operation (default).
+0
+N
+0, 1
+W
+7:5
+Frames to 
+average over
+Two to the power of this value decide how many 
+frames to average over when the black level 
+algorithm is in the averaging mode. In this mode the 
+running frame average is calculated from the 
+following formula: 
+Running frame ave = Old running frame ave - (old 
+running frame ave)/2n + (new frame ave)/ 2n.
+4
+N
+0–7
+W
+15:8
+Reserved
+Reserved.
+80
+(128)
+Table 8: 
+Register Descriptions (continued)
+Bit
+Bit Name
+Bit Description
+Default in 
+Hex (Dec)
+Shadowed
+Legal 
+Values 
+(Dec)
+Read/
+Write
+
+===== PAGE 30 =====
+MT9V022_DS Rev. G  6/15 EN
+25
+©Semiconductor Components Industries, LLC, 2015.
+ MT9V032: 1/3-Inch Wide-VGA Digital Image Sensor
+Registers
+0x48 (72) Black Level Calibration Value
+7:0
+Black Level 
+Calibration Value
+Analog calibration offset: Negative numbers are 
+represented with two’s complement, which is shown 
+in the following formula: 
+Sign = bit 7 (0 is positive, 1 is negative).
+If positive offset value: Magnitude = bit 6:0.
+If negative offset value: Magnitude = not (bit 6:0) + 1.
+During two-wire serial interface read, this register 
+returns the user-programmed value when manual 
+override is enabled (R0x47 bit 0); otherwise, this 
+register returns the result obtained from the 
+calibration algorithm.
+0
+N
+–127 to 
+127
+W
+0x4C (76) Black Level Calibration Value Step Size
+4:0
+Step Size of 
+Calibration Value
+This is the size calibration value may change 
+(positively or negatively) from frame to frame.
+1 calib LSB = ½ ADC LSB, assuming analog gain = 1.
+2
+N
+0–31
+W
+0x70 (112) Row Noise Correction Control 1
+3:0
+Number of Dark 
+Pixels
+The number of pixels used in the row-wise noise 
+calculation.
+0 = 2 pixels.
+1 = 4 pixels.
+2 = 6 pixels.
+4 = 10 pixels.
+8 = 18 pixels.
+See “Row-wise Noise Correction” on page 44 for 
+additional information.
+4
+Y
+0, 1, 2, 4, 8
+W
+4
+Reserved
+Reserved.
+1
+5
+Enable noise 
+correction
+0 = Normal operation.
+1 = Enable row noise cancellation algorithm. When 
+this bit is set, on a per row basis, the dark average is 
+subtracted from each pixel in the row, and then a 
+constant (R0x72) is added. 
+1
+Y
+0, 1
+W
+11
+Use black level 
+average
+1 = Use black level frame average from the dark rows 
+in the row noise correction algorithm for low gains. 
+This frame average was taken before the last 
+adjustment of the offset DAC for that frame, so it 
+might be slightly off.
+0 = Use the average value of the dark columns read 
+out in each row as dark average.
+0
+Y
+0, 1
+W
+0x72 (114) Row Noise Constant
+7:0
+Row noise 
+constant
+Constant used in the row noise cancellation 
+algorithm. It should be set to the dark level targeted 
+by the black level algorithm plus the noise expected 
+between the averaged values of dark columns. At 
+default the constant is set to 42 LSB.
+2A
+(42)
+Y
+0–255
+W
+0x73 (115) Row Noise Correction Control 2
+9:0
+Dark start 
+column address
+The starting column address for the dark columns to 
+be used in the row-wise noise correction algorithm.
+2F7
+(759)
+Y
+759–775
+W
+Table 8: 
+Register Descriptions (continued)
+Bit
+Bit Name
+Bit Description
+Default in 
+Hex (Dec)
+Shadowed
+Legal 
+Values 
+(Dec)
+Read/
+Write
+
+===== PAGE 31 =====
+MT9V022_DS Rev. G  6/15 EN
+26
+©Semiconductor Components Industries, LLC, 2015.
+ MT9V032: 1/3-Inch Wide-VGA Digital Image Sensor
+Registers
+0x74 (116) Pixel Clock, FRAME and LINE VALID Control
+0
+Invert Line Valid
+Invert line valid. When set, LINE_VALID is reset to 
+logic “0” when DOUT is valid.
+0
+Y
+0, 1
+W
+1
+Invert Frame 
+Valid
+Invert frame valid. When set, FRAME_VALID is reset 
+to logic “0” when frame is valid.
+0
+Y
+0, 1
+W
+2
+XOR Line Valid
+1 = Line valid = "Continuous" Line Valid XOR Frame 
+Valid
+0 = Line Valid determined by bit 3. Ineffective if 
+Continuous Line Valid is set.
+0
+Y
+0, 1
+W
+3
+Continuous Line 
+Valid
+1 = "Continuous" Line Valid (continue producing line 
+valid during vertical blank).
+0 = Normal Line Valid (default, no line valid during 
+vertical blank).
+0
+Y
+0, 1
+W
+4
+Invert Pixel Clock
+Invert pixel clock. When set, LINE_VALID, 
+FRAME_VALID, and DOUT is set up to the rising edge 
+of pixel clock, PIXCLK. When clear, they are set up to 
+the falling edge of PIXCLK.
+0
+Y
+0, 1
+W
+0x7F (127) Digital Test Pattern
+9:0
+Two-wire Serial 
+Interface Test 
+Data
+The 10-bit test data in this register is used in place of 
+the data from the sensor. The data is inserted at the 
+beginning of the digital signal processing. Both test 
+enable (bit 13) and use two-wire serial interface (bit 
+10) must be set. 
+0
+N
+0–1023
+W
+10
+Use Two-wire 
+Serial Interface 
+Test Data
+0 = Use Gray Shade Test Pattern as test data.
+1 = Use Two-wire Serial Interface Test Data (bits 9:0) 
+as test data.
+0
+N
+0, 1
+W
+12:11
+Gray Shade Test 
+Pattern
+0 = None.
+1 = Vertical Shades.
+2 = Horizontal Shades.
+3 = Diagonal Shade.
+When bits (12:11)  0, the MT9V032 generates a gray 
+shaded test pattern to be used as digital test data. 
+Ineffective when Use Two-wire Serial Interface Test 
+Data (bit 10) is set.
+0
+N
+0–3
+W
+13
+Test Enable
+Enable the use of test data/gray shaded test pattern 
+in the signal chain. The data is inserted instead of 
+data from the ADCs.
+Set R0x70 bit 5 = 0 when using this mode. If R0x70 
+bit 5 = 1, the row-wise correction algorithm 
+processes the test data values and the result is not 
+accurate.
+0
+Y
+0, 1
+W
+14
+Flip Two-Wire 
+Serial Interface 
+Test Data
+Use only when two-wire serial interface test data (bit 
+10) is set. When set, the two-wire serial interface test 
+data (bits 9:0) is used in place of the data from ADC/
+memory on odd columns, while complement of the 
+two-wire serial interface test data is used on even 
+columns. 
+0
+N
+0, 1
+W
+Table 8: 
+Register Descriptions (continued)
+Bit
+Bit Name
+Bit Description
+Default in 
+Hex (Dec)
+Shadowed
+Legal 
+Values 
+(Dec)
+Read/
+Write
+
+===== PAGE 32 =====
+MT9V022_DS Rev. G  6/15 EN
+27
+©Semiconductor Components Industries, LLC, 2015.
+ MT9V032: 1/3-Inch Wide-VGA Digital Image Sensor
+Registers
+0x80 (128) - 0x98 (152) Tiled Digital Gain
+3:0
+Tile Gain
+Tile Digital Gain = Bits (3:0) x 0.25. See “Gain 
+Settings” on page 41 for additional information on 
+digital gain.
+4
+Y
+1–15
+W
+7:4
+Sample Weight
+To indicate the weight of individual tile used in the 
+automatic gain/exposure control algorithm. 
+F
+(15)
+Y
+0–15
+W
+Refer to Figure 25 on page 42 for R0x99 (153) - R0xA4 (164).
+0x99 (153) Digital Tile Coordinate 1 - X-direction
+9:0
+X 0/5
+The starting x-coordinate of digital tiles X0_*.
+0
+Y
+0–752
+W
+0x9A (154) Digital Tile Coordinate 2 - X-direction
+9:0
+X 1/5
+The starting x-coordinate of digital tiles X1_*.
+096
+(150)
+Y
+0–752
+W
+0x9B (155) Digital Tile Coordinate 3 - X-direction
+9:0
+X 2/5
+The starting x-coordinate of digital tiles X2_*.
+12C
+(300)
+Y
+0–752
+W
+0x9C (156) Digital Tile Coordinate 4 - X-direction
+9:0
+X 3/5
+The starting x-coordinate of digital tiles X3_*.
+1C2
+(450)
+Y
+0–752
+W
+0x9D (157) Digital Tile Coordinate 5 - X-direction
+9:0
+X 4/5
+The starting x-coordinate of digital tiles X4_*.
+258
+(600)
+Y
+0–752
+W
+0x9E (158) Digital Tile Coordinate 6 - X-direction
+9:0
+X 5/5
+The ending x-coordinate of digital tiles X4_*.
+2F0
+(752)
+Y
+0–752
+W
+0x9F (159) Digital Tile Coordinate 1 - Y-direction
+8:0
+Y 0/5
+The starting y-coordinate of digital tiles *_Y0.
+0
+Y
+0–480
+W
+0xA0 (160) Digital Tile Coordinate 2 - Y-direction
+8:0
+Y 1/5
+The starting y-coordinate of digital tiles *_Y1.
+60
+(96)
+Y
+0–480
+W
+0xA1 (161) Digital Tile Coordinate 3 - Y-direction
+8:0
+Y 2/5
+The starting y-coordinate of digital tiles *_Y2.
+0C0
+(192)
+Y
+0–480
+W
+0xA2 (162) Digital Tile Coordinate 4 - Y-direction
+8:0
+Y 3/5
+The starting y-coordinate of digital tiles *_Y3.
+120
+(288)
+Y
+0–480
+W
+0xA3 (163) Digital Tile Coordinate 5 - Y-direction
+8:0
+Y 4/5
+The starting y-coordinate of digital tiles *_Y4.
+180
+(384)
+Y
+0–480
+W
+0xA4 (164) Digital Tile Coordinate 6 - Y-direction
+8:0
+Y 5/5
+The ending y-coordinate of digital tiles *_Y4.
+1E0
+(480)
+Y
+0–480
+W
+0xA5 (165) AEC/AGC Desired Bin
+5:0
+Desired Bin
+User-defined “desired bin” that gives a measure of 
+how bright the image is intended.
+3A
+(58)
+Y
+1–64
+W
+Table 8: 
+Register Descriptions (continued)
+Bit
+Bit Name
+Bit Description
+Default in 
+Hex (Dec)
+Shadowed
+Legal 
+Values 
+(Dec)
+Read/
+Write
+
+===== PAGE 33 =====
+MT9V022_DS Rev. G  6/15 EN
+28
+©Semiconductor Components Industries, LLC, 2015.
+ MT9V032: 1/3-Inch Wide-VGA Digital Image Sensor
+Registers
+0xA6 (166) AEC Update Frequency
+3:0
+Exp Skip Frame
+The number of frames that the AEC must skip before 
+updating the exposure register (R0xBB).
+2
+Y
+0–15
+W
+0xA8 (168) AEC Low Pass Filter
+1:0
+Exp LPF
+This value plays a role in determining the increment/
+decrement size of exposure value from frame to 
+frame. If current bin  0 (R0xBC),
+When Exp LPF = 0:
+Actual new exposure = Calculated new exposure
+When Exp LPF = 1:
+If |(Calculated new exp - current exp) | > (current exp/
+4),
+Actual new exposure = Calculated new exposure, 
+otherwise
+Actual new exposure = Current exp ± (calculated new 
+exp/2)
+When Exp LPF = 2:
+If |(Calculated new exp - current exp) |> (current exp/
+4),
+Actual new exposure = Calculated new exposure, 
+otherwise 
+Actual new exposure = Current exp ± (calculated new 
+exp/4)
+2
+Y
+0–2
+WX
+0xA9 (169) AGC Output Update Frequency
+3:0
+Gain Skip Frame
+The number of frames that the AGC must skip before 
+updating the gain register (R0xBA).
+2
+Y
+0–15
+W
+0xAB (171) AGC Low Pass Filter
+1:0
+Gain LPF
+This value plays a role in determining the increment/
+decrement size of gain value from frame to frame. If 
+current bin  0 (R0xBC)
+When Gain LPF = 0:
+Actual new gain = Calculated new gain
+When Exp LPF = 1:
+if |(Calculated new gain - current gain) | > (current 
+gain/4),
+Actual new gain = Calculated new gain, otherwise 
+Actual new gain = Current exp ± (calculated new 
+gain/2)
+When Exp LPF = 2:   
+if |(Calculated new gain - current gain) | > (current 
+gain /4),
+Actual new gain = Calculated new gain, otherwise
+Actual new gain = Current gain ± (calculated new 
+gain/4).
+2
+Y
+0–2
+W
+0xAF (175) AGC/AEC Enable
+0
+AEC Enable
+0 = Disable Automatic Exposure Control.
+1 = Enable Automatic Exposure Control.
+1
+Y
+0, 1
+W
+1
+AGC Enable
+0 = Disable Automatic Gain Control.
+1 = Enable Automatic Gain Control.
+1
+Y
+0, 1
+W
+Table 8: 
+Register Descriptions (continued)
+Bit
+Bit Name
+Bit Description
+Default in 
+Hex (Dec)
+Shadowed
+Legal 
+Values 
+(Dec)
+Read/
+Write
+
+===== PAGE 34 =====
+MT9V022_DS Rev. G  6/15 EN
+29
+©Semiconductor Components Industries, LLC, 2015.
+ MT9V032: 1/3-Inch Wide-VGA Digital Image Sensor
+Registers
+0xB0 (176) AGC/AEC Pixel Count
+15-0
+Pixel Count
+The number of pixel used for the AEC/AGC 
+histogram.
+ABE0
+(44,000)
+Y
+0–65535
+W
+0xB1 (177) LVDS Master Control
+0
+PLL Bypass
+0 = Internal shift-CLK is driven by PLL. 
+1 = Internal shift-CLK is sourced from the 
+LVDS_BYPASS_CLK. 
+0
+Y
+0, 1
+W
+1
+LVDS Power-
+down
+0 = Normal operation.
+1 = Power-down LVDS block.
+1
+Y
+0, 1
+W
+2
+PLL Test Mode
+0 = Normal operation.
+1 = The PLL output frequency is equal to the system 
+clock frequency (26.6 MHz).
+0
+Y
+0, 1
+W
+3
+LVDS Test Mode
+0 = Normal operation.
+1 = The SER_DATAOUT_P drives a square wave in 
+both stereo and stand-alone modes). In stereo mode, 
+ensure that SER_DATAIN_P is logic “0.”
+0
+Y
+0, 1
+W
+0xB2 (178) LVDS Shift Clock Control
+2:0
+Shift-clk Delay 
+Element Select
+The amount of shift-CLK delay that minimizes inter-
+sensor skew.
+0
+Y
+0–7
+W
+4
+LVDS Receiver 
+Power-down
+When set, LVDS receiver is disabled. 
+1
+Y
+0, 1
+W
+0xB3 (179) LVDS Data Control
+2:0
+Data Delay 
+Element Select
+The amount of data delay that minimizes inter-
+sensor skew.
+0
+Y
+0–7
+W
+4
+LVDS Driver 
+Power-down
+When set, data LVDS driver is disabled.
+1
+Y
+0, 1
+W
+0xB4 (180) LVDS Latency
+1:0
+Stream Latency 
+Select
+The amount of delay so that the two streams are in 
+sync. 
+0
+Y
+0–3
+W
+0xB5 (181) LVDS Internal Sync
+0
+LVDS Internal 
+Sync Enable
+When set, the MT9V032 generates sync pattern (data 
+with all zeros except start bit) on 
+LVDS_SER_DATA_OUT.
+0
+Y
+0, 1
+W
+0xB6 (182) LVDS Payload Control
+0
+Use 10-bit Pixel 
+Enable
+When set, all 10 pixel data bits are output in stand-
+alone mode. Control signals are embedded. If clear, 8 
+bits of pixel data are output with 2 control bits. See  
+“LVDS Output Format” on page 52 for additional 
+information.
+0
+Y
+0, 1
+W
+0xB7 (183) Stereoscopy Error Control
+0
+Enable Stereo 
+Error Detect
+Set this bit to enable stereo error detect mechanism.
+0
+Y
+0, 1
+W
+1
+Enable Stick 
+Stereo Error Flag
+When set, the stereo error flag remains asserted 
+once an error is detected unless clear stereo error flag 
+(bit 2) is set.
+0
+Y
+0, 1
+W
+Table 8: 
+Register Descriptions (continued)
+Bit
+Bit Name
+Bit Description
+Default in 
+Hex (Dec)
+Shadowed
+Legal 
+Values 
+(Dec)
+Read/
+Write
+
+===== PAGE 35 =====
+MT9V022_DS Rev. G  6/15 EN
+30
+©Semiconductor Components Industries, LLC, 2015.
+ MT9V032: 1/3-Inch Wide-VGA Digital Image Sensor
+Registers
+2
+Clear Stereo Error 
+Flag
+Set this bit to clear the stereoscopy error flag (R0xB8 
+returns to logic 0).
+0
+Y
+0, 1
+W
+0xB8 (184) Stereoscopy Error Flag
+0
+Stereoscopy Error 
+Flag
+Stereoscopy error status flag. It is also directly 
+connected to the ERROR output pin.
+R
+0xB9 (185) LVDS Data Output
+15:0
+Combo Reg
+This 16-bit value contains both 8-bit pixel values 
+from both stereoscopic master and slave sensors. It 
+can be used in diagnosis to determine how well in 
+sync the two sensors are. Captures the state when 
+master sensor has issued a reserved byte and slave 
+has not.
+Note: This register should be read from the 
+stereoscopic master sensor only.
+R
+0xBA (186) AGC Gain Output
+6:0
+AGC Gain
+Status register to report the current gain value 
+obtained from the AGC algorithm.
+10
+(16)
+R
+0xBB (187) AEC Exposure Output
+15:0
+AEC Exposure
+Status register to report the current exposure value 
+obtained from the AEC Algorithm.
+00C8
+(200)
+R
+0xBC (188) AGC/AEC Current Bin
+5:0
+Current Bin
+Status register to report the current bin of the 
+histogram.
+R
+0xBD (189) Maximum Total Shutter Width
+15:0
+Maximum Total 
+Shutter Width
+This register is used by the automatic exposure 
+control (AEC) as the upper threshold of exposure. 
+This ensures the new calibrated integration value 
+does not exceed that which the MT9V032 supports.
+01E0
+(480)
+Y
+1–2047
+W
+0xBE (190) AGC/AEC Bin Difference Threshold
+7:0
+Bin Difference 
+Threshold
+This register is used by the AEC only when exposure 
+reaches its minimum value of 1. If the difference 
+between desired bin (R0xA5) and current bin (R0xBC) 
+is larger than the threshold, the exposure is 
+increased. 
+14
+(20)
+Y
+0–63
+W
+0xBF (191) Field Vertical Blank
+8:0
+Field Vertical 
+Blank
+The number of blank rows between odd and even 
+fields.
+Note: For interlaced (both field) mode only. See 
+R0x07[2:0].
+16
+(22)
+Y
+0–255
+W
+0xC0 (192) Monitor Mode Capture Control
+7:0
+Image Capture 
+Numb
+The number of frames to be captured during the 
+wake-up period when monitor mode is enabled.
+0A
+(10)
+Y
+0–255
+W
+0xC1 (193) Thermal Information
+9:0
+Temperature 
+Output
+Status register to report the temperature of sensor. 
+Updated once per frame.
+R
+Table 8: 
+Register Descriptions (continued)
+Bit
+Bit Name
+Bit Description
+Default in 
+Hex (Dec)
+Shadowed
+Legal 
+Values 
+(Dec)
+Read/
+Write
+
+===== PAGE 36 =====
+MT9V022_DS Rev. G  6/15 EN
+31
+©Semiconductor Components Industries, LLC, 2015.
+ MT9V032: 1/3-Inch Wide-VGA Digital Image Sensor
+Registers
+0xC2 (194) Analog Controls
+6
+Reserved
+Reserved.
+1
+N
+0, 1
+W
+7
+Anti-Eclipse 
+Enable
+Setting this bit turns on anti-eclipse circuitry.
+0
+N
+0, 1
+W
+11:13
+V_rst_lim 
+voltage Level
+V_rst_lim = bits (2:0) × 50mV + 1.95V
+Range: 1.95–2.30V; Default: 2.00V
+Usage: For anti-eclipse reference voltage control
+1
+N
+0–7
+W
+0xC3 (195) NTSC Frame Valid Control
+0
+Extend Frame 
+Valid
+When set, frame valid is extended for half-line in 
+length at the odd field.
+0
+Y
+0, 1
+W
+1
+Replace FV/LV 
+with Ped/Snyc
+When set, frame valid and line valid is replaced by 
+ped and sync signals respectively. 
+0
+Y
+0, 1
+W
+0xC4 (196) NTSC Horizontal Blanking Control
+7:0
+Front porch 
+width
+The front porch width in number of master clock 
+cycle. NTSC standard is 1.5sec ±0.1sec
+16
+(22)
+Y
+0–255
+W
+15:8
+Sync Width
+The sync pulse width in number of master clock cycle. 
+NTSC standard is 4.7sec ±0.1sec.
+044
+(68)
+Y
+0–255
+W
+0xC5 (197) NTSC Vertical Blanking Control
+7:0
+Equalizing Pulse 
+Width
+The pulse width in number of master clock cycle. 
+NTSC standard is 2.3sec ±0.1sec.
+21
+(33)
+Y
+0–255
+W
+15:8
+Vertical Serration 
+Width
+The pulse width in number of master clock cycle. 
+NTSC standard is 4.7sec ±0.1sec.
+44
+(68)
+Y
+0–255
+W
+0xF0 (240) Bytewise Address
+Bytewise Address
+Special address to perform 8-bit READs and WRITEs 
+to the sensor. See the "Two-
+Wire Serial Interface Sample Read and Write Sequen
+ces" on page 12” for further details on how to use 
+this functionality.
+0xFE (254) Register Lock
+15:0
+Register Lock 
+Code
+To lock all registers except R0xFE, program data with 
+0xDEAD; to unlock two-wire serial interface, program 
+data with 0xBEEF. When two-wire serial interface is 
+locked, any subsequent two-wire serial interface 
+write to register other than to two-wire serial 
+interface Protect Enable Register is ignored until two-
+wire serial interface is unlocked.
+To lock Register 13 only, program data with 0xDEAF; 
+to unlock, program data with 0xBEEF. When Register 
+13 is locked, any subsequent two-wire serial 
+interface write to this register only is ignored until 
+register is unlocked.
+BEEF
+(48879)
+N
+48879,
+57005,
+57007
+W
+Table 8: 
+Register Descriptions (continued)
+Bit
+Bit Name
+Bit Description
+Default in 
+Hex (Dec)
+Shadowed
+Legal 
+Values 
+(Dec)
+Read/
+Write
+
+===== PAGE 37 =====
+MT9V022_DS Rev. G  6/15 EN
+32
+©Semiconductor Components Industries, LLC, 2015.
+ MT9V032: 1/3-Inch Wide-VGA Digital Image Sensor
+Feature Description
+Feature Description
+Operational Modes
+The MT9V032 works in master, snapshot, or slave mode. In master mode the sensor 
+generates the readout timing. In snapshot mode it accepts an external trigger to start 
+integration, then generates the readout timing. In slave mode the sensor accepts both 
+external integration and readout controls. The integration time is programmed through 
+the two-wire serial interface during master or snapshot modes, or controlled through 
+externally generated control signal during slave mode.
+Master Mode
+There are two possible operation methods for master mode: simultaneous and sequen-
+tial. One of these operation modes must be selected through the two-wire serial inter-
+face. 
+Simultaneous Master Mode
+In simultaneous master mode, the exposure period occurs during readout. The frame 
+synchronization waveforms are shown in Figure 13 and Figure 14. The exposure and 
+readout happen in parallel rather than sequentially, making this the fastest mode of 
+operation.
+Figure 13: 
+ Simultaneous Master Mode Synchronization Waveforms #1
+Readout Time > Exposure Time
+LED_OUT
+DOUT(9:0)
+LINE_VALID
+FRAME_VALID
+Exposure Time
+Vertical Blanking
+xxx
+xxx
+xxx
+
+===== PAGE 38 =====
+MT9V022_DS Rev. G  6/15 EN
+33
+©Semiconductor Components Industries, LLC, 2015.
+ MT9V032: 1/3-Inch Wide-VGA Digital Image Sensor
+Feature Description
+Figure 14: 
+ Simultaneous Master Mode Synchronization Waveforms #2
+When exposure time is greater than the sum of vertical blank and window height, the 
+number of vertical blank rows is increased automatically to accommodate the exposure 
+time.
+Sequential Master Mode
+In sequential master mode the exposure period is followed by readout. The frame 
+synchronization waveforms for sequential master mode are shown in Figure 15. The 
+frame rate changes as the integration time changes.
+Figure 15: 
+ Sequential Master Mode Synchronization Waveforms
+Snapshot Mode
+In snapshot mode the sensor accepts an input trigger signal which initiates exposure, 
+and is immediately followed by readout. Figure 16 shows the interface signals used in 
+snapshot mode. In snapshot mode, the start of the integration period is determined by 
+the externally applied EXPOSURE pulse that is input to the MT9V032. The integration 
+time is preprogrammed via the two-wire serial interface on R0x0B. After the frame's inte-
+gration period is complete the readout process commences and the syncs and data are 
+output. Sensor in snapshot mode can capture a single image or a sequence of images. 
+The frame rate may only be controlled by changing the period of the user supplied 
+EXPOSURE pulse train. The frame synchronization waveforms for snapshot mode are 
+shown in Figure 17.
+Exposure Time > Readout Time
+LED_OUT
+DOUT(9:0)
+LINE_VALID
+FRAME_VALID
+Exposure Time
+Vertical Blanking
+xxx
+xxx
+xxx
+LED_OUT
+DOUT(9:0)
+LINE_VALID
+FRAME_VALID
+Exposure Time
+xxx
+xxx
+xxx
+
+===== PAGE 39 =====
+MT9V022_DS Rev. G  6/15 EN
+34
+©Semiconductor Components Industries, LLC, 2015.
+ MT9V032: 1/3-Inch Wide-VGA Digital Image Sensor
+Feature Description
+Figure 16: 
+ Snapshot Mode Interface Signals
+Figure 17: 
+ Snapshot Mode Frame Synchronization Waveforms
+Slave Mode
+In slave mode, the exposure and readout are controlled using the EXPOSURE, 
+STFRM_OUT, and STLN_OUT pins. When the slave mode is enabled, STFRM_OUT and 
+STLN_OUT become input pins.
+The start and end of integration are controlled by EXPOSURE and STFRM_OUT pulses, 
+respectively. While a STFRM_OUT pulse is used to stop integration, it is also used to 
+enable the readout process.
+After integration is stopped, the user provides STLN_OUT pulses to trigger row readout. 
+A full row of data is read out with each STLN_OUT pulse. The user must provide enough 
+time between successive STLN_OUT pulses to allow the complete readout of one row. 
+It is also important to provide additional STLN_OUT pulses to allow the sensors to read 
+the vertical blanking rows. It is recommended that the user program the vertical blank 
+register (R0x06) with a value of 4, and achieve additional vertical blanking between 
+frames by delaying the application of the STFRM_OUT pulse. 
+The elapsed time between the rising edge of STLN_OUT and the first valid pixel data is 
+[horizontal blanking register (R0x05) + 4] clock cycles.
+CONTROLLER
+EXPOSURE
+SYSCLK
+PIXCLK
+LINE_VALID
+FRAME_VALID
+DOUT(9:0)
+MT9V032
+LED_OUT
+DOUT(9:0)
+LINE_VALID
+FRAME_VALID
+Exposure Time
+xxx
+xxx
+xxx
+EXPOSURE
+
+===== PAGE 40 =====
+MT9V022_DS Rev. G  6/15 EN
+35
+©Semiconductor Components Industries, LLC, 2015.
+ MT9V032: 1/3-Inch Wide-VGA Digital Image Sensor
+Feature Description
+Figure 18: 
+ Slave Mode Operation
+Signal Path
+The MT9V032 signal path consists of a programmable gain, a programmable analog 
+offset, and a 10-bit ADC. See  “Black Level Calibration” on page 43 for the programmable 
+offset operation description. 
+Figure 19: 
+ Signal Path
+On-Chip Biases 
+ADC Voltage Reference
+The ADC voltage reference is programmed through R0x2C, bits 2:0. The ADC reference 
+ranges from 1.0V to 2.1V. The default value is 1.4V. The increment size of the voltage 
+reference is 0.1V from 1.0V to 1.6V (R0x2C[2:0] values 0 to 6). At R0x2C[2:0] = 7, the refer-
+ence voltage jumps to 2.1V. 
+The effect of the ADC calibration does not scale with VREF. Instead it is a fixed value rela-
+tive to the output of the analog gain stage. At default, one LSB of calibration equals two 
+LSB in output data (1LSBOffset = 2mV, 1LSBADC = 1mV).
+It is very important to preserve the correct values of the other bits in R0x2C. The default 
+register setting is 0x0004.
+1-row 
+time
+2 master 
+clocks
+1-row 
+time
+98 master 
+clocks
+Exposure
+(input)
+STFRM_OUT
+(input)
+LED_OUT
+(output)
+STLN_OUT
+(input)
+LINE_VALID
+(output)
+Integration T ime
+Vertical Blanking
+(def = 45 lines)
+Pixel Output
+(reset minus signal)
+Offset Correction
+Voltage (R0x48 or
+result of BLC)
+10 (12) bit ADC
+ADC Data
+(9:0)
+Gain Selection
+(R0x35 or
+result of AGC)
+VREF
+(R0x2C)
+C2
+C1 
+Σ
+
+===== PAGE 41 =====
+MT9V022_DS Rev. G  6/15 EN
+36
+©Semiconductor Components Industries, LLC, 2015.
+ MT9V032: 1/3-Inch Wide-VGA Digital Image Sensor
+Feature Description
+V_Step Voltage Reference
+This voltage is used for pixel high dynamic range operations, programmable from R0x31 
+through R0x34.
+Chip Version 
+Chip version registers R0x00 and R0xFF are read-only.
+Window Control
+Registers R0x01 column start, R0x02 Row Start, R0x03 window height (row size), and 
+R0x04 window width (column size) control the size and starting coordinates of the 
+window. 
+The values programmed in the window height and width registers are the exact window 
+height and width out of the sensor. The window start value should never be set below 
+four. 
+To read out the dark rows set bit 6 of R0x0D. In addition, bit 7 of R0x0D can be used to 
+display the dark columns in the image. 
+Blanking Control 
+Horizontal blanking and vertical blanking registers R0x05 and R0x06 respectively control 
+the blanking time in a row (horizontal blanking) and between frames (vertical blanking). 
+• Horizontal blanking is specified in terms of pixel clocks.
+• Vertical blanking is specified in terms of numbers of rows. 
+The actual imager timing can be calculated using Table 4 on page 8 and Table 5 on 
+page 9 which describe “Row Timing and FRAME_VALID/LINE_VALID signals.” The 
+minimum number of vertical blank rows is 4. 
+
+===== PAGE 42 =====
+MT9V022_DS Rev. G  6/15 EN
+37
+©Semiconductor Components Industries, LLC, 2015.
+ MT9V032: 1/3-Inch Wide-VGA Digital Image Sensor
+Feature Description
+Pixel Integration Control 
+Total Integration
+R0x0B Total Shutter Width (In Terms of Number of Rows) 
+This register (along with the window width and horizontal blanking registers) controls 
+the integration time for the pixels. 
+The actual total integration time, tINT, is:
+tINT = (Number of rows of integration × row time) + overhead
+(EQ 1)
+where:
+– The number of rows integration is equal to the result of automatic exposure control 
+(AEC) which may vary from frame to frame, or, if AEC is disabled, the value in 
+R0x0B
+– Row time = (R0x04 + R0x05) master clock periods
+– Overhead = (R0x04 + R0x05 – 255) master clock periods
+Typically, the value of R0x0B (total shutter width) is limited to the number of rows per 
+frame (which includes vertical blanking rows), such that the frame rate is not affected by 
+the integration time. If R0x0B is increased beyond the total number of rows per frame, it 
+is required to add additional blanking rows using R0x06 as needed. A second constraint 
+is that tINT must be adjusted to avoid banding in the image from light flicker. Under 
+60Hz flicker, this means frame time must be a multiple of 1/120 of a second. Under 50Hz 
+flicker, frame time must be a multiple of 1/100 of a second.
+Changes to Integration Time
+With automatic exposure control disabled (R0xAF, bit 0 is cleared to LOW), and if the 
+total integration time (R0x0B) is changed through the two-wire serial interface while 
+FRAME_VALID is asserted for frame n, the first frame output using the new integration 
+time is frame (n + 2). Similarly, when automatic exposure control is enabled, any change 
+to the integration time for frame n first appears in frame (n + 2) output.
+The sequence is as follows:
+1. During frame n, the new integration time is held in the R0x0B live register.
+2. At the start of frame (n + 1), the new integration time is transferred to the exposure 
+control module. Integration for each row of frame (n + 1) has been completed using 
+the old integration time. The earliest time that a row can start integrating using the 
+new integration time is immediately after that row has been read for frame (n + 1). 
+The actual time that rows start integrating using the new integration time is depen-
+dent on the new value of the integration time.
+3. When frame (n + 1) is read out, it is integrated using the new integration time. If the 
+integration time is changed (R0x0B written) on successive frames, each value written 
+is applied to a single frame; the latency between writing a value and it affecting the 
+frame readout remains at two frames.
+However, when automatic exposure control is disabled, if the integration time is 
+changed through the two-wire serial interface after the falling edge of FRAME_VALID 
+for frame n, the first frame output using the new integration time becomes frame 
+(n + 3).
+
+===== PAGE 43 =====
+MT9V022_DS Rev. G  6/15 EN
+38
+©Semiconductor Components Industries, LLC, 2015.
+ MT9V032: 1/3-Inch Wide-VGA Digital Image Sensor
+Feature Description
+Figure 20: 
+ Latency When Changing Integration
+Exposure Indicator
+The exposure indicator is controlled by:
+• R0x1B LED_OUT control
+The MT9V032 provides an output pin, LED_OUT, to indicate when the exposure takes 
+place. When R0x1B bit 0 is clear, LED_OUT is HIGH during exposure. By using R0x1B, bit 
+1, the polarity of the LED_OUT pin can be inverted.
+High Dynamic Range
+High dynamic range is controlled by:
+• R0x08 shutter width 1
+• R0x09 shutter width 2
+• R0x0A shutter width control 
+• R0x31–R0x34 V_Step voltages
+In the MT9V032, high dynamic range (that is, R0x0F, bit 6 = 1) is achieved by controlling 
+the saturation level of the pixel (HDR or high dynamic range gate) during the exposure 
+period. The sequence of the control voltages at the HDR gate is shown in Figure 21. After 
+the pixels are reset, the step voltage, V_Step, which is applied to HDR gate, is set up at V1 
+for integration time t1 then to V2 for time t2, then V3 for time t3, and finally it is parked at 
+V4, which also serves as an antiblooming voltage for the photodetector. This sequence of 
+voltages leads to a piecewise linear pixel response, illustrated (in approximates) in 
+Figure 21 on page 39.
+FRAME_VALID
+Image Data
+Frame Start
+LED_OUT
+Output image with
+Int =  200 rows 
+Output
+image with
+Int = 300
+rows  
+Int = 300 rows  
+Int =  200 rows
+Int =  200 rows
+Int = 300 rows  
+New Integration
+Programmed
+Actual
+Integration
+
+===== PAGE 44 =====
+MT9V022_DS Rev. G  6/15 EN
+39
+©Semiconductor Components Industries, LLC, 2015.
+ MT9V032: 1/3-Inch Wide-VGA Digital Image Sensor
+Feature Description
+Figure 21: 
+ Sequence of Control Voltages at the HDR Gate
+Figure 22: 
+ Sequence of Voltages in a Piecewise Linear Pixel Response
+The parameters of the step voltage V_Step which takes values V1, V2, and V3 directly 
+affect the position of the knee points in Figure 22.
+Light intensities work approximately as a reciprocal of the partial exposure time. Typi-
+cally, t1 is the longest exposure, t2 shorter, and so on. Thus the range of light intensities is 
+shortest for the first slope, providing the highest sensitivity.
+The register settings for V_Step and partial exposures are:
+V1 = R0x31, bits 4:0
+V2 = R0x32, bits 4:0
+V3 = R0x33, bits 4:0
+V4 = R0x34, bits 4:0
+tINT = t1 + t2 + t3
+There are two ways to specify the knee points timing, the first by manual setting (default) 
+and the second by automatic knee point adjustment. 
+When the auto adjust enabler is set to HIGH (LOW by default), the MT9V032 calculates 
+the knee points automatically using the following equations:
+t1 =tINT - t2 - t3
+(EQ 2)
+t2 = tINT x (½)R0x0A, bits 3:0
+(EQ 3)
+t3 = tINT x (½)R0x0A, bits 7:4
+(EQ 4)
+As a default for auto exposure, t2 is 1/16 of tINT, t3 is 1/64 of tINT. 
+t2
+t3
+V4~0.8V
+Exposure
+t1
+HDR
+Voltage
+VAA (3.3V)
+V1~1.4V
+V2~1.2V
+V3~1.0V
+dV1
+dV2
+dV3
+1/t1
+1/t2
+1/t3
+Light Intensity
+Output
+
+===== PAGE 45 =====
+MT9V022_DS Rev. G  6/15 EN
+40
+©Semiconductor Components Industries, LLC, 2015.
+ MT9V032: 1/3-Inch Wide-VGA Digital Image Sensor
+Feature Description
+When the auto adjust enabler is disabled (default), t1, t2, and t3 may be programmed 
+through the two-wire serial interface:
+t1 = R0x08, bits 14:0
+(EQ 5)
+t2 = (R0x09, bits 14:0) - (R0x08, bits 14:0)
+(EQ 6)
+t3 = tINT - t1 - t2
+(EQ 7)
+tINT may be based on the manual setting of R0x0B or the result of the AEC. If the AEC is 
+enabled then the auto knee adjust must also be enabled.
+Variable ADC Resolution
+By default, ADC resolution of the sensor is 10-bit. Additionally, a companding scheme of 
+12-bit into 10-bit is enabled by the R0x1C (28). This mode allows higher ADC resolution 
+which means less quantization noise at low-light, and lower resolution at high light, 
+where good ADC quantization is not so critical because of the high level of the photon’s 
+shot noise. 
+Figure 23: 
+ 12- to 10-Bit Companding Chart
+256 
+512 
+768 
+1,024 
+4,096
+2,048
+1,024
+512
+256
+4 to 1 Companding (1,536     384)
+8 to 1  Companding (2,048     256)
+10-bit
+Codes
+12-bit
+Codes
+2 to 1  Companding (256     128)
+No companding (256     256)
+
+===== PAGE 46 =====
+MT9V022_DS Rev. G  6/15 EN
+41
+©Semiconductor Components Industries, LLC, 2015.
+ MT9V032: 1/3-Inch Wide-VGA Digital Image Sensor
+Feature Description
+Gain Settings
+Changes to Gain Settings
+When the digital gain settings (R0x80–R0x98) are changed, the gain is updated on the 
+next frame start. However, the latency for an analog gain change to take effect depends 
+on the automatic gain control.
+If automatic gain control is enabled (R0xAF, bit 1 is set to HIGH), the gain changed for 
+frame n first appears in frame (n + 1); if the automatic gain control is disabled, the gain 
+changed for frame n first appears in frame (n + 2).
+Both analog and digital gain change regardless of whether the integration time is also 
+changed simultaneously.
+Figure 24: 
+ Latency of Analog Gain Change When AGC Is Disabled
+Analog Gain
+Analog gain is controlled by:
+• R0x35 global gain
+The formula for gain setting is:
+Gain = Bits[6:0] x 0.0625
+(EQ 8)
+The analog gain range supported in the MT9V032 is 1X–4X with a step size of 
+6.25 percent. To control gain manually with this register, the sensor must NOT be in AGC 
+mode. When adjusting the luminosity of an image, it is recommended to alter exposure 
+first and yield to gain increases only when the exposure value has reached a maximum 
+limit.
+Analog gain = bits (6:0) x 0.0625 for values 16–31
+(EQ 9)
+Analog gain = bits (6:0)/2 x 0.125 for values 32–64
+(EQ 10)
+For values 16–31: each LSB increases analog gain 0.0625v/v. A value of 16 = 1X gain. 
+Range: 1X to 1.9375X.
+For values 32–64: each 2 LSB increases analog gain 0.125v/v (that is, double the gain 
+increase for 2 LSB). Range: 2X to 4X. Odd values do not result in gain increases; the gain 
+increases by 0.125 for values 32, 34, 36, and so on. 
+FRAME_VALID
+Image Data
+Frame Start
+Output image with
+Gain =  3.0X
+Output
+image with
+Gain = 3.5X
+Gain =  3.0X
+Gain =  3.5X
+Gain =  3.0X
+Gain =  3.5X
+New Gain
+Programmed
+Actual
+Gain
+
+===== PAGE 47 =====
+MT9V022_DS Rev. G  6/15 EN
+42
+©Semiconductor Components Industries, LLC, 2015.
+ MT9V032: 1/3-Inch Wide-VGA Digital Image Sensor
+Feature Description
+Digital Gain
+Digital gain is controlled by:
+• R0x99–R0xA4 tile coordinates
+• R0x80–R0x98 tiled digital gain and weight
+In the MT9V032, the image may be divided into 25 tiles, as shown in Figure 25, through 
+the two-wire serial interface, and apply digital gain individually to each tile.
+Figure 25: 
+ Tiled Sample
+Registers 0x99–0x9E and 0x9F–0xA4 represent the coordinates X0/5-X5/5 and Y0/5-Y5/5 in 
+Figure 25, respectively. 
+Digital gains of registers 0x80–0x98 apply to their corresponding tiles. The MT9V032 
+supports a digital gain of 0.25-3.75X.
+The formula for digital gain setting is:
+Digital gain = Bits[3:0] x 0.25
+(EQ 11)
+X0/5     X1/5        X2/5    X3/5      X5/5                    X5/5
+Y0/5
+Y1/5
+Y2/5
+Y3/5
+Y4/5
+Y5/5
+x0_y0     x1_y0                                         x4_y0
+x0_y1     x1_y1                                         x4_y1
+x0_y2     x1_y2                                         x4_y2
+x0_y3     x1_y3                                         x4_y3
+x0_y4     x1_y4                                         x4_y4
+
+===== PAGE 48 =====
+MT9V022_DS Rev. G  6/15 EN
+43
+©Semiconductor Components Industries, LLC, 2015.
+ MT9V032: 1/3-Inch Wide-VGA Digital Image Sensor
+Feature Description
+Black Level Calibration
+Black level calibration is controlled by:
+• R0x4C
+• R0x42
+• R0x46–R0x48
+The MT9V032 has automatic black level calibration on-chip, and if enabled, its result 
+may be used in the offset correction shown in Figure 26.
+Figure 26: 
+ Black Level Calibration Flow Chart
+The automatic black level calibration measures the average value of pixels from 2 dark 
+rows (1 dark row if row bin 4 is enabled) of the chip. (The pixels are averaged as if they 
+were light-sensitive and passed through the appropriate gain.) 
+This row average is then digitally low-pass filtered over many frames (R0x47, bits 7:5) to 
+remove temporal noise and random instabilities associated with this measurement.
+Then, the new filtered average is compared to a minimum acceptable level, low 
+threshold, and a maximum acceptable level, high threshold. 
+If the average is lower than the minimum acceptable level, the offset correction voltage 
+is increased by a programmable offset LSB in R0x4C. (Default step size is 2 LSB Offset = 1 
+ADC LSB at analog gain = 1X.) 
+If it is above the maximum level, the offset correction voltage is decreased by 2 LSB 
+(default). 
+To avoid oscillation of the black level from below to above, the region the thresholds 
+should be programmed so the difference is at least two times the offset DAC step size.
+In normal operation, the black level calibration value/offset correction value is calcu-
+lated at the beginning of each frame and can be read through the two-wire serial inter-
+face from R0x48. This register is an 8-bit signed two’s complement value. 
+However, if R0x47, bit 0 is set to “1,” the calibration value in R0x48 may be manually set 
+to override the automatic black level calculation result. This feature can be used in 
+conjunction with the “show dark rows” feature (R0x0D, bit 6) if using an external black 
+level calibration circuit. 
+Pixel Output
+(reset minus signal)
+Offset Correction
+Voltage (R0x48 or
+result of BLC)
+10 (12) bit ADC
+ADC Data
+(9:0)
+Gain Selection
+(R0x35 or
+result of AGC)
+VREF
+(R0x2C)
+C2
+C1 
+Σ
+
+===== PAGE 49 =====
+MT9V022_DS Rev. G  6/15 EN
+44
+©Semiconductor Components Industries, LLC, 2015.
+ MT9V032: 1/3-Inch Wide-VGA Digital Image Sensor
+Feature Description
+The offset correction voltage is generated according to the following formulas:
+Offset Correction Voltage = (8-bit signed two’s complement calibration value,-127 to 127) × 0.5mV 
+(EQ 12)
+ADC input voltage = (Pixel Output Voltage + Offset Correction Voltage) × Analog Gain 
+(EQ 13)
+Row-wise Noise Correction
+Row-wise noise correction is controlled by the following registers:
+• R0x70 row noise control
+• R0x72 row noise constant
+• R0x73 dark column start
+When the row-wise noise cancellation algorithm is enabled, the average value of the 
+dark columns read out is used as a correction for the whole row. The row-wise correction 
+is in addition to the general black level correction applied to the whole sensor frame and 
+cannot be used to replace the latter. The dark average is subtracted from each pixel 
+belonging to the same row, and then a positive constant is added (R0x72, bits 7:0). This 
+constant should be set to the dark level targeted by the black level algorithm plus the 
+noise expected on the measurements of the averaged values from dark columns; it is 
+meant to prevent clipping from negative noise fluctuations.
+Pixel value = ADC value - dark column average + row noise constant
+(EQ 14)
+On a per-row basis, the dark column average is calculated from a programmable 
+number of dark columns (pixels) values (R0x70, bits 3:0). The default is 10 dark columns. 
+Of these, the maximum and minimum values are removed and then the average is calcu-
+lated. If R0x70, bits 3:0 are set to “0” (2 pixels), it is essentially equivalent to disabling the 
+dark average calculation since the average is equal to “0” after the maximum and 
+minimum values are removed.
+R0x73 is used to indicate the starting column address of dark pixels that the row-noise 
+correction algorithm uses for calculation. In the MT9V032, dark columns which may be 
+used are 759–776. R0x73 is used to select the starting column for the calculation. 
+One additional note in setting the row-noise correction register:
+777 < (R0x73, bits 9:0) + number of dark pixels programmed in R0x70, bits 3:0 -1
+(EQ 15)
+This is to ensure the column pointer does not go beyond the limit the MT9V032 can 
+support.
+
+===== PAGE 50 =====
+MT9V022_DS Rev. G  6/15 EN
+45
+©Semiconductor Components Industries, LLC, 2015.
+ MT9V032: 1/3-Inch Wide-VGA Digital Image Sensor
+Feature Description
+Automatic Gain Control and Automatic Exposure Control
+The integrated AEC/AGC unit is responsible for ensuring that optimal auto settings of 
+exposure and (analog) gain are computed and updated every frame. 
+Automatic exposure control (AEC) and automatic gain control (AGC) can be individually 
+enabled or disabled by R0xAF. When AEC is disabled (R0xAF[0] = 0), the sensor uses the 
+manual exposure value in R0x0B. When AGC is disabled (R0xAF[1] = 0), the sensor uses 
+the manual gain value in R0x35. See ON Semiconductor Technical Note TN-09-81, 
+“MT9V032 AEC and AGC Functions,” for further details.
+Figure 27: 
+ Controllable and Observable AEC/AGC Registers
+The exposure is measured in row-time by reading R0xBB. The exposure range is 
+1 to 2047. The gain is measured in gain-units by reading R0xBA. The gain range is 
+16 to 63 (unity gain = 16 gain-units; multiply by 1/16 to get the true gain).
+When AEC is enabled (R0xAF[0] = 1), the maximum auto exposure value is limited by 
+R0xBD; minimum auto exposure is fixed at 1 row. 
+When AGC is enabled (R0xAF[1] = 1), the maximum auto gain value is limited by R0x36; 
+minimum auto gain is fixed to 16 gain-units.
+The exposure control measures current scene luminosity and desired output luminosity 
+by accumulating a histogram of pixel values while reading out a frame. The desired 
+exposure and gain are then calculated from this for subsequent frame.
+Pixel Clock Speed
+The pixel clock speed is same as the master clock (SYSCLK) at 26.66 MHz by default. 
+However, when column binning 2 or 4 (R0x0D, bit 2 or 3) is enabled, the pixel clock 
+speed is reduced by half and one-fourth of the master clock speed respectively. See 
+“Read Mode Options” on page 47 and “Column Binning” on page 49 for additional infor-
+mation.
+EXP.  LPF
+(R0xA8)
+1
+0
+1
+0
+EXP.  SKIP
+(R0xA6)
+MANUAL EXP.
+(R0x0B)
+AEC ENABLE
+(R0xAF[0])
+MAX. EXPOSURE
+(R0xBD)
+MIN EXP.
+AEC
+UNIT
+To exposure
+timing control
+AEC
+OUTPUT
+R0xBB
+R0xBA
+To analog
+gain control
+HISTOGRAM
+GENERATOR
+UNIT
+AGC
+UNIT
+GAIN LPF
+(R0xAB)
+GAIN SKIP
+(R0xA9)
+MANUAL GAIN
+(R0x35)
+AGC ENABLE
+(R0xAF[1])
+AGC OUTPUT
+MAX. GAIN
+(R0x36)
+MIN GAIN
+DESIRED BIN
+(desired luminance)
+(R0xA5)
+CURRENT BIN
+(current luminance)
+(R0xBC)
+1
+16
+
+===== PAGE 51 =====
+MT9V022_DS Rev. G  6/15 EN
+46
+©Semiconductor Components Industries, LLC, 2015.
+ MT9V032: 1/3-Inch Wide-VGA Digital Image Sensor
+Feature Description
+Hard Reset of Logic
+The RC circuit for the MT9V032 uses a 10kresistor and a 0.1F capacitor. The rise time 
+for the RC circuit is 1s maximum.
+Soft Reset of Logic
+Soft reset of logic is controlled by:
+• R0x0C reset
+Bit 0 is used to reset the digital logic of the sensor while preserving the existing two-wire 
+serial interface configuration. Furthermore, by asserting the soft reset, the sensor aborts 
+the current frame it is processing and starts a new frame. Bit 1 is a shadowed reset 
+control register bit to explicitly reset the automatic gain and exposure control feature.
+These two bits are self-resetting bits and also return to “0” during two-wire serial inter-
+face reads.
+STANDBY Control
+The sensor goes into standby mode by setting STANDBY to HIGH. Once the sensor 
+detects that STANDBY is asserted, it completes the current frame before disabling the 
+digital logic, internal clocks, and analog power enable signal. To release the sensor from 
+the standby mode, reset STANDBY back to LOW. The LVDS must be powered to ensure 
+that the device is in standby mode. See "Appendix B – Power-On 
+Reset and Standby Timing" on page 67 for more information on standby.
+Monitor Mode Control
+Monitor mode is controlled by:
+• R0x0E monitor mode enable
+• R0xC0 monitor mode image capture control
+The sensor goes into monitor mode when R0x0E bit 0 is set to HIGH. In this mode, the 
+sensor first captures a programmable number of frames (R0xC0), then goes into a sleep 
+period for five minutes. The cycle of sleeping for five minutes and waking up to capture a 
+number of frames continues until R0x0E bit 0 is cleared to return to normal operation.
+In some applications when monitor mode is enabled, the purpose of capturing frames is 
+to calibrate the gain and exposure of the scene using automatic gain and exposure 
+control feature. This feature typically takes less than 10 frames to settle. In case a larger 
+number of frames is needed, the value of R0xC0 may be increased to capture more 
+frames.
+During the sleep period, none of the analog circuitry and a very small fraction of digital 
+logic (including a five-minute timer) is powered. The master clock (SYSCLK) is therefore 
+always required.
+
+===== PAGE 52 =====
+MT9V022_DS Rev. G  6/15 EN
+47
+©Semiconductor Components Industries, LLC, 2015.
+ MT9V032: 1/3-Inch Wide-VGA Digital Image Sensor
+Feature Description
+Read Mode Options
+(Also see “Output Data Format” on page 7 and “Output Data Timing” on page 8.)
+Column Flip
+By setting bit 5 of R0x0D the readout order of the columns is reversed, as shown in 
+Figure 28 on page 47. 
+Row Flip
+By setting bit 4 of R0x0D the readout order of the rows is reversed, as shown in Figure 29 
+on page 47. 
+Figure 28: 
+ Readout of 6 Pixels in Normal and Column Flip Output Mode
+Figure 29: 
+ Readout of 6 Rows in Normal and Row Flip Output Mode
+Pixel Binning
+In addition to windowing mode in which smaller resolution (CIF, QCIF) is obtained by 
+selecting small window from the sensor array, the MT9V032 also provides the ability to 
+show the entire image captured by pixel array with smaller resolution by pixel binning. 
+Pixel binning is based on combining signals from adjacent pixels by averaging. There are 
+two options: binning 2 and binning 4. When binning 2 is on, 4 pixel signals from 2 adja-
+cent rows and columns are combined. In binning 4 mode, 16 pixels are combined from 4 
+adjacent rows and columns. The image mode may work in conjunction with image flip. 
+The binning operation increases SNR but decreases resolution. 
+Enabling row bin2 and row bin4 improves frame rate by 2x and 4x respectively. The 
+feature of column binning does not increase the frame rate in less resolution modes.
+LINE_VALID
+Normal readout
+       DOUT(9:0)
+Reverse readout
+       DOUT(9:0)
+P4,1
+(9:0)
+P4,n
+(9:0)
+P4,n-1
+(9:0)
+P4,n-2
+(9:0)
+P4,n-3
+(9:0)
+P4,n-4
+(9:0)
+P4,n-5
+(9:0)
+P4,2
+(9:0)
+P4,3
+(9:0)
+P4,4
+(9:0)
+P4,5
+(9:0)
+P4,6
+(9:0)
+LINE_VALID
+Normal readout
+       DOUT(9:0)
+Reverse readout
+       DOUT(9:0)
+Row4
+(9:0)
+Row5
+(9:0)
+Row6
+(9:0)
+Row7
+(9:0)
+Row8
+7(9:0)
+Row9
+(9:0)
+Row484
+(9:0)
+Row483
+(9:0)
+Row482
+(9:0)
+Row481
+(9:0)
+Row480
+7(9:0)
+Row479
+(9:0)
+
+===== PAGE 53 =====
+MT9V022_DS Rev. G  6/15 EN
+48
+©Semiconductor Components Industries, LLC, 2015.
+ MT9V032: 1/3-Inch Wide-VGA Digital Image Sensor
+Feature Description
+Row Binning
+By setting bit 0 or 1 of R0x0D, only half or one-fourth of the row set is read out, as shown 
+in Figure 30 below. The number of rows read out is half or one-fourth of what is set in 
+R0x03.
+Figure 30: 
+ Readout of 8 Pixels in Normal and Row Bin Output Mode
+LINE_VALID
+Normal readout
+       DOUT(9:0)
+Row4
+(9:0)
+Row5
+(9:0)
+Row6
+(9:0)
+Row7
+(9:0)
+Row8
+(9:0)
+Row9
+(9:0)
+Row10
+(9:0)
+Row11
+(9:0)
+LINE_VALID
+Row Bin 2 readout
+       DOUT(9:0)
+Row4
+(9:0)
+Row6
+(9:0)
+Row8
+(9:0)
+LINE_VALID
+Row Bin 4 readout
+       DOUT(9:0)
+Row4
+(9:0)
+Row8
+(9:0)
+Row10
+(9:0)
+
+===== PAGE 54 =====
+MT9V022_DS Rev. G  6/15 EN
+49
+©Semiconductor Components Industries, LLC, 2015.
+ MT9V032: 1/3-Inch Wide-VGA Digital Image Sensor
+Feature Description
+Column Binning
+In setting bit 2 or 3 of R0x0D, the pixel data rate is slowed down by a factor of either two 
+or four, respectively. This is due to the overhead time in the digital pixel data processing 
+chain. As a result, the pixel clock speed is also reduced accordingly.
+Figure 31: 
+ Readout of 8 Pixels in Normal and Column Bin Output Mode
+LINE_VALID
+Normal readout
+       DOUT(9:0)
+PIXCLK
+       DOUT(9:0)
+PIXCLK
+       DOUT(9:0)
+PIXCLK
+D1
+(9:0)
+D2
+(9:0)
+D3
+(9:0)
+D4
+(9:0)
+D5
+(9:0)
+D6
+(9:0)
+D7
+(9:0)
+D8
+(9:0)
+LINE_VALID
+Column Bin 2 readout
+D12
+(9:0)
+D34
+(9:0)
+D56
+(9:0)
+D78
+(9:0)
+LINE_VALID
+Column Bin 4 readout
+       DOUT(9:0)
+d1234
+(9:0)
+d5678
+(9:0)
+
+===== PAGE 55 =====
+MT9V022_DS Rev. G  6/15 EN
+50
+©Semiconductor Components Industries, LLC, 2015.
+ MT9V032: 1/3-Inch Wide-VGA Digital Image Sensor
+Feature Description
+Interlaced Readout
+The MT9V032 has two interlaced readout options. By setting R0x07[2:0] = 1, all the even-
+numbered rows are read out first, followed by a number of programmable field blanking 
+(R0xBF, bits 7:0), and then the odd-numbered rows and finally vertical blanking 
+(minimum is 4 blanking rows). By setting R0x07[2:0] = 2, only one field is read out; 
+consequently, the number of rows read out is half what is set in R0x03. The row start 
+address (R0x02) determines which field gets read out; if the row start address is even, the 
+even field is read out; if row start address is odd, the odd field is read out.
+Figure 32: 
+ Spatial Illustration of Interlaced Image Readout
+When interlaced mode is enabled, the total number of blanking rows are determined by 
+both field blanking register (R0xBF) and vertical blanking register (R0x06). The follow-
+ings are their equations.
+Field Blanking = R0xBF, bits 7:0
+(EQ 16)
+Vertical Blanking = R0x06, bits 8:0 -R0xBF, bits 7:0
+(EQ 17)
+with 
+minimum vertical blanking requirement = 4
+(EQ 18)
+Similar to progressive scan, FRAME_VALID is logic LOW during the valid image row only. 
+Binning should not be used in conjunction with interlaced mode. 
+P4,1 P4,2 P4,3.....................................P4,n-1 P4,n
+P6,0 P6,1 P6,2.....................................P6,n-1 P6,n
+00 00 00 .................. 00 00 00
+00 00 00 .................. 00 00 00
+Pm-2,0 Pm-2,2.....................................Pm-2,n-2 Pm-2,n
+Pm,2 Pm,2.....................................Pm,n-1 Pm,n
+00 00 00 .................. 00 00 00
+00 00 00 .................. 00 00 00
+00 00 00 .................. 00 00 00
+00 00 00 .................. 00 00 00
+00 00 00 ..................................... 00 00 00
+00 00 00 ..................................... 00 00 00
+00 00 00 ............................................................................................. 00 00 00
+00 00 00 ............................................................................................. 00 00 00
+VALID IMAGE - Even Field
+HORIZONTAL
+BLANKING 
+VERTICAL BLANKING 
+P5,1 P5,2 P5,3.....................................P5,n-1 P5,n
+P7,0 P7,1 P7,2.....................................P7,n-1 P7,n
+Pm-3,1 Pm-3,2.....................................Pm-3,n-1 Pm-3,n
+Pm,1 Pm,1.....................................Pm,n-1 Pm,n
+VALID IMAGE - Odd Field
+FIELD BLANKING
+
+===== PAGE 56 =====
+MT9V022_DS Rev. G  6/15 EN
+51
+©Semiconductor Components Industries, LLC, 2015.
+ MT9V032: 1/3-Inch Wide-VGA Digital Image Sensor
+Feature Description
+LINE_VALID
+By setting bit 2 and 3 of R0x74, the LINE_VALID signal can get three different output 
+formats. The formats for reading out four rows and two vertical blanking rows are shown 
+in Figure 33. In the last format, the LINE_VALID signal is the XOR between the contin-
+uous LINE_VALID signal and the FRAME_VALID signal.
+Figure 33: 
+ Different LINE_VALID Formats
+LVDS Serial (Stand-Alone/Stereo) Output
+The LVDS interface allows for the streaming of sensor data serially to a standard off-the-
+shelf deserializer up to five meters away from the sensor. The pixels (and controls) are 
+packeted—12-bit packets for stand-alone mode and 18-bit packets for stereoscopy 
+mode. All serial signalling (CLK and data) is LVDS. The LVDS serial output could either 
+be data from a single sensor (stand-alone) or stream-merged data from two sensors (self 
+and its stereoscopic slave pair). The appendices describe in detail the topologies for 
+both stand-alone and stereoscopic modes. 
+There are two standard deserializers that can be used. One for a stand-alone sensor 
+stream and the other from a stereoscopic stream. The deserializer attached to a stand-
+alone sensor is able to reproduce the standard parallel output (8-bit pixel data, 
+LINE_VALID, FRAME_VALID and PIXCLK). The deserializer attached to a stereoscopic 
+sensor is able to reproduce 8-bit pixel data from each sensor (with embedded 
+LINE_VALID and FRAME_VALID) and pixel-clk. An additional (simple) piece of logic is 
+required to extract LINE_VALID and FRAME_VALID from the 8-bit pixel data. Irrespec-
+tive of the mode (stereoscopy/stand-alone), LINE_VALID and FRAME_VALID are always 
+embedded in the pixel data. 
+In stereoscopic mode, the two sensors run in lock-step, implying all state machines are 
+in the same state at any given time. This is ensured by the sensor-pair getting their sys-
+clks and sys-resets in the same instance. Configuration writes through the two-wire 
+serial interface are done in such a way that both sensors can get their configuration 
+updates at once. The inter-sensor serial link is designed in such a way that once the slave 
+PLL locks and the data-dly, shft-clk-dly and stream-latency-sel are configured, the 
+master sensor streams good stereo content irrespective of any variation voltage and/or 
+temperature as long as it is within specification. The configuration values of data-dly, 
+shft-clk-dly and stream-latency-sel are either predetermined from the board layout or 
+can be empirically determined by reading back the stereo-error flag. This flag gets 
+asserted when the two sensor streams are not in sync when merged. The combo_reg is 
+used for out-of-sync diagnosis.
+Default
+FRAME_VALID
+LINE_VALID
+Continuously
+FRAME_VALID
+LINE_VALID
+XOR
+FRAME_VALID
+LINE_VALID
+
+===== PAGE 57 =====
+MT9V022_DS Rev. G  6/15 EN
+52
+©Semiconductor Components Industries, LLC, 2015.
+ MT9V032: 1/3-Inch Wide-VGA Digital Image Sensor
+Feature Description
+Figure 34: 
+ Serial Output Format for a 6x2 Frame
+Notes:
+1. External pixel values of 0, 1, 2, 3, are reserved (they only convey control information). Any raw pixel 
+of value 0, 1, 2 and 3 will be substituted with 4. 
+2. The external pixel sequence 1023, 0 1023 is a reserved sequence (conveys control information). Any 
+raw pixel sequence of 1023, 0, 1023 will be substituted with 1023, 4, 1023.
+LVDS Output Format
+In stand-alone mode, the packet size is 12 bits (2 frame bits and 10 payload bits); 10-bit 
+pixels or 8-bit pixels can be selected. In 8-bit pixel mode (R0xB6[0] = 0), the packet 
+consists of a start bit, 8-bit pixel data (with sync codes), the line valid bit, the frame valid 
+bit and the stop bit. For 10-bit pixel mode (R0xB6[0] = 1), the packet consists of a start 
+bit, 10-bit pixel data, and the stop bit.
+In stereoscopic mode (see Figure 47 on page 65), the packet size is 18 bits (2 frame bits 
+and 16 payload bits). The packet consists of a start bit, the master pixel byte (with sync 
+codes), the slave byte (with sync codes), and the stop bit.)
+Table 9: 
+LVDS Packet Format in Stand-Alone Mode
+(Stereoscopy Mode Bit De-Asserted)
+12-Bit Packet
+use_10-bit_pixels Bit De-
+Asserted
+(8-Bit Mode)
+use_10-bit_pixels Bit Asserted
+(10-Bit Mode)
+Bit[0]
+1'b1 (Start bit)
+1'b1 (Start bit)
+Bit[1]
+PixelData[2]
+PixelData[0]
+Bit2]
+PixelData[3]
+PixelData[1]
+Bit[3]
+PixelData[4]
+PixelData[2]
+Bit4]
+PixelData[5]
+PixelData[3]
+Bit[5]
+PixelData[6]
+PixelData[4]
+Bit[6]
+PixelData[7]
+PixelData[5]
+Bit[7]
+PixelData[8]
+PixelData[6]
+Bit[8]
+PixelData[9]
+PixelData[7]
+Bit[9]
+Line_Valid
+PixelData[8]
+Bit[10]
+Frame_Valid
+PixelData[9]
+Bit[11]
+1'b0 (Stop bit)
+1'b0 (Stop bit)
+Internal
+PIXCLK
+Internal
+Parallel
+Data
+Internal
+Line_Valid
+Internal
+Frame_Valid
+External
+Serial
+Data Out
+P41
+P43
+P42
+P44
+P45
+P46
+P54
+P55
+P56
+P52
+P51
+P53
+1023
+1023
+0
+1
+P41
+P42
+P46
+2
+1
+P44
+P43
+P45
+P51
+P52
+P56     3
+P54
+P53
+P55
+
+===== PAGE 58 =====
+MT9V022_DS Rev. G  6/15 EN
+53
+©Semiconductor Components Industries, LLC, 2015.
+ MT9V032: 1/3-Inch Wide-VGA Digital Image Sensor
+Feature Description
+Control signals LINE_VALID and FRAME_VALID can be reconstructed from their respec-
+tive preceding and succeeding flags that are always embedded within the pixel data in 
+the form of reserved words.
+When LVDS mode is enabled along with column binning (bin 2 or bin 4, R0x0D[3:2]), the 
+packet size remains the same but the serial pixel data stream repeats itself depending on 
+whether 2X or 4X binning is set: 
+• For bin 2, LVDS outputs double the expected data (pixel 0,0 is output twice in 
+sequence, followed by pixel 0,1 twice, . . .).
+• For bin 4, LVDS outputs 4 times the expected data (pixel 0,0 is output 4 times in 
+sequence followed by pixel 0,1 times 4, . . .).
+The receiving hardware will need to undersample the output stream getting data either 
+every 2 clocks (bin 2) or every 4 (bin 4) clocks.
+If the sensor provides a pixel whose value is 0,1, 2, or 3 (that is, the same as a reserved 
+word) then the outgoing serial pixel value is switched to 4.
+Table 10: 
+LVDS Packet Format in Stereoscopy Mode (Stereoscopy Mode Bit Asserted)
+18-bit Packet
+Function
+Bit[0]
+1'b1 (Start bit)
+Bit[1]
+MasterSensorPixelData[2]
+Bit[2]
+MasterSensorPixelData[3]
+Bit[3]
+MasterSensorPixelData[4]
+Bit[4]
+MasterSensorPixelData[5]
+Bit[5]
+MasterSensorPixelData[6]
+Bit[6]
+MasterSensorPixelData[7]
+Bit[7]
+MasterSensorPixelData[8]
+Bit[8]
+MasterSensorPixelData[9]
+Bit[9]
+SlaveSensorPixelData[2]
+Bit[10]
+SlaveSensorPixelData[3]
+Bit[11]
+SlaveSensorPixelData[4]
+Bit[12]
+SlaveSensorPixelData[5]
+Bit[13]
+SlaveSensorPixelData[6]
+Bit[14]
+SlaveSensorPixelData[7]
+Bit[15]
+SlaveSensorPixelData[8]
+Bit[16]
+SlaveSensorPixelData[9]
+Bit[17]
+1'b0 (Stop bit)
+Table 11: 
+Reserved Words in the Pixel Data Stream
+Pixel Data Reserved Word
+Flag
+0
+Precedes frame valid assertion
+1
+Precedes line valid assertion
+2
+Succeeds line valid de-assertion
+3
+Succeeds frame valid de-assertion
+
+===== PAGE 59 =====
+MT9V022_DS Rev. G  6/15 EN
+54
+©Semiconductor Components Industries, LLC, 2015.
+ MT9V032: 1/3-Inch Wide-VGA Digital Image Sensor
+Electrical Specifications
+Electrical Specifications
+Table 12: 
+DC Electrical Characteristics
+VPWR = 3.3V ±0.3V; TA = Ambient = 25°C
+Symbol
+Definition
+Condition
+Minimum
+Typical
+Maximum
+Unit
+VIH
+Input high voltage
+VPWR - 0.5
+–
+VPWR + 0.3
+V
+VIL
+Input low voltage
+–0.3
+–
+0.8
+V
+IIN
+Input leakage current
+No pull-up resistor; 
+VIN = VPWR or VGND
+–15.0
+–
+15.0
+A
+VOH
+Output high voltage
+IOH = –4.0mA
+VPWR -0.7
+–
+–
+V
+VOL
+Output low voltage
+IOL = 4.0mA
+–
+–
+0.3
+V
+IOH
+Output high current
+VOH = VDD - 0.7
+–9.0
+–
+–
+mA
+IOL
+Output low current
+VOL = 0.7
+–
+–
+9.0
+mA
+VAA
+Analog power supply
+Default settings
+3.0
+3.3
+3.6
+V
+IPWRA
+Analog supply current
+Default settings
+–
+35.0
+60.0
+mA
+VDD
+Digital power supply
+Default settings
+3.0
+3.3
+3.6
+V
+IPWRD
+Digital supply current
+Default settings, CLOAD = 10pF
+–
+35.0
+60
+mA
+VAAPIX
+Pixel array power supply
+Default settings
+3.0
+3.3
+3.6
+V
+IPIX
+Pixel supply current
+Default settings
+0.5
+1.4
+3.0
+mA
+VLVDS
+LVDS power supply 
+Default settings
+3.0
+3.3
+3.6
+V
+ILVDS
+LVDS supply current
+Default settings
+11.0
+13.0
+15.0
+mA
+IPWRA 
+Standby
+Analog standby supply current
+STDBY = VDD
+2
+3
+4
+A
+IPWRD 
+Standby 
+Clock Off
+Digital standby supply current 
+with clock off
+STDBY = VDD, CLKIN = 0 MHz
+1
+2
+4
+A
+IPWRD 
+Standby 
+Clock On
+Digital standby supply current 
+with clock on
+STDBY= VDD, CLKIN = 27 MHz
+–
+1.05
+–
+mA
+LVDS Driver DC Specifications
+|VOD|
+Output differential voltage
+RLOAD = 100 
+1%
+250
+–
+400
+mV
+|DVOD|
+Change in VOD between 
+complementary output states
+–
+–
+50
+mV
+VOS
+Output offset voltage
+1.0
+1.2
+1.4
+mV
+DVOS
+Change in VOS between 
+complementary output states
+–
+–
+35
+mV
+IOS
+Output current when driver 
+shorted to ground
+10
+12
+mA
+IOZ
+Output current when driver is tri-
+state
+1
+10
+A
+LVDS Receiver DC Specifications
+VIDTH+
+Input differential
+| VGPD| < 925mV
+–100
+–
+100
+mV
+Iin
+Input current
+–
+–
+20
+A
+
+===== PAGE 60 =====
+MT9V022_DS Rev. G  6/15 EN
+55
+©Semiconductor Components Industries, LLC, 2015.
+ MT9V032: 1/3-Inch Wide-VGA Digital Image Sensor
+Electrical Specifications
+Notes:
+1. This is a stress rating only, and functional operation of the device at these or any other conditions 
+above those indicated in the operational sections of this specification is not implied.
+Exposure to absolute maximum rating conditions for extended periods may affect 
+reliability.
+Notes:
+1. The frequency range specified applies only to the parallel output mode of operation.
+Propagation Delays for PIXCLK and Data Out Signals
+The pixel clock is inverted and delayed relative to the master clock. The relative delay 
+from the master clock (SYSCLK) rising edge to both the pixel clock (PIXCLK) falling edge 
+and the data output transition is typically 7ns. Note that the falling edge of the pixel 
+clock occurs at approximately the same time as the data output transitions. See Table 14 
+for data setup and hold times. 
+Table 13: 
+Absolute Maximum Ratings 
+Caution
+Stresses greater than those listed may cause permanent damage to the device. 
+Symbol
+Parameter
+Minimum
+Maximum
+Unit
+VSUPPLY
+Power supply voltage (all supplies)
+–0.3
+4.5
+V
+ISUPPLY
+Total power supply current
+–
+200
+mA
+IGND
+Total ground current
+–
+200
+mA
+VIN
+DC input voltage
+–0.3
+VDD + 0.3
+V
+VOUT
+DC output voltage
+–0.3
+VDD + 0.3
+V
+TSTG1
+Storage temperature
+–40
++125
+°C
+Table 14: 
+AC Electrical Characteristics
+VPWR = 3.3V ±0.3V; TA = Ambient = 25°C; Output Load = 10pF
+Symbol
+Definition
+Condition
+Minimum
+Typical
+Maximum
+Unit
+SYSCLK
+Input clock frequency
+Note 1
+13.0
+26.6
+27.0
+MHz
+Clock duty cycle
+45.0
+50.0
+55.0
+%
+tR
+Input clock rise time
+1
+2
+5
+ns
+tF
+Input clock fall time
+1
+2
+5
+ns
+tPLHP
+SYSCLK to PIXCLK propagation delay
+CLOAD = 10pF
+3
+7
+11
+ns
+tPD
+PIXCLK to valid DOUT(9:0) propagation delay
+CLOAD = 10pF
+–2
+0
+2
+ns
+tSD
+Data setup time
+14
+16
+–
+ns
+tHD
+Data hold time
+14
+16
+–
+ns
+tPFLR
+PIXCLK to LINE_VALID propagation delay
+CLOAD = 10pF
+–2
+0
+2
+ns
+tPFLF
+PIXCLK to FRAME_VALID propagation delay
+CLOAD = 10pF
+–2
+0
+2
+ns
+
+===== PAGE 61 =====
+MT9V022_DS Rev. G  6/15 EN
+56
+©Semiconductor Components Industries, LLC, 2015.
+ MT9V032: 1/3-Inch Wide-VGA Digital Image Sensor
+Electrical Specifications
+Propagation Delays for FRAME_VALID and LINE_VALID Signals
+The LINE_VALID and FRAME_VALID signals change on the same rising master clock 
+edge as the data output. The LINE_VALID goes HIGH on the same rising master clock 
+edge as the output of the first valid pixel's data and returns LOW on the same master 
+clock rising edge as the end of the output of the last valid pixel's data.
+As shown in the “Output Data Timing” on page 8, FRAME_VALID goes HIGH 143 pixel 
+clocks before the first LINE_VALID goes HIGH. It returns LOW 23 pixel clocks after the 
+last LINE_VALID goes LOW. 
+Figure 35: 
+ Propagation Delays for PIXCLK and Data Out Signals
+Figure 36: 
+ Propagation Delays for FRAME_VALID and LINE_VALID Signals
+tPD
+tR
+tF
+tPLHP
+tHD
+tSD
+SYSCLK
+PIXCLK
+DOUT(9:0)
+PIXCLK
+FRAME_VALID
+LINE_VALID
+tPFLF
+tPFLR
+PIXCLK
+FRAME_VALID
+LINE_VALID
+
+===== PAGE 62 =====
+MT9V022_DS Rev. G  6/15 EN
+57
+©Semiconductor Components Industries, LLC, 2015.
+ MT9V032: 1/3-Inch Wide-VGA Digital Image Sensor
+Electrical Specifications
+Performance Specifications
+Table 15 summarizes the specification for each performance parameter. 
+Notes:
+1. All specifications address operation is at TA = 25°C (±3°C) and supply voltage = 3.3V. Image sensor 
+was tested without a lens. Multiple images were captured and analyzed. 
+Setup: VDD = VAA = VAAPIX  = LVDSVDD = 3.3V. Testing was done with default frame timing and 
+default register settings, with the exception of AEC/AGC, row noise correction, and auto black level, 
+which were disabled.
+Performance definitions are detailed in the following sections.
+Test 1: Sensitivity
+A flat-field light source (90 lux, color temperature 4400K, broadband, w/ IR cut filter) is 
+used as an illumination source. Signals are measured in LSB on the sensor output. A 
+series of four frames are captured and averaged to obtain a scalar sensitivity output 
+code. 
+Test 2: Dark Signal Nonuniformity (DSNU)
+The image sensor is held in the dark. Analog gain is changed to the maximum setting of 
+4X. Signals are measured in LSB on the sensor output. A series of four frames are 
+captured and averaged (pixel-by-pixel) into one average frame. DSNU is calculated as 
+the standard deviation of this average frame.
+Test 3: Photo Response Nonuniformity (PRNU)
+A flat-field light source (90 lux, color temperature 4400K, broadband, with IR cut filter) is 
+used as an illumination source. Signals are measured in LSB on the sensor output. Two 
+series of four frames are captured and averaged (pixel-by-pixel) into one average frame, 
+one series is captured under illuminated conditions, and one is captured in the dark. 
+PRNU is expressed as a percentage relating the standard deviation of the average frames 
+difference (illuminated frame - dark frame) to the average illumination level:
+(EQ 19)
+where Sillumination(i) is the signal measured for the i-th pixel from the average illumi-
+nated frame, Sdark(i) is the signal measured for the i-th pixel from the average dark 
+frame, and Np is the total number of pixels contained in the array.
+Table 15: 
+Performance Specifications
+Parameter
+Unit
+Minimum
+Typical
+Maximum
+Test Number
+Sensitivity
+LSB
+400
+572
+745
+1
+DSNU
+LSB
+N/A
+2.3
+7.0
+2
+PRNU
+%
+N/A
+1.3
+4.0
+3
+Dynamic Range
+dB
+52.0
+54.4
+N/A
+4
+SNR
+dB
+33.0
+37.3
+N/A
+5
+PRNU
+100
+1
+Np
+-----
+Sillumination i
+Sdark i
+–
+
+2
+i
+1
+=
+Np
+
+1
+Np
+-----
+Sillumination i
+
+
+i
+1
+=
+Np
+
+---------------------------------------------------------------------------------------
+
+=
+
+===== PAGE 63 =====
+MT9V022_DS Rev. G  6/15 EN
+58
+©Semiconductor Components Industries, LLC, 2015.
+ MT9V032: 1/3-Inch Wide-VGA Digital Image Sensor
+Electrical Specifications
+Test 4: Dynamic Range
+A temporal noise measurement is made with the image sensor in the dark and analog 
+gain changed to the maximum setting of 4X. Signals are measured in LSB on the sensor 
+output. Two consecutive dark frames are captured. Temporal noise is calculated as the 
+average pixel value of the difference frame:
+(EQ 20)
+Where S1i is the signal measured for the i-th pixel from the first frame, S2i is the signal 
+measured for the i-th pixel from the second frame, and Np is the total number of pix-
+els contained in the array.
+The dynamic range is calculated according to the following formula:
+ 
+(EQ 21)
+Where t is the temporal noise measured in the dark at 4X gain.
+Test 5: Signal-to-Noise Ratio
+A flat-field light source (90 lux, color temperature 4400K, broadband, with IR cut filter) is 
+used as an illumination source. Signals are measured in LSB on the sensor output. Two 
+consecutive illuminated frames are captured. Temporal noise is calculated as the 
+average pixel value of the difference frame (according to the formula shown in Test 4).
+The signal-to-noise ratio is calculated as the ratio of the average signal level to the 
+temporal noise according to the following formula:
+(EQ 22)
+Where t is the temporal noise measured from the illuminated frames, S1i is the signal 
+measured for the i-th pixel from the first frame, and Np is the total number of pixels 
+contained in the array.
+i
+S1i
+S2i
+–
+
+2
+i
+1
+=
+Np
+
+2 Np
+
+------------------------------------
+=
+DynamicRange
+20
+4
+1022
+
+t
+--------------------
+log
+
+=
+Signal
+to
+–
+Noise
+–
+Ratio
+–
+20
+S1i
+i
+1
+=
+Np
+
+
+
+
+
+
+
+
+
+Np
+
+
+
+
+
+
+
+
+
+t
+-------------------------------------
+log
+
+=
+
+===== PAGE 64 =====
+MT9V022_DS Rev. G  6/15 EN
+59
+©Semiconductor Components Industries, LLC, 2015.
+ MT9V032: 1/3-Inch Wide-VGA Digital Image Sensor
+Electrical Specifications
+Two-Wire Serial Bus Timing
+The two-wire serial bus operation requires certain minimum master clock cycles 
+between transitions. These are specified in the following diagrams in master clock 
+cycles. 
+Figure 37: 
+ Serial Host Interface Start Condition Timing
+ 
+Figure 38: 
+ Serial Host Interface Stop Condition Timing
+Notes:
+1. All timing are in units of master clock cycle.
+Figure 39: 
+ Serial Host Interface Data Timing for WRITE
+Notes:
+1. SDATA is driven by an off-chip transmitter.
+Figure 40: 
+ Serial Host Interface Data Timing for READ
+Notes:
+1. SDATA is pulled LOW by the sensor, or allowed to be pulled HIGH by a pull-up resistor off-chip. 
+SCLK
+4
+SDATA
+4
+SCLK
+4
+SDATA
+4
+SCLK
+4
+SDATA
+4
+SCLK
+5
+SDATA
+
+===== PAGE 65 =====
+MT9V022_DS Rev. G  6/15 EN
+60
+©Semiconductor Components Industries, LLC, 2015.
+ MT9V032: 1/3-Inch Wide-VGA Digital Image Sensor
+Electrical Specifications
+Figure 41: 
+ Acknowledge Signal Timing After an 8-Bit WRITE to the Sensor
+Figure 42: 
+ Acknowledge Signal Timing After an 8-Bit READ from the Sensor
+Note:
+After a READ, the master receiver must pull down SDATA to acknowledge receipt of data bits. When 
+read sequence is complete, the master must generate a “No Acknowledge” by leaving SDATA to 
+float HIGH. On the following cycle, a start or stop bit may be used.
+Temperature Reference
+The MT9V032 contains a temperature reference circuit that can be used to measure rela-
+tive temperatures. Contact your ON Semiconductor field applications engineer (FAE) for 
+more information on using this circuit.
+SCLK
+Sensor pulls down
+SDATA pin
+6
+SDATA
+3
+SCLK
+Sensor tri-states SDATA pin
+(turns off pull down)
+7
+SDATA
+6
+
+===== PAGE 66 =====
+MT9V022_DS Rev. G  6/15 EN
+61
+©Semiconductor Components Industries, LLC, 2015.
+ MT9V032: 1/3-Inch Wide-VGA Digital Image Sensor
+Electrical Specifications
+Figure 43: 
+ Typical Quantum Efficiency—Color
+0
+5
+10
+15
+20
+25
+30
+35
+40
+350
+450
+550
+650
+750
+850
+950
+1050
+Wavelength (nm)
+)
+%
+( y
+c
+n
+ei
+ciff
+E 
+m
+u
+t
+n
+a
+u
+Q
+Blue
+Green (B)
+Green (R)
+Red
+
+===== PAGE 67 =====
+MT9V022_DS Rev. G  6/15 EN
+62
+©Semiconductor Components Industries, LLC, 2015.
+ MT9V032: 1/3-Inch Wide-VGA Digital Image Sensor
+Electrical Specifications
+Figure 44: 
+ Typical Quantum Efficiency—Monochrome
+0
+10
+20
+30
+40
+50
+60
+350
+450
+550
+650
+750
+850
+950
+1050
+Wavelength (nm)
+)
+%
+( y
+c
+n
+ei
+ciff
+E 
+m
+u
+t
+n
+a
+u
+Q
+
+===== PAGE 68 =====
+MT9V022_DS Rev. G  6/15 EN
+63
+©Semiconductor Components Industries, LLC, 2015.
+ MT9V032: 1/3-Inch Wide-VGA Digital Image Sensor
+Package Dimensions
+Package Dimensions
+Figure 45: 
+ 48-Pin CLCC Package Outline Drawing
+ 
+Notes:
+1. All dimensions in millimeters.
+2. Optical center = Package center
+Seating
+plane
+4.4
+11.43
+5.215
+5.715
+Lid material: borosilicate glass 0.55 thickness
+Wall material: alumina ceramic
+Substrate material: alumina ceramic 0.7 thickness
+8.8
+4.4
+5.715
+4.84
+5.215
+0.8
+TYP
+1.75
+0.8 TYP
+8.8
+48
+1
+10.9 ±0.1
+CTR
+47X
+1.0 ±0.2
+48X R 0.15
+48X
+0.40 ±0.05
+11.43
+10.9 ±0.1
+CTR
+Lead finish: 
+Au plating, 0.50 microns
+minimum thickness
+ 
+over Ni plating, 1.27 microns
+minimum thickness
+2.3 ±0.2
+1.7
+N t
+O ti
+l
+t
+k
+t
+First
+clear
+pixel
+Optical
+center1
+C
+A
+B
+Optical
+area
+Optical area:
+Maximum rotation of optical area relative to package edges: 1º
+Maximum tilt of optical area relative to
+ 
+seating plane  A  : 50 microns
+Maximum tilt of optical area relative to
+ 
+top of cover glass  D  : 100 microns
+A
+D
+0.90
+for reference only
+1.400 ±0.125
+0.35
+for reference only
+V CTR
+Ø0.20 A B C
+H CTR
+Ø0.20 A B C
+Image
+sensor die:
+0.675 thickness
+0.10 A
+0.05
+0.2
+4X
+
+===== PAGE 69 =====
+MT9V022_DS Rev. G  6/15 EN
+64
+©Semiconductor Components Industries, LLC, 2015.
+ MT9V032: 1/3-Inch Wide-VGA Digital Image Sensor
+Appendix A – Serial Configurations
+Appendix A – Serial Configurations
+With the LVDS serial video output, the deserializer can be up to 8 meters from the 
+sensor. The serial link can save on the cabling cost of 14 wires (DOUT[9:0], LINE_VALID, 
+FRAME_VALID, PIXCLK, GND). Instead, just three wires (two serial LVDS, one GND) are 
+sufficient to carry the video signal. 
+Configuration of Sensor for Stand-Alone Serial Output with Internal PLL
+In this configuration, the internal PLL generates the shift-clk (x12). The LVDS pins SER_-
+DATAOUT_P and SER_DATAOUT_N must be connected to a deserializer (clocked at 
+approximately the same system clock frequency). 
+Figure 46 shows how a standard off-the-shelf deserializer (National Semiconductor 
+DS92LV1212A) can be used to retrieve the standard parallel video signals of DOUT(9:0), 
+LINE_VALID and FRAME_VALID.
+Figure 46: 
+ Stand-Alone Topology
+Typical configuration of the sensor:
+1. Power up sensor.
+2. Enable LVDS driver (set R0xB3[4]= 0).
+3. De-assert LVDS power-down (set R0xB1[1] = 0.
+4. Issue a soft reset (set R0x0C[0] = 1 followed by R0x0C[0] = 0.
+If necessary:
+5. Force sync patterns for the deserializer to lock (set R0xB5[0] = 1).
+6. Stop applying sync patterns (set R0xB5[0] = 0).
+Sensor
+LVDS
+BYPASS_CLKIN
+LVDS
+SER_DATAIN
+LVDS
+SHIFT_CLKOUT
+DS92LV1212A
+8
+2
+LINE_VALID
+FRAME_VALID
+PIXEL
+LVDS
+SER_DATAOUT
+26.6 MHz
+Osc.
+CLK
+26.6 MHz
+Osc.
+8 meters (maximum)
+8-bit configuration shown
+
+===== PAGE 70 =====
+MT9V022_DS Rev. G  6/15 EN
+65
+©Semiconductor Components Industries, LLC, 2015.
+ MT9V032: 1/3-Inch Wide-VGA Digital Image Sensor
+Appendix A – Serial Configurations
+Configuration of Sensor for Stereoscopic Serial Output with Internal PLL
+In this configuration the internal PLL generates the shift-clk (x18) in phase with the 
+system-clock. The LVDS pins SER_DATAOUT_P and SER_DATAOUT_N must be 
+connected to a deserializer (clocked at approximately the same system clock frequency). 
+Figure 47 shows how a standard off-the-shelf deserializer can be used to retrieve back 
+DOUT(9:2) for both the master and slave sensors. Additional logic is required to extract 
+out LINE_VALID and FRAME_VALID embedded within the pixel data stream.
+Figure 47: 
+ Stereoscopic Topology
+Typical configuration of the master and slave sensors:
+1. Power up the sensors.
+2. Broadcast WRITE to de-assert LVDS power-down (set R0xB1[1] = 0).
+3. Individual WRITE to master sensor putting its internal PLL into bypass mode (set 
+R0xB1[0] = 1).
+4. Broadcast WRITE to both sensors to set the stereoscopy bit (set R0x07[5] = 1).
+5. Make sure all resolution, vertical blanking, horizontal blanking, window size, and 
+AEC/AGC configurations are done through broadcast WRITE to maintain lockstep.
+6. Broadcast WRITE to enable LVDS driver (set R0xB3[4] = 0).
+7. Broadcast WRITE to enable LVDS receiver (set R0xB2[4] = 0).
+8. Individual WRITE to master sensor, putting its internal PLL into bypass mode (set 
+R0xB1[0] = 1).
+9. Individual WRITE to slave sensor, enabling its internal PLL (set R0xB1[0] = 0).
+10. Individual WRITE to slave sensor, setting it as a stereo slave (set R0x07[6] = 1).
+11. Individual WRITEs to master sensor to minimize the inter-sensor skew (set 
+R0xB2[2:0], R0xB3[2:0], and R0xB4[1:0] appropriately). Use R0xB7 and R0xB8 to get 
+lockstep feedback from stereo_error_flag. 
+12. Broadcast WRITE to issue a soft reset (set R0x0C[0] = 1 followed by R0x0C[0] = 0).
+X1 8/X1 2 PL L
+SENSOR
+SENSOR
+DS92LV16
+8                         8
+  PIXEL                     PIXEL
+  FROM                     FROM
+    SLAVE                   MASTER
+SENSOR
+SLAVE                                                            MASTER
+1. PLL in non-bypass mode                                              1. PLL in bypass mode
+2. PLL in x 18 mode (stereoscopy)
+LV and FV are embedded in the data stream
+26.6 MHz
+Osc.
+LVDS
+SER_DATAIN
+LVDS
+BYPASS_CLKIN
+LVDS
+SER_DATAIN
+LVDS
+BYPASS_CLKIN
+LVDS
+SHIFT_CLKOUT
+LVDS
+SER_DATAOUT
+5 meters (maximum)
+26.6 MHz
+Osc.
+LVDS
+SER_DATAOUT
+LVDS
+SHIFT_CLKOUT
+
+===== PAGE 71 =====
+ MT9V032: 1/3-Inch Wide-VGA Digital Image Sensor
+Appendix A – Serial Configurations
+MT9V022_DS Rev. G  6/15 EN
+66
+©Semiconductor Components Industries, LLC, 2015.
+Note:
+The stereo_error_flag is set if a mismatch has occurred at a reserved byte (slave and 
+master sensor’s codes at this reserved byte must match). If the flag is set, steps 11 and 
+12 are repeated until the stereo_error_flag remains cleared.
+Broadcast and Individual Writes for Stereoscopic Topology
+In stereoscopic mode, the two sensors are required to run in lockstep. This implies that 
+control logic in each sensor is in exactly the same state as its pair on every clock. To 
+ensure this, all inputs that affect control logic must be identical and arrive at the same 
+time at each sensor. 
+These inputs include:
+• system clock
+• system reset
+• two-wire serial interface clk - SCL
+• two-wire serial interface data - SDA
+Figure 48: 
+ Two-Wire Serial Interface Configuration in Stereoscopic Mode
+The setup in Figure 48 shows how the two sensors can maintain lockstep when their 
+configuration registers are written through the two-wire serial interface. A WRITE to 
+configuration registers would either be broadcast (simultaneous WRITES to both 
+sensors) or individual (WRITE to just one sensor at a time). READs from configuration 
+registers would be individual (READs from just one sensor at a time). 
+One of the two serial interface slave address bits of the sensor is hardwired. The other is 
+controlled by the host. This allows the host to perform either a broadcast or a one-to-
+one access.
+Broadcast WRITES are performed by setting the same S_CTRL_ADR input bit for both 
+slave and master sensor. Individual WRITES are performed by setting opposite 
+S_CTRL_ADR input bit for both slave and master sensor. Similarly, individual READs are 
+performed by setting opposite S_CTRL_ADR input bit for both slave and master sensor.
+SLAVE
+SENSOR
+MASTER
+SENSOR
+All system clock lengths (L) must be equal.
+SCL and SDA lengths to each sensor (from the host) must also be equal.
+Host launches SCL and SDA on positive
+edge of SYSCLK.
+SCL 
+SDA 
+HOST
+26.6 MHz
+Osc.
+L
+L
+L
+CLK
+S_CTRL_ADR[0]        CLK
+S_CTRL_ADR[0]        CLK
+SCL
+SCL
+SDA
+SDA
+
+===== PAGE 72 =====
+MT9V022_DS Rev. G  6/15 EN
+67
+©Semiconductor Components Industries, LLC, 2015.
+ MT9V032: 1/3-Inch Wide-VGA Digital Image Sensor
+Appendix B – Power-On Reset and Standby Timing
+Appendix B – Power-On Reset and Standby Timing
+Reset, Clocks, and Standby
+There are no constraints concerning the order in which the various power supplies are 
+applied; however, the MT9V032 requires reset in order operate properly at power-up. 
+Refer to Figure 49 for the power-up, reset, and standby sequences.
+Figure 49: 
+ Power-up, Reset, Clock and Standby Sequence
+Notes:
+1. All output signals are defined during initial power-up with RESET# held LOW without SYSCLK being 
+active. To properly reset the rest of the sensor, during initial power-up, assert RESET# (set to LOW 
+state) for at least 750ns after all power supplies have stabilized and SYSCLK is active (being 
+clocked). Driving RESET# to LOW state does not put the part in a low power state.
+2. Before using two-wire serial interface, wait for 10 SYSCLK rising edges after RESET# is de-asserted.
+3. Once the sensor detects that STANDBY has been asserted, it completes the current frame readout 
+before entering standby mode. The user must supply enough SYSCLKs to allow a complete frame 
+readout. See Table 4, “Frame Time,” on page 8 for more information.
+4. In standby, all video data and synchronization output signals are High-Z.
+5. In standby, the two-wire serial interface is not active.
+SYSCLK
+Two-Wire Serial I/F
+SCLK, SDATA
+RESET # 
+VDD, VDDLVDS,
+VAA, VAAPIX
+DATA OUTPUT
+STANDBY
+MIN 10 SYSCLK cycles
+Pre-Standby
+Standby
+Wake
+ up
+Active
+Driven = 0
+ 
+Low-Power
+non-Low-Power
+ 
+Does not
+respond to
+serial
+interface
+when
+STANDBY = 1
+DOUT[9:0]
+Power
+   up
+ 
+non-Low-Power
+MIN 20 SYSCLK cycles
+MIN 10 SYSCLK cycles 
+Active
+Power
+down
+DOUT[9:0]
+Note 3
+MIN 10 SYSCLK cycles
+
+===== PAGE 73 =====
+MT9V022_DS Rev. G  6/15 EN
+68
+©Semiconductor Components Industries, LLC, 2015.
+ MT9V032: 1/3-Inch Wide-VGA Digital Image Sensor
+Appendix B – Power-On Reset and Standby Timing
+Standby Assertion Restrictions
+STANDBY cannot be asserted at any time. If STANDBY is asserted during a specific 
+window within the vertical blanking period, the MT9V032 may enter a permanent 
+standby state. This window (that is, dead zone) occurs prior to the beginning of the new 
+frame readout. The permanent standby state is identified by the absence of the 
+FRAME_VALID signal on frame readouts. Issuing a hardware reset (RESET# set to LOW 
+state) will return the image sensor to default startup conditions.
+This dead zone can be avoided by:
+1. Asserting STANDBY during the valid frame readout time (FRAME_VALID is HIGH) 
+and maintaining STANDBY assertion for a minimum of one frame period. 
+2. Asserting STANDBY at the end of valid frame readout (falling edge of FRAME_VALID) 
+and maintaining STANDBY assertion for a minimum of [5 + R0x06] row-times. 
+When STANDBY is asserted during the vertical blanking period (FRAME_VALID is LOW), 
+the STANDBY signal must not change state between [Vertical Blanking Register (R0x06) - 
+5] row-times and [Vertical Blanking Register + 5] row-times after the falling edge of 
+FRAME_VALID.
+Figure 50: 
+ STANDBY Restricted Location
+FRAME _VALID
+Dead Zone
+10 row-times
+Vertical Blanking Period
+(R0x06) row-times
+5 row-times
+5 row-times 
+
+===== PAGE 74 =====
+ON Semiconductor and the ON logo are registered trademarks of Semiconductor Components Industries, LLC (SCILLC) or its subsidiaries in the United States and/or other countries. SCILLC owns the
+rights to a number of patents, trademarks, copyrights, trade secrets, and other intellectual property. A listing of SCILLC’s product/patent coverage may be accessed at www.onsemi.com/site/pdf/
+Patent-Marking.pdf. SCILLC reserves the right to make changes without further notice to any products herein. SCILLC makes no warranty, representation or guarantee regarding the suitability of its
+products for any particular purpose, nor does SCILLC assume any liability arising out of the application or use of any product or circuit, and specifically disclaims any and all liability, including
+without limitation special, consequential or incidental damages. “Typical” parameters which may be provided in SCILLC data sheets and/or specifications can and do vary in different applications
+and actual performance may vary over time. All operating parameters, including “Typicals” must be validated for each customer application by customer’s technical experts. SCILLC does not convey
+any license under its patent rights nor the rights of others. SCILLC products are not designed, intended, or authorized for use as components in systems intended for surgical implant into the body,
+or other applications intended to support or sustain life, or for any other application in which the failure of the SCILLC product could create a situation where personal injury or death may occur.
+Should Buyer purchase or use SCILLC products for any such unintended or unauthorized application, Buyer shall indemnify and hold SCILLC and its officers, employees, subsidiaries, affiliates, and
+distributors harmless against all claims, costs, damages, and expenses, and reasonable attorney fees arising out of, directly or indirectly, any claim of personal injury or death associated with such
+unintended or unauthorized use, even if such claim alleges that SCILLC was negligent regarding the design or manufacture of the part. SCILLC is an Equal Opportunity/Affirmative Action Employer.
+This literature is subject to all applicable copyright laws and is not for resale in any manner.
+ MT9V032: 1/3-Inch Wide-VGA Digital Image Sensor
+Revision History
+MT9V022_DS Rev. G  6/15 EN
+69
+©Semiconductor Components Industries, LLC, 2015 .
+Revision History
+Rev. G . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .6/15/15
+• Updated “Ordering Information” on page 2
+• Updated format of Table of contents
+Rev. F . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .4/16/15
+• Updated “Ordering Information” on page 2
+Rev. E . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .3/27/15
+• Converted to ON Semiconductor template
+Rev. D . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .5/9/11
+• Updated trademarks
+• Applied updated template
+Rev. C . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .9/10
+• Updated to Aptina template
+Rev. B . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .3/07
+• Changed text in “Automatic Black Level Calibration” on page 6
+• Changed “writing (or reading) the least significant 8 bits to R0x80 (128)” on 
+page 10 to “writing (or reading) the least significant 8 bits to R0xF0 (240)”
+• Changed “the special register address (R0xF1)” on page 13 to “the special 
+register address (R0xF0)”
+• Changed wording in Table 7 on page 15 row 0x00, on page 23 row 0xFF, and in 
+Table 8 on page 19 row 0x00/0xFF from “Rev1,” and so on to “Iter1”, and so 
+on. 
+• Updated legal values for R0x08, R0x09, R0x0B in Table 8 on page 19
+• Updated Figure 24: “Latency of Analog Gain Change When AGC Is Disabled,” on 
+page 41
+• Changed signal name in Table 13 on page 55 in Maximum column, VIN and VOUT 
+rows, from VDDQ to VDD
+• Moved “Propagation Delays for PIXCLK and Data Out Signals” up to follow Table 14 
+on page 55
+• Added section on “Performance Specifications” on page 57
+• Updated Figure 45 “48-Pin CLCC Package Outline Drawing” on page 63
+• Updated Figure 46: “Stand-Alone Topology,” on page 64
+Rev. A . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .06/06
+• Initial release

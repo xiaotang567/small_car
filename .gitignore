@@ -25,3 +25,9 @@ tools/log_*.txt
 MDK-ARM/build_log.txt
 .workbuddy/
 tools/_track_now.png
+
+# ── 环岛离线调试：存下来的二值帧 + 临时图（体积大，不进库）──
+tools/frames_round/
+tools/rb_grid.png
+tools/rb_zoom.png
+tools/rb_last4x.png

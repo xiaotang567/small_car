@@ -53,6 +53,28 @@ GRAY_W, GRAY_H = 94, 60        # 灰度缩略图（2×2 抽取）
 VIEW_W, VIEW_H = 752, 480      # 显示尺寸
 SCALE_EDGE = 4                 # 边界坐标 → 显示坐标
 
+# ★ 2026-11-07：调试用——把收到的**二值整帧**自动存成 PNG（默认关，不占资源）
+#   启动前设环境变量 CARUI_FRAMES=<目录>  ⇒ 每帧存一张 f_0001.png（188×120，8bit）
+#   CARUI_FRAMES_MAX 控制最多存几张（默认 600）
+#   用途：给 PC 端算法做离线回放（环岛识别先在 PC 上试，试通了再抄到板子里）
+DUMP_DIR = os.environ.get('CARUI_FRAMES', '').strip()
+try:
+    DUMP_MAX = int(os.environ.get('CARUI_FRAMES_MAX', '600') or 600)
+except Exception:
+    DUMP_MAX = 600
+_dump_n = [0]
+
+
+def _dump_frame(buf):
+    if not DUMP_DIR or _dump_n[0] >= DUMP_MAX:
+        return
+    d = DUMP_DIR
+    if not os.path.isdir(d):
+        os.makedirs(d, exist_ok=True)
+    _dump_n[0] += 1
+    Image.frombytes('L', (BIN_W, BIN_H), buf).save(
+        os.path.join(d, 'f_%04d.png' % _dump_n[0]))
+
 # 界面配色
 C_BG      = '#1e1e26'
 C_PANEL   = '#26262f'
@@ -280,15 +302,18 @@ class App(object):
         self.v_yaw = tk.StringVar(value='---')
         self.v_srv = tk.StringVar(value='---')
         self.v_duty = tk.StringVar(value='---')
+        self.v_rb = tk.StringVar(value='---')      # ★ 2198：环岛/开阔区状态
 
         self._lbl(f, '转速').grid(row=0, column=0, sticky='w', padx=6)
         tk.Label(f, textvariable=self.v_rpm, bg=C_PANEL, fg='#66e08a',
                  font=('Consolas', 16, 'bold'), anchor='w').grid(row=0, column=1, sticky='w')
         for i, (k, v) in enumerate((('加速度', self.v_acc), ('角速度', self.v_gyr),
                                      ('偏航角', self.v_yaw), ('舵机', self.v_srv),
-                                     ('输出占空比', self.v_duty)), start=1):
+                                     ('输出占空比', self.v_duty),
+                                     ('环岛', self.v_rb)), start=1):
             self._lbl(f, k).grid(row=i, column=0, sticky='w', padx=6)
-            tk.Label(f, textvariable=v, bg=C_PANEL, fg=C_FG,
+            tk.Label(f, textvariable=v, bg=C_PANEL,
+                     fg='#ffcc66' if k == '环岛' else C_FG,
                      font=('Consolas', 11), anchor='w').grid(row=i, column=1, sticky='w')
 
         # ---- 电机1 ----
@@ -406,6 +431,11 @@ class App(object):
         self.btn_vis.grid(row=1, column=0, padx=4, pady=(0, 4), sticky='ew')
         self.btn_sweep = self._btn(f, '扫舵测试  st', self.do_sweep_toggle, bg=C_BTN, w=10, h=1)
         self.btn_sweep.grid(row=1, column=1, padx=4, pady=(0, 4), sticky='ew')
+
+        # ★ 2198：环岛"直走"模式总开关（命令 rb 0/1）—— 现场 A/B 对比用，不用重烧
+        self.rb_on = True
+        self.btn_rb = self._btn(f, '环岛直走  rb', self.do_rb_toggle, bg=C_ON, w=10, h=1)
+        self.btn_rb.grid(row=2, column=0, columnspan=2, padx=4, pady=(0, 6), sticky='ew')
 
         # ---- 其它 ----
         f = tk.LabelFrame(right, text=' 其它 ', bg=C_PANEL, fg=C_ACCENT,
@@ -729,6 +759,18 @@ class App(object):
         except Exception:
             pass
 
+    def do_rb_toggle(self):
+        """★ 2198：环岛"直走"模式 开/关（固件 rb 0/1）
+        开着：识别到环岛/宽白区就保住直走，不再跟着那块白地打舵
+        关掉：完全按老逻辑走（用来现场对比）"""
+        self.rb_on = not self.rb_on
+        self.send_ack('rb %d' % (1 if self.rb_on else 0), 'ACK rb',
+                      '环岛直走 → %s' % ('开' if self.rb_on else '关'), self.btn_rb)
+        try:
+            self.btn_rb.configure(bg=C_ON if self.rb_on else C_BTN)
+        except Exception:
+            pass
+
     def do_img(self, on):
         """图传开关：0 = 停（链路全给文本，调遥测用），1 = 恢复"""
         if on:
@@ -881,6 +923,11 @@ class App(object):
             seg = pay[r * 24:(r + 1) * 24]
             out += b''.join(_BIT8[b] for b in seg)[:BIN_W]
         self.frames += 1
+        if DUMP_DIR:
+            try:
+                _dump_frame(bytes(out))
+            except Exception:
+                pass
         if not self.mode_gray:
             self.shot = (BIN_W, BIN_H, bytes(out), False)
             self.schedule_draw(force=True)
@@ -1044,6 +1091,17 @@ class App(object):
                     self.log('⚠ 界面在"运行"，但板子输出 = 0%：命令没到板子，或已被清零')
             else:
                 self.warn_zero = False
+        # ★ 2198：环岛 / 开阔区（rb=1 时板子"直走"，不再跟着那块宽白地打舵）
+        if 'rb' in d:
+            iw = int(d.get('iw', 0))
+            ir = int(d.get('ir', 0))
+            wn = int(d.get('wn', 0))
+            if int(d['rb']):
+                self.v_rb.set('环岛 %dpx@%d行  常宽%d' % (iw, ir, wn))
+            elif iw >= 8:
+                self.v_rb.set('无 有缝%d@%d 常宽%d' % (iw, ir, wn))
+            else:
+                self.v_rb.set('无            常宽%d' % wn)
         if 'm' in d:
             self.mode_gray = (int(d['m']) == 0)
             self.refresh_buttons()

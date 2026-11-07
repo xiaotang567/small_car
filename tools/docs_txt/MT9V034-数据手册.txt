@@ -1,0 +1,7151 @@
+
+===== PAGE 1 =====
+Products and specifications discussed herein are subject to change by Aptina without notice. 
+ MT9V034: 1/3-Inch Wide-VGA Digital Image Sensor
+Features
+Aptina Confidential and Proprietary
+PDF: 09005aef8366edcb/Source: 09005aef8366ede5
+Aptina Imaging reserves the right to change products or specifications without notice.
+MT9V034_DS - Rev. A 10/08 EN
+1
+©2008 Aptina Imaging Corporation All rights reserved.
+1/3-Inch Wide-VGA CMOS Digital Image Sensor
+MT9V034
+For the latest data sheet revision, refer to Aptina’s Web site: www.aptina.com
+Features
+• DigitalClarity® CMOS imaging technology
+• Array format: Wide-VGA, active 752H x 480V 
+(360,960 pixels)
+• TrueSNAP™ global shutter photodiode pixels; 
+simultaneous integration and readout
+• Monochrome or color: NIR enhanced performance 
+for use with non-visible NIR illumination
+• Readout modes: progressive or interlaced
+• Shutter efficiency: >99%
+• Simple two-wire serial interface
+• Real-time exposure context switching - dual register 
+set
+• Register lock capability
+• Window size: User programmable to any smaller 
+format (QVGA, CIF, QCIF). Data rate can be 
+maintained independent of window size
+• Binning: 2 x 2 and 4 x 4 of the full resolution
+• ADC: On-chip, 10-bit column-parallel (option to 
+operate in 12-bit to 10-bit companding mode)
+• Automatic controls: Auto exposure control (AEC) 
+and auto gain control (AGC); variable regional and 
+variable weight AEC/AGC
+• Support for four unique serial control register IDs to 
+control multiple imagers on the same bus
+• Data output formats: 
+– Single sensor mode:
+10-bit parallel/stand-alone
+8-bit or 10-bit serial LVDS
+– Stereo sensor mode:
+Interspersed 8-bit serial LVDS
+• High dynamic range (HDR) mode 
+Applications
+• Security
+• High dynamic range imaging
+• Unattended surveillance
+• Stereo vision
+• Video as input
+• Machine vision
+• Automation
+Table 1: 
+Key Performance Parameters
+Ordering Information
+Parameter
+Value
+Optical format
+1/3-inch
+Active imager size
+4.51mm(H) x 2.88mm(V)
+5.35mm diagonal
+Active pixels
+752H x 480V
+Pixel size
+6.0 x 6.0μm
+Color filter array
+Monochrome or color RGB Bayer 
+pattern
+Shutter type
+TrueSNAP™ Global shutter
+Maximum data rate
+master clock
+27 Mp/s
+27 MHz
+Full resolution
+752 x 480
+Frame rate
+60 fps (at full resolution)
+ADC resolution
+10-bit column-parallel
+Responsivity
+4.8 V/lux-sec (550nm)
+Dynamic range
+>55dB linear; 
+>110dB in HDR mode
+Supply voltage
+3.3V +0.3V (all supplies)
+Power consumption
+<160mW at maximum data rate 
+(LVDS disabled); 120μW standby 
+power at 3.3V
+Operating temperature
+–30°C to +70°C ambient
+Packaging
+48-pin CLCC
+Table 2: 
+Available Part Numbers
+Part Number
+Number 
+of Pins
+Description
+MT9V034C12STM
+48-pin
+CLCC (monochrome)
+MT9V034C12STC
+48-pin
+CLCC (color)
+MT9V034C12STMD ES
+48-pin
+Monochrome demo kit
+MT9V034C12STMH ES
+48-pin
+Monochrome head 
+board
+MT9V034C12STCD ES
+48-pin
+Color demo kit 
+MT9V034C12STCH ES
+48-pin
+Color head board
+
+===== PAGE 2 =====
+PDF: 09005aef8366edcb/Source: 09005aef8366ede5
+Aptina Imaging reserves the right to change products or specifications without notice.
+MT9V034_DS - Rev. A 10/08 EN
+2
+©2008 Aptina Imaging Corporation. All rights reserved.
+ MT9V034: 1/3-Inch Wide-VGA Digital Image Sensor
+Table of Contents
+Aptina Confidential and Proprietary
+Table of Contents
+Features. . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .1
+Applications . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .1
+Ordering Information. . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .1
+General Description . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .6
+Pin Descriptions . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .8
+Pixel Data Format . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .10
+Pixel Array Structure . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .10
+Color Device Limitations. . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .11
+Pixel Binning . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .11
+Interlaced Readout. . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .11
+Automatic Black Level Calibration . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .11
+Other Limiting Factors . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .11
+Output Data Format . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .12
+Output Data Timing. . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .13
+Serial Bus Description . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .15
+Protocol . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .15
+Start Bit. . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .15
+Slave Address. . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .15
+Acknowledge Bit . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .15
+No-Acknowledge Bit . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .15
+Stop Bit . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .15
+Sequence . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .16
+Bus Idle State. . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .16
+Data Bit Transfer. . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .16
+Two-Wire Serial Interface Sample Read and Write Sequences . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .17
+16-Bit Write Sequence. . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .17
+16-Bit Read Sequence . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .17
+8-Bit Write Sequence . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .18
+8-Bit Read Sequence . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .18
+Register Lock . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .19
+Lock All Registers. . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .19
+Lock Only Read Mode Registers (R0x0D and R0x0E). . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .19
+Real-Time Context Switching . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .20
+Registers . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .21
+Shadowed Register. . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .25
+Feature Description . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .47
+Operational Modes . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .47
+Master Mode. . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .47
+Simultaneous Master Mode . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .47
+Sequential Master Mode . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .48
+Snapshot Mode . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .48
+Slave Mode . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .49
+Signal Path . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .50
+On-Chip Biases . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .50
+ADC Voltage Reference . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .50
+V_Step Voltage Reference . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .51
+Chip Version . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .51
+Window Control . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .51
+Blanking Control. . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .51
+Pixel Integration Control . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .52
+Total Integration . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .52
+
+===== PAGE 3 =====
+PDF: 09005aef8366edcb/Source: 09005aef8366ede5
+Aptina Imaging reserves the right to change products or specifications without notice.
+MT9V034_DS - Rev. A 10/08 EN
+3
+©2008 Aptina Imaging Corporation. All rights reserved.
+ MT9V034: 1/3-Inch Wide-VGA Digital Image Sensor
+Table of Contents
+Aptina Confidential and Proprietary
+Changes to Integration Time . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .53
+Exposure Indicator . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .54
+High Dynamic Range . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .54
+ADC Companding Mode. . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .56
+Gain Settings . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .57
+Changes to Gain Settings. . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .57
+Analog Gain . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .58
+Digital Gain. . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .58
+Black Level Calibration . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .59
+Row-wise Noise Correction . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .61
+Automatic Gain Control and Automatic Exposure Control . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .61
+Pixel Clock Speed . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .62
+Hard Reset of Logic . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .63
+Soft Reset of Logic . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .63
+STANDBY Control . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .63
+Monitor Mode Control . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .63
+Read Mode Options . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .63
+Column Flip . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .63
+Row Flip. . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .64
+Pixel Binning. . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .64
+Row Binning . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .65
+Column Binning . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .65
+Interlaced Readout . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .66
+LINE_VALID . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .68
+LVDS Serial (Stand-Alone/Stereo) Output . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .68
+LVDS Output Format. . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .69
+LVDS Enable and Disable. . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .71
+LVDS Data Bus Timing . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .72
+Electrical Specifications. . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .73
+Propagation Delays for PIXCLK and Data Out Signals. . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .75
+Propagation Delays for FRAME_VALID and LINE_VALID Signals . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .75
+Two-Wire Serial Bus Timing . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .76
+Minimum Master Clock Cycles . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .77
+Package Dimensions . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .80
+Appendix A – Power-On Reset and Standby Timing . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .81
+Revision History. . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .82
+
+===== PAGE 4 =====
+PDF: 09005aef8366edcb/Source: 09005aef8366ede5
+Aptina Imaging reserves the right to change products or specifications without notice.
+MT9V034_DS - Rev. A 10/08 EN
+4
+©2008 Aptina Imaging Corporation. All rights reserved.
+ MT9V034: 1/3-Inch Wide-VGA Digital Image Sensor
+List of Figures
+Aptina Confidential and Proprietary
+List of Figures
+Figure 1:
+Block Diagram. . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .6
+Figure 2:
+48-Pin CLCC Package Pinout Diagram . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .7
+Figure 3:
+Typical Configuration (Connection)—Parallel Output Mode. . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .9
+Figure 4:
+Pixel Array Description . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .10
+Figure 5:
+Pixel Color Pattern Detail (Top Right Corner) . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .11
+Figure 6:
+Spatial Illustration of Image Readout. . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .12
+Figure 7:
+Timing Example of Pixel Data . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .13
+Figure 8:
+Row Timing and FRAME_VALID/LINE_VALID Signals . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .13
+Figure 9:
+Timing Diagram Showing a Write to R0x09 with the Value 0x0284 . . . . . . . . . . . . . . . . . . . . . . . . . . . . .17
+Figure 10:
+Timing Diagram Showing a Read from R0x09; Returned Value 0x0284 . . . . . . . . . . . . . . . . . . . . . . . . .17
+Figure 11:
+Timing Diagram Showing a Bytewise Write to R0x09 with the Value 0x0284 . . . . . . . . . . . . . . . . . . . .18
+Figure 12:
+Timing Diagram Showing a Bytewise Read from R0x09; Returned Value 0x0284 . . . . . . . . . . . . . . . .18
+Figure 13:
+Simultaneous Master Mode Synchronization Waveforms #1. . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .47
+Figure 14:
+Simultaneous Master Mode Synchronization Waveforms #2. . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .48
+Figure 15:
+Sequential Master Mode Synchronization Waveforms . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .48
+Figure 16:
+Snapshot Mode Interface Signals . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .49
+Figure 17:
+Snapshot Mode Frame Synchronization Waveforms . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .49
+Figure 18:
+Slave Mode Operation . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .50
+Figure 19:
+Signal Path . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .50
+Figure 20:
+Latency When Changing Integration . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .53
+Figure 21:
+Sequence of Control Voltages at the HDR Gate . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .54
+Figure 22:
+Sequence of Voltages in a Piecewise Linear Pixel Response . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .55
+Figure 23:
+12- to 10-Bit Companding Chart . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .56
+Figure 24:
+Latency of Analog Gain Change When AGC Is Disabled . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .57
+Figure 25:
+Tiled Sample . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .59
+Figure 26:
+Black Level Calibration Flow Chart. . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .59
+Figure 27:
+Controllable and Observable AEC/AGC Registers. . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .62
+Figure 28:
+Readout of Six Pixels in Normal and Column Flip Output Mode. . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .64
+Figure 29:
+Readout of Six Rows in Normal and Row Flip Output Mode . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .64
+Figure 30:
+Readout of 8 Pixels in Normal and Row Bin Output Mode . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .65
+Figure 31:
+Readout of 8 Pixels in Normal and Column Bin Output Mode. . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .66
+Figure 32:
+Spatial Illustration of Interlaced Image Readout. . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .67
+Figure 33:
+Different LINE_VALID Formats. . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .68
+Figure 34:
+Serial Output Format for a 6x2 Frame . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .69
+Figure 35:
+LVDS Timing . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .72
+Figure 36:
+Propagation Delays for PIXCLK and Data Out Signals . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .75
+Figure 37:
+Propagation Delays for FRAME_VALID and LINE_VALID Signals. . . . . . . . . . . . . . . . . . . . . . . . . . . . . .75
+Figure 38:
+Two-wire Serial Bus Timing . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .76
+Figure 39:
+Serial Host Interface Start Condition Timing . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .77
+Figure 40:
+Serial Host Interface Stop Condition Timing . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .77
+Figure 41:
+Serial Host Interface Data Timing for Write . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .77
+Figure 42:
+Serial Host Interface Data Timing for Read . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .78
+Figure 43:
+Acknowledge Signal Timing After an 8-Bit WRITE to the Sensor. . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .78
+Figure 44:
+Acknowledge Signal Timing After an 8-Bit READ from the Sensor . . . . . . . . . . . . . . . . . . . . . . . . . . . . .78
+Figure 45:
+Typical Quantum Efficiency – Color. . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .79
+Figure 46:
+Typical Quantum Efficiency – Monochrome . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .79
+Figure 47:
+48-Pin CLCC Package Outline Drawing. . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .80
+Figure 48:
+Power-up, Reset, Clock and Standby Sequence. . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .81
+
+===== PAGE 5 =====
+PDF: 09005aef8366edcb/Source: 09005aef8366ede5
+Aptina Imaging reserves the right to change products or specifications without notice.
+MT9V034_DS - Rev. A 10/08 EN
+5
+©2008 Aptina Imaging Corporation. All rights reserved.
+ MT9V034: 1/3-Inch Wide-VGA Digital Image Sensor
+List of Tables
+Aptina Confidential and Proprietary
+List of Tables
+Table 1:
+Key Performance Parameters. . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .1
+Table 2:
+Available Part Numbers. . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .1
+Table 3:
+Pin Descriptions . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .8
+Table 4:
+Frame Time . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .13
+Table 5:
+Frame Time—Long Integration Time . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .14
+Table 6:
+Slave Address Modes . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .16
+Table 7:
+Real-Time Context-Switchable Registers . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .20
+Table 8:
+Default Register Descriptions . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .21
+Table 9:
+Register Descriptions. . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .25
+Table 10:
+LVDS Packet Format in Stand-Alone Mode . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .69
+Table 11:
+LVDS Packet Format in Stereoscopy Mode (Stereoscopy Mode Bit Asserted) . . . . . . . . . . . . . . . . . . .70
+Table 12:
+Reserved Words in the Pixel Data Stream . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .70
+Table 13:
+SER_DATAOUT_* state . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .71
+Table 14:
+SHFT_CLK_* state. . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .71
+Table 15:
+LVDS AC Timing Specifications. . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .72
+Table 16:
+DC Electrical Characteristics Over Temperature. . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .73
+Table 17:
+DC Electrical Characteristics . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .73
+Table 18:
+Absolute Maximum Ratings . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .74
+Table 19:
+AC Electrical Characteristics . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .74
+Table 20:
+Two-Wire Serial Bus Timing Parameters. . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .76
+
+===== PAGE 6 =====
+PDF: 09005aef8366edcb/Source: 09005aef8366ede5
+Aptina Imaging reserves the right to change products or specifications without notice.
+MT9V034_DS - Rev. A 10/08 EN
+6
+©2008 Aptina Imaging Corporation. All rights reserved.
+ MT9V034: 1/3-Inch Wide-VGA Digital Image Sensor
+General Description
+Aptina Confidential and Proprietary
+General Description
+The MT9V034 is a 1/3-inch wide-VGA format CMOS active-pixel digital image sensor 
+with TrueSNAP™ global shutter and high dynamic range (HDR) operation. The sensor 
+has specifically been designed to support the demanding interior and exterior surveil-
+lance imaging needs, which makes this part ideal for a wide variety of imaging applica-
+tions in real-world environments.
+This wide-VGA CMOS image sensor features DigitalClarity⎯Aptina’s breakthrough 
+low-noise CMOS imaging technology that achieves CCD image quality (based on 
+signal-to-noise ratio and low-light sensitivity) while maintaining the inherent size, cost, 
+and integration advantages of CMOS.
+The active imaging pixel array is 752H x 480V. It incorporates sophisticated camera func-
+tions on-chip—such as binning 2 x 2 and 4 x 4, to improve sensitivity when operating in 
+smaller resolutions—as well as windowing, column and row mirroring. It is program-
+mable through a simple two-wire serial interface. 
+The MT9V034 can be operated in its default mode or be programmed for frame size, 
+exposure, gain setting, and other parameters. The default mode outputs a 
+wide-VGA-size image at 60 frames per second (fps). 
+An on-chip analog-to-digital converter (ADC) provides 10 bits per pixel. A 12-bit resolu-
+tion companded for 10 bits for small signals can be alternatively enabled, allowing more 
+accurate digitization for darker areas in the image.
+In addition to a traditional, parallel logic output the MT9V034 also features a serial low-
+voltage differential signaling (LVDS) output. The sensor can be operated in a stereo-
+camera, and the sensor, designated as a stereo-master, is able to merge the data from 
+itself and the stereo-slave sensor into one serial LVDS stream. 
+The sensor is designed to operate in a wide temperature range (–30°C to +70°C). 
+Figure 1: 
+ Block Diagram
+Parallel
+Video
+Data Out
+Serial
+Register
+I/O
+Control Register
+ADCs
+Active-Pixel
+Sensor (APS)
+Array
+752H x 480V
+Timing and Control
+Digital Processing
+Analog Processing
+Serial Video
+LVDS Out
+Slave Video LVDS In
+ (for stereo applications only)
+
+===== PAGE 7 =====
+PDF: 09005aef8366edcb/Source: 09005aef8366ede5
+Aptina Imaging reserves the right to change products or specifications without notice.
+MT9V034_DS - Rev. A 10/08 EN
+7
+©2008 Aptina Imaging Corporation. All rights reserved.
+ MT9V034: 1/3-Inch Wide-VGA Digital Image Sensor
+General Description
+Aptina Confidential and Proprietary
+Figure 2: 
+ 48-Pin CLCC Package Pinout Diagram
+1
+2
+3
+4
+5
+6
+44
+43
+19
+20
+21
+22
+23
+24
+25
+26
+27
+28
+29
+30
+7
+8
+9
+10
+11
+12
+13
+14
+15
+16
+17
+18
+42
+41
+40
+39
+38
+37
+36
+35
+34
+33
+32
+31
+LVDSGND
+BYPASS_CLKIN_N
+BYPASS_CLKIN_P
+SER_DATAIN_N
+SER_DATAIN_P
+LVDSGND
+DGND
+VDD
+DOUT5
+DOUT6
+DOUT7
+DOUT8
+DOUT3
+DOUT4
+VAAPIX
+VAA
+AGND
+NC
+NC
+VAA
+AGND
+STANDBY
+RESET_BAR
+S_CTRL_ADR1
+DOUT9
+LINE_VALID
+FRAME_VALID
+STLN_OUT
+EXPOSURE
+SDATA
+SCLK
+STFRM_OUT
+LED_OUT
+OE
+RSVD
+S_CTRL_ADR0
+VDDLVDS
+SER_DATAOUT_N
+SER_DATAOUT_P
+SHFT_CLKOUT_P
+SHFT_CLKOUT_N
+VDD
+DGND
+SYSCLK
+PIXCLK
+DOUT0
+DOUT1
+DOUT2
+48
+47
+46
+45
+
+===== PAGE 8 =====
+PDF: 09005aef8366edcb/Source: 09005aef8366ede5
+Aptina Imaging reserves the right to change products or specifications without notice.
+MT9V034_DS - Rev. A 10/08 EN
+8
+©2008 Aptina Imaging Corporation. All rights reserved.
+ MT9V034: 1/3-Inch Wide-VGA Digital Image Sensor
+Pin Descriptions
+Aptina Confidential and Proprietary
+Pin Descriptions
+Table 3: 
+Pin Descriptions
+48-Pin CLCC 
+Numbers
+Symbol
+Type
+Description
+Note
+29
+RSVD
+Input 
+Connect to DGND.
+1
+10
+SER_DATAIN_N
+Input
+Serial data in for stereoscopy (differential negative). Tie to 1KΩ 
+pull-up (to 3.3V) in non-stereoscopy mode.
+11
+SER_DATAIN_P
+Input
+Serial data in for stereoscopy (differential positive). Tie to DGND in 
+non-stereoscopy mode.
+8
+BYPASS_CLKIN_N
+Input
+Input bypass shift-CLK (differential negative). Tie to 1KΩ pull-up 
+(to 3.3V) in non-stereoscopy mode.
+9
+BYPASS_CLKIN_P
+Input
+Input bypass shift-CLK (differential positive). Tie to DGND in non-
+stereoscopy mode.
+23
+EXPOSURE
+Input
+Rising edge starts exposure in snapshot and slave modes.
+25
+SCLK
+Input
+Two-wire serial interface clock. Connect to VDD with 1.5K resistor 
+even when no other two-wire serial interface peripheral is 
+attached.
+28
+OE
+Input
+DOUT enable pad, active HIGH.
+2
+30
+S_CTRL_ADR0
+Input
+Two-wire serial interface slave address select (see Table 6 on 
+page 16).
+31
+S_CTRL_ADR1
+Input
+Two-wire serial interface slave address select (see Table 6 on 
+page 16).
+32
+RESET_BAR
+Input
+Asynchronous reset. All registers assume defaults.
+33
+STANDBY
+Input
+Shut down sensor operation for power saving.
+47
+SYSCLK
+Input
+Master clock (26.6 MHz; 13 MHz – 27 MHz).
+24
+SDATA
+I/O
+Two-wire serial interface data. Connect to VDD with 1.5K resistor 
+even when no other two-wire serial interface peripheral is 
+attached.
+22
+STLN_OUT
+I/O
+Output in master mode—start line sync to drive slave chip in-
+phase; input in slave mode.
+26
+STFRM_OUT
+I/O
+Output in master mode—start frame sync to drive a slave chip in-
+phase; input in slave mode.
+20
+LINE_VALID
+Output
+Asserted when DOUT data is valid.
+21
+FRAME_VALID
+Output
+Asserted when DOUT data is valid.
+15
+DOUT5
+Output
+Parallel pixel data output 5.
+16
+DOUT6
+Output
+Parallel pixel data output 6.
+17
+DOUT7
+Output
+Parallel pixel data output 7.
+18
+DOUT8
+Output
+Parallel pixel data output 8.
+19
+DOUT9
+Output
+Parallel pixel data output 9.
+27
+LED_OUT
+Output
+LED strobe output.
+41
+DOUT4
+Output
+Parallel pixel data output 4.
+42
+DOUT3
+Output
+Parallel pixel data output 3.
+43
+DOUT2
+Output
+Parallel pixel data output 2.
+44
+DOUT1
+Output
+Parallel pixel data output 1.
+45
+DOUT0
+Output
+Parallel pixel data output 0.
+46
+PIXCLK
+Output
+Pixel clock out. DOUT is valid on rising edge of this clock.
+2
+SHFT_CLKOUT_N
+Output
+Output shift CLK (differential negative).
+3
+SHFT_CLKOUT_P
+Output
+Output shift CLK (differential positive).
+4
+SER_DATAOUT_N
+Output
+Serial data out (differential negative).
+
+===== PAGE 9 =====
+PDF: 09005aef8366edcb/Source: 09005aef8366ede5
+Aptina Imaging reserves the right to change products or specifications without notice.
+MT9V034_DS - Rev. A 10/08 EN
+9
+©2008 Aptina Imaging Corporation. All rights reserved.
+ MT9V034: 1/3-Inch Wide-VGA Digital Image Sensor
+Pin Descriptions
+Aptina Confidential and Proprietary
+Notes:
+1. Pin 29, (RSVD) must be tied to GND.
+2. Output enable (OE) tri-states signals DOUT0–DOUT9, LINE_VALID, FRAME_VALID, and PIXCLK.
+3. No connect. These pins must be left floating for proper operation.
+Figure 3: 
+ Typical Configuration (Connection)—Parallel Output Mode
+Note:
+LVDS signals are to be left floating.
+5
+SER_DATAOUT_P
+Output
+Serial data out (differential positive).
+1, 14
+VDD
+Supply
+Digital power 3.3V.
+35, 39
+VAA
+Supply
+Analog power 3.3V.
+40
+VAAPIX
+Supply
+Pixel power 3.3V. 
+6
+VDDLVDS
+Supply
+Dedicated power for LVDS pads.
+7, 12
+LVDSGND
+Ground
+Dedicated GND for LVDS pads.
+13, 48
+DGND
+Ground
+Digital GND.
+34, 38
+AGND
+Ground
+Analog GND.
+36, 37
+NC
+NC
+No connect.
+3
+Table 3: 
+Pin Descriptions (continued)
+48-Pin CLCC 
+Numbers
+Symbol
+Type
+Description
+Note
+SYSCLK
+LINE_VALID
+FRAME_VALID
+PIXCLK
+      DOUT(9:0) 
+STANDBY
+EXPOSURE
+RSVD
+S_CTRL_ADR0
+S_CTRL_ADR1
+LVDSGND
+LED_OUT
+SDATA
+SCLK
+RESET_BAR
+OE
+VDDLVDS
+AGND
+DGND
+VDD
+VAA
+VAAPIX
+Master clock
+0.1μF
+To controller
+STANDBY from
+controller or
+digital GND
+Two-wire
+serial interface
+VDD
+VAA 
+VAAPIX 
+To LED output
+10KΩ
+1.5KΩ
+
+===== PAGE 10 =====
+PDF: 09005aef8366edcb/Source: 09005aef8366ede5
+Aptina Imaging reserves the right to change products or specifications without notice.
+MT9V034_DS - Rev. A 10/08 EN
+10
+©2008 Aptina Imaging Corporation. All rights reserved.
+ MT9V034: 1/3-Inch Wide-VGA Digital Image Sensor
+Pixel Data Format
+Aptina Confidential and Proprietary
+Pixel Data Format
+Pixel Array Structure
+The MT9V034 pixel array is configured as 809 columns by 499 rows, shown in Figure 4. 
+The dark pixels are optically black and are used internally to monitor black level. Of the 
+left 52 columns, 36 are dark pixels used for row noise correction. Of the top 14 rows of 
+pixels, two of the dark rows are used for black level correction. Also, three black rows 
+from the top black rows can be read out by setting the Show Dark Rows bit in the Read 
+Mode register; setting Show Dark Columns will display the 36 dark columns. There are 
+753 columns by 481 rows of optically active pixels. While the sensor's format is 752 x 480, 
+one additional active column and active row are included for use when horizontal or 
+vertical mirrored readout is enabled, to allow readout to start on the same pixel. This one 
+pixel adjustment is always performed, for monochrome or color versions. The active 
+area is surrounded with optically transparent dummy pixels to improve image unifor-
+mity within the active area. Neither dummy pixels nor barrier pixels can be read out. 
+Figure 4: 
+ Pixel Array Description
+(0, 0)
+3 barrier + 38 (1 + 36 addressed + 1) dark 
++ 9 barrier + 2 light dummy
+2 barrier + 2 light dummy
+2 barrier + 2 light dummy
+active pixel
+light dummy pixel
+dark pixel
+barrier pixel
+4.92 x 3.05 mm2
+Pixel Array
+809 x 499 (753 x 481 active)
+6.0μm pixel
+2 barrier + 8 (2 + 4 addressed + 2) dark + 2 barrier + 2 light dummy
+
+===== PAGE 11 =====
+PDF: 09005aef8366edcb/Source: 09005aef8366ede5
+Aptina Imaging reserves the right to change products or specifications without notice.
+MT9V034_DS - Rev. A 10/08 EN
+11
+©2008 Aptina Imaging Corporation. All rights reserved.
+ MT9V034: 1/3-Inch Wide-VGA Digital Image Sensor
+Color Device Limitations
+Aptina Confidential and Proprietary
+Figure 5: 
+ Pixel Color Pattern Detail (Top Right Corner)
+Color Device Limitations
+The color version of the MT9V034 does not support or offers reduced performance for 
+the following functionalities. 
+Pixel Binning
+Pixel binning is done on immediate neighbor pixels only, no facility is provided to skip 
+pixels according to a Bayer pattern. Therefore, the result of binning combines pixels of 
+different colors. See “Pixel Binning” on page 64 for additional information.
+Interlaced Readout
+Interlaced readout yields one field consisting only of red and green pixels and another 
+consisting only of blue and green pixels. This is due to the Bayer pattern of the CFA.
+Automatic Black Level Calibration
+When the color bit is set (R0x0F[1]=1), the sensor uses black level correction values from 
+one green plane, which are applied to all colors. To use the calibration value based on all 
+dark pixels' offset values, the color bit should be cleared.
+Other Limiting Factors
+Black level correction and row-wise noise correction are applied uniformly to each color. 
+The row-wise noise correction algorithm does not work well in color sensors. Automatic 
+exposure and gain control calculations are made based on all three colors, not just the 
+green channel. High dynamic range does operate in color; however, Aptina strongly 
+recommends limiting use to linear operation where good color fidelity is required.
+Active Pixel (0,0)
+Array Pixel (4,14)
+Row Readout Direction
+B
+G
+B
+G
+B
+G
+G
+R
+G
+R
+G
+R
+G
+R
+G
+R
+G
+R
+G
+R
+G
+R
+G
+R
+G
+R
+G
+R
+G
+R
+B
+G
+B
+G
+B
+G
+B
+G
+B
+G
+B
+G
+B
+G
+B
+G
+B
+G
+Column Readout Direction
+
+===== PAGE 12 =====
+PDF: 09005aef8366edcb/Source: 09005aef8366ede5
+Aptina Imaging reserves the right to change products or specifications without notice.
+MT9V034_DS - Rev. A 10/08 EN
+12
+©2008 Aptina Imaging Corporation. All rights reserved.
+ MT9V034: 1/3-Inch Wide-VGA Digital Image Sensor
+Output Data Format
+Aptina Confidential and Proprietary
+Output Data Format
+The MT9V034 image data can be read out in a progressive scan or interlaced scan mode. 
+Valid image data is surrounded by horizontal and vertical blanking, as shown in Figure 6. 
+The amount of horizontal and vertical blanking is programmable through R0x05 and 
+R0x06, respectively (R0xCD and R0xCE for context B). LV is HIGH during the shaded 
+region of the figure. See  “Output Data Timing” on page 13 for the description of FV 
+timing. 
+Figure 6: 
+ Spatial Illustration of Image Readout
+P0,0 P0,1 P0,2.....................................P0,n-1 P0,n
+P1,0 P1,1 P1,2.....................................P1,n-1 P1,n
+00 00 00 .................. 00 00 00
+00 00 00 .................. 00 00 00
+Pm-1,0 Pm-1,1.....................................Pm-1,n-1 Pm-1,n
+Pm,0 Pm,1.....................................Pm,n-1 Pm,n
+00 00 00 .................. 00 00 00
+00 00 00 .................. 00 00 00
+00 00 00 .................. 00 00 00
+00 00 00 .................. 00 00 00
+00 00 00 .................. 00 00 00
+00 00 00 .................. 00 00 00
+00 00 00 ..................................... 00 00 00
+00 00 00 ..................................... 00 00 00
+00 00 00 ..................................... 00 00 00
+00 00 00 ..................................... 00 00 00
+VALID IMAGE
+HORIZONTAL
+BLANKING 
+VERTICAL BLANKING
+VERTICAL/HORIZONTAL
+BLANKING 
+
+===== PAGE 13 =====
+PDF: 09005aef8366edcb/Source: 09005aef8366ede5
+Aptina Imaging reserves the right to change products or specifications without notice.
+MT9V034_DS - Rev. A 10/08 EN
+13
+©2008 Aptina Imaging Corporation. All rights reserved.
+ MT9V034: 1/3-Inch Wide-VGA Digital Image Sensor
+Output Data Format
+Aptina Confidential and Proprietary
+Output Data Timing
+The data output of the MT9V034 is synchronized with the PIXCLK output. When 
+LINE_VALID (LV) is HIGH, one 10-bit pixel datum is output every PIXCLK period. 
+Figure 7: 
+ Timing Example of Pixel Data
+The PIXCLK is a nominally inverted version of the master clock (SYSCLK). This allows 
+PIXCLK to be used as a clock to latch the data. However, when column bin 2 is enabled, 
+the PIXCLK is HIGH for one complete master clock master period and then LOW for one 
+complete master clock period; when column bin 4 is enabled, the PIXCLK is HIGH for 
+two complete master clock periods and then LOW for two complete master clock 
+periods. It is continuously enabled, even during the blanking period. Setting R0x72 
+bit[4] = 1 causes the MT9V034 to invert the polarity of the PIXCLK.
+The parameters P1, A, Q, and P2 in Figure 8 are defined in Table 4. 
+Figure 8: 
+ Row Timing and FRAME_VALID/LINE_VALID Signals
+ 
+Table 4: 
+Frame Time
+Parameter
+Name
+Equation
+Default Timing at 26.66 MHz
+A
+Active data time
+Context A: R0x04 
+Context B: R0xCC
+752 pixel clocks
+= 752 master
+= 28.20μs
+P1
+Frame start blanking
+Context A: R0x05 - 23
+Context B: R0xCD - 23
+71 pixel clocks
+= 71master
+= 2.66μs
+P2
+Frame end blanking
+23 (fixed)
+23 pixel clocks
+= 23 master
+= 0.86μs
+Q
+Horizontal blanking 
+Context A: R0x05
+Context B: R0xCD
+94 pixel clocks
+= 94 master
+= 3.52μs
+LINE_VALID
+PIXCLK
+    DOUT(9:0)
+P0
+(9:0)
+P1
+(9:0)
+P2
+(9:0)
+P3
+(9:0)
+P4
+(9:0)
+Pn-1
+(9:0)
+Pn
+(9:0)
+Valid Image Data
+Blanking
+Blanking
+...
+...
+...
+...
+P1
+A
+ Q
+A
+ Q
+A
+P2
+Number of master clocks
+FRAME_VALID
+LINE_VALID
+...
+...
+...
+
+===== PAGE 14 =====
+PDF: 09005aef8366edcb/Source: 09005aef8366ede5
+Aptina Imaging reserves the right to change products or specifications without notice.
+MT9V034_DS - Rev. A 10/08 EN
+14
+©2008 Aptina Imaging Corporation. All rights reserved.
+ MT9V034: 1/3-Inch Wide-VGA Digital Image Sensor
+Output Data Format
+Aptina Confidential and Proprietary
+Sensor timing is shown above in terms of pixel clock and master clock cycles (refer to 
+Figure 7 on page 13). The recommended master clock frequency is 26.66 MHz. The 
+vertical blanking and the total frame time equations assume that the integration time 
+(Coarse Shutter Width plus Fine Shutter Width) is less than the number of active rows 
+plus the blanking rows minus the overhead rows:
+Window Height + Vertical Blanking – 2
+(EQ 1)
+If this is not the case, the number of integration rows must be used instead to determine 
+the frame time, as shown in Table 5. In this example it is assumed that the Coarse Shutter 
+Width Control is programmed with 523 rows, and the Fine Shutter Width Total is zero. 
+For Simultaneous mode, if the exposure time registers (Coarse Shutter Width Total plus 
+Fine Shutter Width Total) exceed the total readout time, then the vertical blanking time 
+is internally extended automatically to adjust for the additional integration time 
+required. This extended value is not written back to the vertical blanking registers. The 
+Vertical Blank register can be used to adjust frame-to-frame readout time. This register 
+does not affect the exposure time but it may extend the readout time.
+ 
+Notes:
+1. The MT9V034 uses column parallel analog-digital converters, thus short row timing is not possible. 
+The minimum total row time is 690 columns (horizontal width + horizontal blanking). The mini-
+mum horizontal blanking is 61. When the window width is set below 627, horizontal blanking 
+must be increased.
+A+Q
+Row time
+Context A: R0x04 + R0x05
+Context B: R0xCC + R0xCD
+846 pixel clocks 
+= 846 master
+= 31.72μs
+V
+Vertical blanking
+Context A: (R0x06) x (A + Q) + 4
+Context B: (R0xCE) x (A + Q) + 4
+38,074 pixel clocks
+= 38,074 master
+= 1.43ms
+Nrows x (A + Q)
+Frame valid time
+Context A: (R0x03) × (A + Q)
+Context B: (R0xCB) x (A + Q)
+406,080 pixel clocks
+= 406,080 master
+= 15.23ms
+F
+Total frame time
+V + (Nrows x (A + Q))
+444,154 pixel clocks
+= 444,154 master 
+= 16.66ms
+Table 5: 
+Frame Time—Long Integration Time
+Parameter
+Name
+Equation
+(Number of Master Clock Cycles)
+Default Timing
+at 26.66 MHz
+V’
+Vertical blanking (long 
+integration time)
+Context A: (R0x0B + 2 - R0x03) × (A + Q) + R0xD5 + 4
+Context B: (R0xD2 + 2 - R0xCB) x (A + Q) + R0xD8 + 4
+38,074 pixel clocks
+= 38,074 master
+= 1.43ms
+F
+Total frame time (long 
+integration time)
+Context A: (R0x0B + 2) × (A + Q) + R0xD5 + 4
+Context B: (R0xD2 + 2) x (A + Q) + R0xD8 + 4
+444,154 pixel clocks
+= 444,154 master 
+= 16.66ms
+Table 4: 
+Frame Time (continued)
+Parameter
+Name
+Equation
+Default Timing at 26.66 MHz
+
+===== PAGE 15 =====
+PDF: 09005aef8366edcb/Source: 09005aef8366ede5
+Aptina Imaging reserves the right to change products or specifications without notice.
+MT9V034_DS - Rev. A 10/08 EN
+15
+©2008 Aptina Imaging Corporation. All rights reserved.
+ MT9V034: 1/3-Inch Wide-VGA Digital Image Sensor
+Serial Bus Description
+Aptina Confidential and Proprietary
+Serial Bus Description
+Registers are written to and read from the MT9V034 through the two-wire serial inter-
+face bus. The MT9V034 is a serial interface slave with four possible IDs (0x90, 0x98, 0xB0 
+and 0xB8) determined by the S_CTRL_ADR0 and S_CTRL_ADR1 input pins. Data is 
+transferred into the MT9V034 and out through the serial data (SDATA) line. The SDATA 
+line is pulled up to VDD off-chip by a 1.5KΩ resistor. Either the slave or master device can 
+pull the SDATA line down—the serial interface protocol determines which device is 
+allowed to pull the SDATA line down at any given time. The registers are 16-bit wide, and 
+can be accessed through 16- or 8-bit two-wire serial interface sequences.
+Protocol
+The two-wire serial interface defines several different transmission codes, as shown in 
+the following sequence:
+1. a start bit
+2. the slave device 8-bit address
+3. a(n) (no) acknowledge bit
+4. an 8-bit message
+5. a stop bit
+Start Bit
+The start bit is defined as a HIGH-to-LOW transition of the data line while the clock line 
+is HIGH.
+Slave Address
+The 8-bit address of a two-wire serial interface device consists of 7 bits of address and 
+1 bit of direction. A “0” in the LSB of the address indicates write mode, and a “1” indi-
+cates read mode. As indicated above, the MT9V034 allows four possible slave addresses 
+determined by the two input pins, S_CTRL_ADR0 and S_CTRL_ADR1.
+Acknowledge Bit
+The master generates the acknowledge clock pulse. The transmitter (which is the master 
+when writing, or the slave when reading) releases the data line, and the receiver indi-
+cates an acknowledge bit by pulling the data line LOW during the acknowledge clock 
+pulse.
+No-Acknowledge Bit
+The no-acknowledge bit is generated when the data line is not pulled down by the 
+receiver during the acknowledge clock pulse. A no-acknowledge bit is used to terminate 
+a read sequence.
+Stop Bit
+The stop bit is defined as a LOW-to-HIGH transition of the data line while the clock line 
+is HIGH.
+
+===== PAGE 16 =====
+PDF: 09005aef8366edcb/Source: 09005aef8366ede5
+Aptina Imaging reserves the right to change products or specifications without notice.
+MT9V034_DS - Rev. A 10/08 EN
+16
+©2008 Aptina Imaging Corporation. All rights reserved.
+ MT9V034: 1/3-Inch Wide-VGA Digital Image Sensor
+Serial Bus Description
+Aptina Confidential and Proprietary
+Sequence
+A typical READ or WRITE sequence begins by the master sending a start bit. After the 
+start bit, the master sends the slave device’s 8-bit address. The last bit of the address 
+determines if the request is a read or a write, where a “0” indicates a WRITE and a “1” 
+indicates a READ. The slave device acknowledges its address by sending an acknowledge 
+bit back to the master. 
+If the request was a WRITE, the master then transfers the 8-bit register address to which 
+a WRITE should take place. The slave sends an acknowledge bit to indicate that the 
+register address has been received. The master then transfers the data 8 bits at a time, 
+with the slave sending an acknowledge bit after each 8 bits. The MT9V034 uses 16-bit 
+data for its internal registers, thus requiring two 8-bit transfers to write to one register. 
+After 16 bits are transferred, the register address is automatically incremented, so that 
+the next 16 bits are written to the next register address. The master stops writing by 
+sending a start or stop bit.
+A typical READ sequence is executed as follows. First the master sends the write mode 
+slave address and 8-bit register address, just as in the write request. The master then 
+sends a start bit and the read mode slave address. The master then clocks out the register 
+data 8 bits at a time. The master sends an acknowledge bit after each 8-bit transfer. The 
+register address is automatically incremented after every 16 bits is transferred. The data 
+transfer is stopped when the master sends a no-acknowledge bit. The MT9V034 allows 
+for 8-bit data transfers through the two-wire serial interface by writing (or reading) the 
+most significant 8 bits to the register and then writing (or reading) the least significant 8 
+bits to Byte-Wise Address register (0x0F0).
+Bus Idle State
+The bus is idle when both the data and clock lines are HIGH. Control of the bus is initi-
+ated with a start bit, and the bus is released with a stop bit. Only the master can generate 
+the start and stop bits.
+Data Bit Transfer
+One data bit is transferred during each clock pulse. The two-wire serial interface clock 
+pulse is provided by the master. The data must be stable during the HIGH period of the 
+serial clock—it can only change when the two-wire serial interface clock is LOW. Data is 
+transferred 8 bits at a time, followed by an acknowledge bit.
+Table 6: 
+Slave Address Modes
+{S_CTRL_ADR1, S_CTRL_ADR0}
+Slave Address
+Write/Read Mode
+00
+0x90
+Write
+0x91
+Read
+01
+0x98
+Write
+0x99
+Read
+10
+0xB0
+Write
+0xB1
+Read
+11
+0xB8
+Write
+0xB9
+Read
+
+===== PAGE 17 =====
+PDF: 09005aef8366edcb/Source: 09005aef8366ede5
+Aptina Imaging reserves the right to change products or specifications without notice.
+MT9V034_DS - Rev. A 10/08 EN
+17
+©2008 Aptina Imaging Corporation. All rights reserved.
+ MT9V034: 1/3-Inch Wide-VGA Digital Image Sensor
+Two-Wire Serial Interface Sample Read and Write Sequences
+Aptina Confidential and Proprietary
+Two-Wire Serial Interface Sample Read and Write Sequences
+16-Bit Write Sequence
+A typical write sequence for writing 16 bits to a register is shown in Figure 9. A start bit 
+given by the master, followed by the write address, starts the sequence. The image sensor 
+then gives an acknowledge bit and expects the register address to come first, followed by 
+the 16-bit data. After each 8-bit the image sensor gives an acknowledge bit. All 16 bits 
+must be written before the register is updated. After 16 bits are transferred, the register 
+address is automatically incremented, so that the next 16 bits are written to the next 
+register. The master stops writing by sending a start or stop bit.
+Figure 9: 
+ Timing Diagram Showing a Write to R0x09 with the Value 0x0284
+16-Bit Read Sequence
+A typical read sequence is shown in Figure 10. First the master has to write the register 
+address, as in a write sequence. Then a start bit and the read address specifies that a read 
+is about to happen from the register. The master then clocks out the register data 8 bits 
+at a time. The master sends an acknowledge bit after each 8-bit transfer. The register 
+address is auto-incremented after every 16 bits is transferred. The data transfer is 
+stopped when the master sends a no-acknowledge bit.
+Figure 10: 
+ Timing Diagram Showing a Read from R0x09; Returned Value 0x0284
+SCLK
+SDATA
+START
+ACK
+0xB8 ADDR
+ACK
+ACK
+ACK
+STOP
+R0x09
+1000 0100
+0000 0010
+SCLK
+SDATA
+START
+ACK
+0xB8 ADDR
+0xB9  ADDR
+0000 0010
+R0x09
+ACK
+ACK
+ACK
+STOP
+1000  0100
+NACK
+
+===== PAGE 18 =====
+PDF: 09005aef8366edcb/Source: 09005aef8366ede5
+Aptina Imaging reserves the right to change products or specifications without notice.
+MT9V034_DS - Rev. A 10/08 EN
+18
+©2008 Aptina Imaging Corporation. All rights reserved.
+ MT9V034: 1/3-Inch Wide-VGA Digital Image Sensor
+Two-Wire Serial Interface Sample Read and Write Sequences
+Aptina Confidential and Proprietary
+8-Bit Write Sequence
+To be able to write 1 byte at a time to the register a special register address is added. The 
+8-bit write is done by first writing the upper 8 bits to the desired register and then writing 
+the lower 8 bits to the Bytewise Address register (R0xF0). The register is not updated until 
+all 16 bits have been written. It is not possible to just update half of a register. In 
+Figure 11 on page 18, a typical sequence for 8-bit writing is shown. The second byte is 
+written to the Bytewise register (R0xF0).
+Figure 11: 
+ Timing Diagram Showing a Bytewise Write to R0x09 with the Value 0x0284
+8-Bit Read Sequence
+To read one byte at a time the same special register address is used for the lower byte. 
+The upper 8 bits are read from the desired register. By following this with a read from the 
+Bytewise Address register (R0xF0) the lower 8 bits are accessed (Figure 12). The master 
+sets the no-acknowledge bits shown.
+Figure 12: 
+ Timing Diagram Showing a Bytewise Read from R0x09; Returned Value 0x0284
+STOP
+ 
+R0xF0
+ACK
+START
+0xB8 ADDR
+ 
+ACK
+SDATA 
+SCLK
+ACK
+ACK
+ACK
+ACK
+R0x09
+0xB8 ADDR
+0000 0010
+1000 0100
+ 
+START
+START
+0xB9 ADDR
+SDATA
+SCLK
+STOP
+NACK
+ACK
+ACK
+ACK
+R0x09
+START
+0xB8 ADDR
+0000 0010
+START
+0xB9 ADDR
+SDATA
+SCLK
+NACK
+ACK
+ACK
+ACK
+R0xF0
+START
+0xB8 ADDR
+1000 0100
+
+===== PAGE 19 =====
+PDF: 09005aef8366edcb/Source: 09005aef8366ede5
+Aptina Imaging reserves the right to change products or specifications without notice.
+MT9V034_DS - Rev. A 10/08 EN
+19
+©2008 Aptina Imaging Corporation. All rights reserved.
+ MT9V034: 1/3-Inch Wide-VGA Digital Image Sensor
+Two-Wire Serial Interface Sample Read and Write Sequences
+Aptina Confidential and Proprietary
+Register Lock
+Included in the MT9V034 is a register lock (R0xFE) feature that can be used as a solution 
+to reduce the probability of an inadvertent noise-triggered two-wire serial interface 
+write to the sensor. All registers, or only the Read Mode registers–R0x0D and R0x0E, can 
+be locked. It is important to prevent an inadvertent two-wire serial interface write to the 
+Read Mode registers in automotive applications since this register controls the image 
+orientation and any unintended flip to an image can cause serious results.
+At power-up, the register lock defaults to a value of 0xBEEF, which implies that all 
+registers are unlocked and any two-wire serial interface writes to the register gets 
+committed.
+Lock All Registers
+If a unique pattern (0xDEAD) to R0xFE is programmed, any subsequent two-wire serial 
+interface writes to registers (except R0xFE) are NOT committed. Alternatively, if the user 
+writes a 0xBEEF to the register lock register, all registers are unlocked and any 
+subsequent two-wire serial interface writes to the register are committed.
+Lock Only Read Mode Registers (R0x0D and R0x0E) 
+If a unique pattern (0xDEAF) to R0xFE is programmed, any subsequent two-wire serial 
+interface writes to R0x0D or R0x0E are NOT committed. Alternatively, if the user writes a 
+0xBEEF to register lock register, registers R0x0D and R0x0E are unlocked and any 
+subsequent two-wire serial interface writes to these registers are committed.
+
+===== PAGE 20 =====
+PDF: 09005aef8366edcb/Source: 09005aef8366ede5
+Aptina Imaging reserves the right to change products or specifications without notice.
+MT9V034_DS - Rev. A 10/08 EN
+20
+©2008 Aptina Imaging Corporation. All rights reserved.
+ MT9V034: 1/3-Inch Wide-VGA Digital Image Sensor
+Two-Wire Serial Interface Sample Read and Write Sequences
+Aptina Confidential and Proprietary
+Real-Time Context Switching
+In the MT9V034, the user may switch between two full register sets (listed in Table 7) by 
+writing to a context switch change bit in register 0x07. This context switch will change all 
+registers (no shadowing) at the frame start time and have the new values apply to the 
+immediate next exposure and readout time. 
+.
+Table 7: 
+Real-Time Context-Switchable Registers 
+Register Name
+Register Number (Hex) For Context A
+Register Number (Hex) for Context B
+Column Start
+0x01
+0xC9
+Row Start
+0x02
+0xCA
+Window Height
+0x03
+0xCB
+Window Width
+0x04
+0xCC
+Horizontal Blanking
+0x05
+0xCD
+Vertical Blanking
+0x06
+0xCE
+Coarse Shutter Width 1
+0x08
+0xCF
+Coarse Shutter Width 2
+0x09
+0xD0
+Coarse Shutter Width Control
+0x0A
+0xD1
+Coarse Shutter Width Total
+0x0B
+0xD2
+Fine Shutter Width 1
+0xD3
+0xD6
+Fine Shutter Width 2
+0xD4
+0xD7
+Fine Shutter Width Total
+0xD5
+0xD8
+Read Mode 
+0x0D [5:0]
+0x0E [5:0]
+High Dynamic Range enable
+0x0F [0]
+0x0F [8]
+ADC Resolution Control
+0x1C [1:0]
+0x1C [9:8]
+V1 Control – V4 Control
+0x31 – 0x34
+0x39 –0x3C
+Analog Gain Control
+0x35
+0x36
+Row Noise Correction Control 1
+0x70 [1:0]
+0x70 [9:8]
+Tiled Digital Gain
+0x80 [3:0] – 0x98 [3:0]
+0x80 [11:8] – 0x98 [11:8]
+AEC/AGC Enable
+0xAF [1:0]
+0xAF [9:8]
+
+===== PAGE 21 =====
+PDF: 09005aef8366edcb/Source: 09005aef8366ede5
+Aptina Imaging reserves the right to change products or specifications without notice.
+MT9V034_DS - Rev. A 10/08 EN
+21
+©2008 Aptina Imaging Corporation. All rights reserved.
+ MT9V034: 1/3-Inch Wide-VGA Digital Image Sensor
+Registers
+Aptina Confidential and Proprietary
+Registers
+Caution
+Writing and changing the value of a reserved register (word or bit) puts the device in an 
+unknown state and may damage the device.
+Table 8: 
+Default Register Descriptions
+1 = always 1; 0 = always 0; d = programmable; ? = read only
+Register Number 
+(Hex)
+Description
+Data Format
+(Binary)
+Default Value
+(Hex)
+0x00
+Chip Version
+0001 0011 0010 0100 (LSB)
+Iter. 1: 0x1324
+0x01
+Column Start
+0000 00dd dddd dddd
+0x0001
+0x02
+Row Start Context A
+0000 000d dddd dddd
+0x0004
+0x03
+Window Height Context A
+0000 000d dddd dddd
+0x01E0
+0x04
+Window Width Context A
+0000 00dd dddd dddd
+0x02F0
+0x05
+Horizontal Blanking Context A
+0000 00dd dddd dddd
+0x005E
+0x06
+Vertical Blanking Context A
+0ddd dddd dddd dddd
+0x002D
+0x07
+Chip Control1
+0000 dddd dddd dddd
+0x0388
+0x08
+Coarse Shutter Width 1 Context A
+0ddd dddd dddd dddd
+0x01BB
+0x09
+Coarse Shutter Width 2 Context A
+0ddd dddd dddd dddd
+0x01D9
+0x0A
+Shutter Width Ctrl Context A
+0000 00dd dddd dddd
+0x0164
+0x0B
+Coarse Total Shutter Width Context A
+0ddd dddd dddd dddd
+0x01E0
+0x0C
+Reset
+0000 0000 0000 00dd
+0x0000
+0x0D
+Read Mode Context A
+0000 0011 dddd dddd
+0x0300
+0x0E
+Read Mode Context B
+0000 0000 00dd dddd
+0x0000
+0x0F
+Sensor Type, HDR Enable
+0000 000d 0000 00dd
+0x0100
+0x10
+Reserved
+–
+0x0040
+0x11
+Reserved
+–
+0x8042
+0x12
+Reserved
+–
+0x0022
+0x13
+Reserved
+–
+0x2D32
+0x14
+Reserved
+–
+0x0E02
+0x15
+Reserved
+–
+0x0E32
+0x16
+Reserved
+–
+0x2802
+0x17
+Reserved
+–
+0x3E38
+0x18
+Reserved
+–
+0x3E38
+0x19
+Reserved
+–
+0x2802
+0x1A
+Reserved
+–
+0x0428
+0x1B
+LED_OUT Ctrl
+0000 0000 0000 00dd
+0x0000
+0x1C
+Companding
+0000 00dd 0000 00dd
+0x0302
+0x1D
+Reserved
+–
+0x0040
+0x1E
+Reserved
+–
+0x0000
+0x1F
+Reserved
+–
+0x0000
+0x20
+Reserved 
+–
+0x01C1
+0x21
+Reserved
+–
+0x0020
+0x22
+Reserved
+–
+0x0020
+0x23
+Reserved
+–
+0x0010
+0x24
+Reserved
+–
+0x0010
+0x25
+Reserved
+–
+0x0020
+0x26
+Reserved
+–
+0x0004
+0x27
+Reserved
+–
+0x000C
+
+===== PAGE 22 =====
+PDF: 09005aef8366edcb/Source: 09005aef8366ede5
+Aptina Imaging reserves the right to change products or specifications without notice.
+MT9V034_DS - Rev. A 10/08 EN
+22
+©2008 Aptina Imaging Corporation. All rights reserved.
+ MT9V034: 1/3-Inch Wide-VGA Digital Image Sensor
+Registers
+Aptina Confidential and Proprietary
+0x28
+Reserved
+–
+0x0010
+0x29
+Reserved
+–
+0x0010
+0x2A
+Reserved
+–
+0x0020
+0x2B
+Reserved
+–
+0x0004
+0x2C
+VREF_ADC Control
+0000 0000 0000 0ddd
+0x0000
+0x2D
+Reserved
+–
+0x0004
+0x2E
+Reserved
+–
+0x0007
+0x2F
+Reserved
+–
+0x0004
+0x30
+Reserved
+–
+0x0003
+0x31
+V1 Context A
+0000 0000 000d dddd
+0x0027
+0x32
+V2 Context A
+0000 0000 000d dddd
+0x001A
+0x33
+V3 Context A
+0000 0000 000d dddd
+0x0005
+0x34
+V4 Context A
+0000 0000 000d dddd
+0x0003
+0x35
+Analog Gain Context A
+0000 0000 0ddd dddd
+0x0010
+0x36
+Analog Gain Context B
+0000 0000 0ddd dddd
+0x0010
+0x37
+Reserved
+–
+0x0000
+0x38
+Reserved
+–
+0x0000
+0x39
+V1 Control Context B
+0000 0000 00dd dddd
+0x27
+0x3A
+V2 Control Context B
+0000 0000 00dd dddd
+0x26
+0x3B
+V3 Control Context B
+0000 0000 00dd dddd
+0x5
+0x3C
+V4 Control Context B
+0000 0000 00dd dddd
+0x3
+0x40
+Reserved
+0000 0000 ???? ????
+RO
+0x42
+Frame Dark Average
+0000 0000 ???? ????
+RO
+0x46
+Dark Avg Thresholds
+dddd dddd dddd dddd
+0x231D
+0x47
+BL Calib Control
+0000 0000 ddd0 000d
+0x0080
+0x48 
+Black Level Calibration Value
+0000 0000 dddd dddd
+0x0000
+0x4C 
+BL Calib Step Size
+0000 0000 000d dddd
+0x0002
+0x60
+Reserved
+0000 0000 0000 0000
+0x0000
+0x61 – 0x66
+Unused
+–
+0x0000
+0x67
+Reserved
+–
+0x0000
+0x68
+Reserved
+–
+RO
+0x69
+Reserved
+–
+RO
+0x6A
+Reserved
+–
+RO
+0x6B
+Reserved
+–
+RO
+0x6C
+Reserved
+–
+0x0000
+0x70
+Row Noise Corr Control
+0000 00dd 0000 00dd
+0x0000
+0x71
+Row Noise Constant
+0000 00dd dddd dddd
+0x002A
+0x72
+Pixclk, FV, LV Ctrl
+0000 0000 000d dddd
+0x0000
+0x73 – 0x7E
+Unused
+–
+0x0000
+0x7F
+Digital Test Pattern
+0ddd ddd dddd dddd
+0x0000
+0x80
+Tile Weight/Gain X0_Y0
+0000 dddd dddd dddd
+0x04F4
+0x81
+Tile Weight/Gain X1_Y0
+0000 dddd dddd dddd
+0x04F4
+0x82
+Tile Weight/Gain X2_Y0
+0000 dddd dddd dddd
+0x04F4
+0x83
+Tile Weight/Gain X3_Y0
+0000 dddd dddd dddd
+0x04F4
+0x84
+Tile Weight/Gain X4_Y0
+0000 dddd dddd dddd
+0x04F4
+Table 8: 
+Default Register Descriptions (continued)
+1 = always 1; 0 = always 0; d = programmable; ? = read only
+Register Number 
+(Hex)
+Description
+Data Format
+(Binary)
+Default Value
+(Hex)
+
+===== PAGE 23 =====
+PDF: 09005aef8366edcb/Source: 09005aef8366ede5
+Aptina Imaging reserves the right to change products or specifications without notice.
+MT9V034_DS - Rev. A 10/08 EN
+23
+©2008 Aptina Imaging Corporation. All rights reserved.
+ MT9V034: 1/3-Inch Wide-VGA Digital Image Sensor
+Registers
+Aptina Confidential and Proprietary
+0x85
+Tile Weight/Gain X0_Y1
+0000 dddd dddd dddd
+0x04F4
+0x86
+Tile Weight/Gain X1_Y1
+0000 dddd dddd dddd
+0x04F4
+0x87
+Tile Weight/Gain X2_Y1
+0000 dddd dddd dddd
+0x04F4
+0x88
+Tile Weight/Gain X3_Y1
+0000 dddd dddd dddd
+0x04F4
+0x89
+Tile Weight/Gain X4_Y1
+0000 dddd dddd dddd
+0x04F4
+0x8A
+Tile Weight/Gain X0_Y2
+0000 dddd dddd dddd
+0x04F4
+0x8B
+Tile Weight/Gain X1_Y2
+0000 dddd dddd dddd
+0x04F4
+0x8C
+Tile Weight/Gain X2_Y2
+0000 dddd dddd dddd
+0x04F4
+0x8D
+Tile Weight/Gain X3_Y2
+0000 dddd dddd dddd
+0x04F4
+0x8E
+Tile Weight/Gain X4_Y2
+0000 dddd dddd dddd
+0x04F4
+0x8F
+Tile Weight/Gain X0_Y3
+0000 dddd dddd dddd
+0x04F4
+0x90
+Tile Weight/Gain X1_Y3
+0000 dddd dddd dddd
+0x04F4
+0x91
+Tile Weight/Gain X2_Y3
+0000 dddd dddd dddd
+0x04F4
+0x92
+Tile Weight/Gain X3_Y3
+0000 dddd dddd dddd
+0x04F4
+0x93
+Tile Weight/Gain X4_Y3
+0000 dddd dddd dddd
+0x04F4
+0x94
+Tile Weight/Gain X0_Y4
+0000 dddd dddd dddd
+0x04F4
+0x95
+Tile Weight/Gain X1_Y4
+0000 dddd dddd dddd
+0x04F4
+0x96
+Tile Weight/Gain X2_Y4
+0000 dddddddd dddd
+0x04F4
+0x97
+Tile Weight/Gain X3_Y4
+0000 dddd dddd dddd
+0x04F4
+0x98
+Tile Weight/Gain X4_Y4
+0000 dddd dddd dddd
+0x04F4
+0x99
+Tile Coord. X 0/5
+0000 00dd dddd dddd
+0x0000
+0x9A
+Tile Coord. X 1/5
+0000 00dd dddd dddd
+0x0096
+0x9B
+Tile Coord. X 2/5
+0000 00dd dddd dddd
+0x012C
+0x9C
+Tile Coord. X 3/5
+0000 00dd dddd dddd
+0x01C2
+0x9D
+Tile Coord. X 4/5
+0000 00dd dddd dddd
+0x0258
+0x9E
+Tile Coord. X 5/5
+0000 00dd dddd dddd
+0x02F0
+0x9F
+Tile Coord. Y 0/5
+0000 000d dddd dddd
+0x0000
+0xA0
+Tile Coord. Y 1/5
+0000 000d dddd dddd
+0x0060
+0xA1
+Tile Coord. Y 2/5
+0000 000d dddd dddd
+0x00C0
+0xA2
+Tile Coord. Y 3/5
+0000 000d dddd dddd
+0x0120
+0xA3
+Tile Coord. Y 4/5
+0000 000d dddd dddd
+0x0180
+0xA4
+Tile Coord. Y 5/5
+0000 000d dddd dddd
+0x01E0
+0XA5
+AEC/AGC Desired Bin
+0000 0000 00dd dddd
+0x003A
+0xA6
+AEC Update Frequency
+0000 0000 0000 dddd
+0x0002
+0xA7
+Unused
+0000 0000 0000 0000
+0x0000
+0xA8
+AEC LPF
+0000 0000 0000 00dd
+0x0000
+0xA9
+AGC Update Frequency
+0000 0000 0000 dddd
+0x0002
+0xAA
+AGC LPF
+0000 0000 0000 00dd
+0x0002
+0xAB
+Max Analog Gain
+0000 0000 0ddd dddd
+0x0040
+0xAC
+AEC MInimum Exposure
+dddd dddd dddd dddd
+0x0001
+0xAD
+AEC Maximum Exposure
+dddd dddd dddd dddd
+0x01E0
+0xAE
+Bin Difference Threshold
+0000 0000 dddd dddd
+0x0014
+0xAF
+AEC/AGC Enable A/B
+0000 00dd 0000 00dd
+0x0003
+0xB0
+AEC/AGC Pix Count
+dddd dddd dddd dddd
+0xABE0
+0xB1
+LVDS Master Ctrl
+0000 0000 0000 dddd
+0x0002
+Table 8: 
+Default Register Descriptions (continued)
+1 = always 1; 0 = always 0; d = programmable; ? = read only
+Register Number 
+(Hex)
+Description
+Data Format
+(Binary)
+Default Value
+(Hex)
+
+===== PAGE 24 =====
+PDF: 09005aef8366edcb/Source: 09005aef8366ede5
+Aptina Imaging reserves the right to change products or specifications without notice.
+MT9V034_DS - Rev. A 10/08 EN
+24
+©2008 Aptina Imaging Corporation. All rights reserved.
+ MT9V034: 1/3-Inch Wide-VGA Digital Image Sensor
+Registers
+Aptina Confidential and Proprietary
+Notes:
+1. The MT9V034 requires R0x07[9] to be set to “0” for normal operation.  The power-on default value 
+sets this bit to “1.”
+0xB2
+LVDS Shift Clk Ctrl
+0000 0000 000d 0ddd
+0x0010
+0xB3
+LVDS Data Ctrl
+0000 0000 000d 0ddd
+0x0010
+0xB4
+Data Stream Latency
+0000 0000 0000 00dd
+0x0000
+0xB5
+LVDS Internal Sync
+0000 0000 0000 000d
+0x0000
+0xB6
+LVDS Payload Control
+0000 0000 0000 000d
+0x0000
+0xB7
+Stereoscop. Error Ctrl
+0000 0000 0000 0ddd
+0x0000
+0xB8
+Stereoscop. Error Flag
+0000 0000 0000 000?
+RO
+0xB9
+LVDS Data Output
+???? ???? ???? ????
+RO
+0xBA
+AGC Gain Output
+0000 0000 0??? ????
+RO
+0XBB
+AEC Gain Output
+???? ???? ???? ????
+RO
+0xBC
+AGC/AEC Current Bin
+0000 0000 00?? ????
+RO
+0xBD – 0xBE
+Reserved
+0000 0000 0000 0000
+0x0000
+0xBF
+Interlace Field Blank
+0000 000d dddd dddd
+0x0016
+0xC0
+Mon Mode Capture Ctrl
+0000 0000 dddd dddd
+0x000A
+0xC1
+Reserved
+0000 00?? ???? ????
+RO
+0xC2
+Anti-eclipse Controls
+00dd d000 d100 0000
+0x0840
+0xC3
+Reserved
+0000 000? ???? ????
+0x007F
+0xC4
+Reserved
+0000 0000 ???? ????
+0x007F
+0xC5
+Reserved
+0000 0000 ???? ????
+0x007F
+0xC6
+NTSV FV and LV Control
+0000 0000 0000 00dd
+0x0
+0xC7
+NTSC Horiz Blank Ctrl
+dddd dddd dddd dddd
+0x4416
+0xC8
+NTSC Vert Blank Ctrl
+dddd dddd dddd dddd
+0x4421
+0xC9
+Column Start Context B
+0000 00dd dddd dddd
+0x001
+0xCA
+Row Start Context B
+0000 000d dddd dddd
+0x004
+0xCB
+Window Height Context B
+0000 000d dddd dddd
+0x1E0
+0xCC
+Window Width Context B
+0000 00dd dddd dddd
+0x2F0
+0xCD
+Horizontal Blanking Context B
+0000 00dd dddd dddd
+0x5E
+0xCE
+Vertical Blanking Context B
+0ddd dddd dddd dddd
+0x2D
+0xCF
+Coarse SW1 Context B
+0ddd dddd dddd dddd
+0x1DE
+0xD0
+Coarse SW2 Context B
+0ddd dddd dddd dddd
+0x1DF
+0xD1
+Shutter Width Ctrl Context B
+0000 00dd dddd dddd
+0x064
+0xD2
+Coarse Shutter Width Total Context B
+0ddd dddd dddd dddd
+0x1E0
+0xD3
+Fine SW1 Context A
+0000 00dd dddd dddd
+0x0000
+0xD4
+Fine SW2 Context A
+0000 00dd dddd dddd
+0x0000
+0xD5
+Fine Shutter Width Total Context A
+0000 0ddd dddd dddd
+0x0000
+0xD6
+Fine SW1 Context B
+0000 0ddd dddd dddd
+0x0000
+0xD7
+Fine SW2 Context B
+0000 0ddd dddd dddd
+0x0000
+0xD8
+Fine Shutter Width Total Context B
+0000 0ddd dddd dddd
+0x0000
+0xD9
+Monitor Mode
+0000 0000 0000 000d
+0x0000
+0xF0
+Bytewise Addr
+0000 0000 dddd dddd
+0x0000
+0xFE
+Register Lock
+dddd dddd dddd dddd
+0xBEEF
+Table 8: 
+Default Register Descriptions (continued)
+1 = always 1; 0 = always 0; d = programmable; ? = read only
+Register Number 
+(Hex)
+Description
+Data Format
+(Binary)
+Default Value
+(Hex)
+
+===== PAGE 25 =====
+PDF: 09005aef8366edcb/Source: 09005aef8366ede5
+Aptina Imaging reserves the right to change products or specifications without notice.
+MT9V034_DS - Rev. A 10/08 EN
+25
+©2008 Aptina Imaging Corporation. All rights reserved.
+ MT9V034: 1/3-Inch Wide-VGA Digital Image Sensor
+Registers
+Aptina Confidential and Proprietary
+Shadowed Register
+Some sensor settings cannot be changed during frame readout. For example, changing 
+Window Width R0x04 part way through frame readout results in inconsistent LV 
+behavior. To avoid this, the MT9V034 double-buffers many registers by implementing a 
+“pending” and a “live” version. Two-wire serial interface reads and writes access the 
+pending register. The live register controls the sensor operation. The value in the 
+pending register is transferred to a live register at a fixed point in the frame timing, called 
+“frame-start.” Frame-start is defined as the point at which the first dark row is read out. 
+By default, this occurs four row times before FRAME_VALID (FV) goes HIGH. To deter-
+mine which registers or register fields are double-buffered in this way, see the “Shad-
+owed” column in Table 9.
+Notation used in the register description table:
+• Shadowed
+N = No. The register value is updated and used immediately.
+Y = Yes. The register value is updated at next frame start. Frame start is defined as 
+when the first dark row is read out. By default this is four rows before FV goes HIGH.
+• Read/Write
+R = Read-only register/bit.
+W = Read/Write register/bit.
+Table 9 provides a detailed description of the registers. Bit fields that are not identified in 
+the table are read only.
+Table 9: 
+Register Descriptions
+Bit
+Bit Name
+Bit Description
+Default in 
+Hex (Dec)
+Shadowed
+Legal 
+Values 
+(Dec)
+Read/
+Write
+0x00/0xFF (0/255) Chip Version
+15:0
+Chip Version
+Chip version—read-only
+0x1324 
+(4900)
+R
+0x01 (1) Column Start Context A
+9:0
+Column Start
+The first column to be read out (not counting dark 
+columns that may be read). To window the image 
+down, set this register to the starting X value. 
+Readable/active columns are 1–752.
+001
+(1)
+Y
+1–752
+W
+0x02 (2) Row Start Context A
+8:0
+Row Start
+The first row to be read out (not counting any dark 
+rows that may be read). To window the image down, 
+set this register to the starting Y value. 
+Setting a value less than four is not recommended 
+since the dark rows should be read using R0x0D. 
+004
+(4)
+N
+4–482
+W
+0x03 (3) Window Height Context A
+8:0
+Window Height
+Number of rows in the image to be read out (not 
+counting any dark rows or border rows that may be 
+read). 
+1E0
+(480)
+Y
+1–480
+W
+0x04 (4) Window Width Context A
+9:0
+Window Width
+Number of columns in image to be read out (not 
+counting any dark columns or border columns that 
+may be read).
+2F0
+(752)
+N
+1–752
+W
+0x05 (5) Horizontal Blanking Context A
+
+===== PAGE 26 =====
+PDF: 09005aef8366edcb/Source: 09005aef8366ede5
+Aptina Imaging reserves the right to change products or specifications without notice.
+MT9V034_DS - Rev. A 10/08 EN
+26
+©2008 Aptina Imaging Corporation. All rights reserved.
+ MT9V034: 1/3-Inch Wide-VGA Digital Image Sensor
+Registers
+Aptina Confidential and Proprietary
+9:0
+Horizontal 
+Blanking
+Number of blank columns in a row.
+Minimum horizontal blanking is 61 for normal mode, 
+71 for column bin 2 mode, and 91 for column bin 4 
+mode
+05E
+(94)
+Y
+61–1023
+W
+0x06 (6) Vertical Blanking Context A
+14:0
+Vertical Blank
+Number of blank rows in a frame. V-Blank value must 
+meet the following minimums:   
+Linear Mode:
+V-Blank (min) = (SW_total - SW1 + 7)
+                   = SW_total - R0x08 + 7
+If manual exposure, then SW_total = R0x0B.
+If auto-exposure mode then SW_total = R0xAD.
+High Dynamic Range Mode:
+ If Auto-Knee Point disabled, then above equations 
+apply. If Auto-Knee Point enabled, then V-Blank (min) 
+= (t2 + t3 + 7).
+Note: Calculate t2 and t3 taking into account Auto-
+Exposure setting.
+Note: When Sequential Mode is enabled, this register 
+is ineffective. Vertical blank = exposure + 6 rows.
+002D
+(45)
+N
+2–32288
+W
+0x07 (7) Chip Control
+2:0
+Scan Mode
+0 = Progressive scan.
+1 = Not valid.
+2 = Two-field Interlaced scan. Even-numbered rows 
+are read first, and followed by odd-numbered rows.
+3 = Single-field Interlaced scan. If start address is 
+even number, only even-numbered rows are read 
+out; if start address is odd number, only odd-
+numbered rows are read out. Effective image size is 
+decreased by half.
+0
+Y
+0, 2, 3
+W
+4–3
+Sensor Operating 
+Mode
+0 = Slave mode. The user is allowed to initiate 
+exposure and readout.
+1 = Master mode. Sensor generates its own exposure 
+and readout timing according to simultaneous/
+sequential mode control bit.
+2 = Invalid mode.
+3 = Snapshot mode. The user triggers the start of 
+frame by providing a pulse at EXPOSURE pin.
+1
+Y
+0,1, 3
+W
+5
+Stereoscopy 
+Mode
+0 = Stereoscopy disabled. Sensor is stand-alone and 
+the PLL generates a 320 MHz (x12) clock. Typical 
+maximum cable length is 8 meters.
+1 = Stereoscopy enabled. The PLL generates a 
+540 MHz (x18) clock. Typical maximum cable length 
+is 5 meters.
+0
+Y
+0,1
+W
+6
+Stereoscopic 
+Master/Slave 
+mode
+0 = Stereoscopic master.
+1 = Stereoscopic slave. Stereoscopy mode should be 
+enabled when using this bit.
+0
+Y
+0,1
+W
+Table 9: 
+Register Descriptions (continued)
+Bit
+Bit Name
+Bit Description
+Default in 
+Hex (Dec)
+Shadowed
+Legal 
+Values 
+(Dec)
+Read/
+Write
+
+===== PAGE 27 =====
+PDF: 09005aef8366edcb/Source: 09005aef8366ede5
+Aptina Imaging reserves the right to change products or specifications without notice.
+MT9V034_DS - Rev. A 10/08 EN
+27
+©2008 Aptina Imaging Corporation. All rights reserved.
+ MT9V034: 1/3-Inch Wide-VGA Digital Image Sensor
+Registers
+Aptina Confidential and Proprietary
+7
+Parallel Output 
+Enable
+0 = Disable parallel output, LV and FV.  Dout[9:0], 
+FRAME_VALID, and LINE_VALID are forced to logic "0" 
+in sensor digital core. It does not control pads.
+1= Enable parallel output.
+1
+Y
+0,1
+W
+8
+Simultaneous/
+Sequential Mode
+0 = Sequential mode. Pixel and column readout take 
+place only after exposure is complete. 
+1 = Simultaneous mode. Pixel and column readout 
+take place in conjunction with exposure.
+1
+Y
+0,1
+W
+9
+Reserved
+0 = Normal (recommended) operation.
+1 = Reserved function.  Do not use.
+1(1)
+Y
+0, 1
+W
+15
+Context A/B 
+Select
+0 = Context A registers are used.
+1 = Context B registers are used.
+0
+Y
+0, 1
+W
+0x08 (8) Coarse Shutter Width 1 Context A
+14:0
+Coarse Shutter 
+Width 1
+The row number in which the first knee occurs. This 
+may be used when high dynamic range is enabled 
+(R0x0F[0] = 1) and exposure knee point auto adjust is 
+disabled (R0x0A[8] = 0). This register is not 
+shadowed, but any change made does not take effect 
+until the following new frame.
+This register's minimum value is 2, for either linear or 
+HDR modes.
+Note: 
+t1 = Shutter width 1; 
+t2 = Shutter width 2 - Shutter width 1; 
+t3 = total integration - Shutter width 2.
+1BB
+(443)
+N
+0–32765
+W
+0x09 (9) Coarse Shutter Width 2 Context A
+14:0
+Course Shutter 
+Width 2
+The row number in which the second knee occurs. 
+This may be used only when high dynamic range is 
+enabled and exposure knee point auto adjust control 
+bit is disabled. This register is not shadowed, but any 
+change made does not take effect until the following 
+new frame.
+Note: 
+t1 = Shutter width 1;
+t2 = Shutter width 2 – Shutter 1;
+t3 = Total integration – Shutter width 2.
+1D9
+(473)
+N
+0–32765
+W
+0x0A (10) Shutter Width Control Context A
+3:0
+T2 Ratio
+When Exposure Knee Point Auto Adjust is enabled, 
+then one-half to the power of this value indicates the 
+ratio of duration time t2, when saturation control 
+gate is adjusted to level V2, to total coarse 
+integration. This register is not shadowed, but any 
+change made does not take effect until the following 
+new frame.
+T2 = Total coarse integration × (½)t2_ratio. 
+4
+N
+0–15
+W
+Table 9: 
+Register Descriptions (continued)
+Bit
+Bit Name
+Bit Description
+Default in 
+Hex (Dec)
+Shadowed
+Legal 
+Values 
+(Dec)
+Read/
+Write
+
+===== PAGE 28 =====
+PDF: 09005aef8366edcb/Source: 09005aef8366ede5
+Aptina Imaging reserves the right to change products or specifications without notice.
+MT9V034_DS - Rev. A 10/08 EN
+28
+©2008 Aptina Imaging Corporation. All rights reserved.
+ MT9V034: 1/3-Inch Wide-VGA Digital Image Sensor
+Registers
+Aptina Confidential and Proprietary
+7:4
+T3 Ratio
+When Exposure Knee Point Auto Adjust is enabled, 
+then one-half to the power of this value indicates the 
+ratio of duration time t3, when saturation control 
+gate is adjusted to level V3, to total coarse 
+integration. This register is not shadowed, but any 
+change made does not take effect until the following 
+new frame.
+t3 = Total integration × (½)t3_ratio.
+Note: t3 = Total integration - t2 - t1.
+6
+N
+0–15
+W
+8
+Exposure Knee 
+Point Auto Adjust 
+Enable
+0 = Auto adjust disabled.
+1 = Auto adjust enabled.
+1
+N
+0,1
+W
+9
+Single Knee 
+Enable
+0 = Single knee disabled.
+1 = Single knee enabled. 
+0
+N
+0,1
+W
+0x0B (11) Coarse Shutter Width Total Context A
+14:0
+Coarse Shutter 
+Width Total
+Total integration time in number of rows. This value 
+is used only when AEC is disabled only (bit 0 of 
+R0xAF). This register is not shadowed, but any 
+change made does not take effect until the following 
+new frame.
+1E0
+(480)
+N
+0–32765
+W
+0x0C (12) Reset
+0
+Soft Reset
+Setting this bit will cause the sensor to abandon the 
+current frame by resetting all digital logic except 
+two-wire serial interface configuration. This is a self-
+resetting register bit and should always read “0.” 
+(This bit de-asserts internal active LOW reset signal 
+for 15 clock cycles.)
+0
+N
+0, 1
+W
+1
+Auto Block Soft 
+Reset
+Setting this bit causes the sensor to reset the 
+automatic gain and exposure control logic. This is a 
+self-resetting register bit and should always read “0.” 
+(This bit de-asserts internal active LOW reset signal 
+for 15 clock cycles.)
+0
+Y
+0, 1
+W
+0x0D (13) Read Mode Context A
+1:0
+Row Bin 
+0 = Normal operation.
+1 = Row bin 2. Two pixel rows are read per row 
+output. Image size is effectively reduced by a factor 
+of 2 vertically while data rate and pixel clock are not 
+affected. Resulting frame rate is increased by 2.
+2 = Row bin 4. Four pixel rows are read per row 
+output. Image size is effectively reduced by a factor 
+of 4 vertically while data rate and pixel clock are not 
+affected. Resulting frame rate is increased by 4.
+3 = Not valid.
+0
+Y
+0, 1, 2
+W
+Table 9: 
+Register Descriptions (continued)
+Bit
+Bit Name
+Bit Description
+Default in 
+Hex (Dec)
+Shadowed
+Legal 
+Values 
+(Dec)
+Read/
+Write
+
+===== PAGE 29 =====
+PDF: 09005aef8366edcb/Source: 09005aef8366ede5
+Aptina Imaging reserves the right to change products or specifications without notice.
+MT9V034_DS - Rev. A 10/08 EN
+29
+©2008 Aptina Imaging Corporation. All rights reserved.
+ MT9V034: 1/3-Inch Wide-VGA Digital Image Sensor
+Registers
+Aptina Confidential and Proprietary
+3:2
+Column Bin
+0 = Normal operation.
+1 = Column bin 2. When set, image size is reduced by 
+a factor of 2 horizontally. Frame rate is not affected 
+but data rate and pixel clock are reduced by one-half 
+that of master clock.
+2 = Column bin 4.
+When set, image size is reduced by a factor of 4 
+horizontally.
+Frame rate is not affected but data rate and pixel 
+clock are reduced by one-fourth that of master clock.
+3 = Not valid.
+0
+Y
+0, 1, 2
+W
+4
+Row Flip
+Read out rows from bottom to top (upside down). 
+When set, row readout starts from row (Row 
+Start + Window Height) and continues down to (Row 
+Start + 1). When clear, readout starts at Row Start 
+and continues to (Row Start + Window Height - 1).
+This ensures that the starting color is maintained. 
+This one pixel adjustment is always performed, for 
+monochrome or color versions.
+0
+Y
+0, 1
+W
+5
+Column Flip
+Read out columns from right to left (mirrored). When 
+set, column readout starts from column (Col Start + 
+Window Width) and continues down to (Col Start + 
+1). When clear, readout starts at Col Start and 
+continues to (Col Start + Window Width - 1). 
+This ensures that the starting color is maintained. 
+This one pixel adjustment is always performed, for 
+monochrome or color versions.
+0
+Y
+0, 1
+W
+6
+Show Dark Rows
+When set, three dark rows are output before the 
+active window. Frame valid is thus asserted earlier 
+than normal. This has no effect on integration time 
+or frame rate. Whether the dark rows are shown in 
+the image or not the definition frame start is before 
+the dark rows are read out.
+0
+Y
+0, 1
+W
+7
+Show Dark 
+Columns
+When set, 36 dark columns are output before the 
+active pixels in a line. Line valid is thus asserted 
+earlier than normal, and the horizontal blank time is 
+shortened by 36 pixel clocks.
+0
+Y
+0, 1
+W
+9:8
+Reserved
+Reserved.
+3
+3
+0x0E (14) Read Mode Context B
+1:0
+Row Bin
+0 = Normal Operation
+1 = Row bin 2. Two pixel rows are read per row 
+output. Image size is effectively reduced by a factor 
+of 2 vertically while data rate and pixel clock are not 
+affected. Resulting frame rate is increased by 2.
+2 = Row bin 4. Four pixel rows are read per row 
+output. Image size is effectively reduced by a factor 
+of 4 vertically w
+Resulting frame rate is increased by 4.
+3 = Invalid
+0
+Y
+0, 1, 2
+W
+0x0F (15) Sensor Type Control
+Table 9: 
+Register Descriptions (continued)
+Bit
+Bit Name
+Bit Description
+Default in 
+Hex (Dec)
+Shadowed
+Legal 
+Values 
+(Dec)
+Read/
+Write
+
+===== PAGE 30 =====
+PDF: 09005aef8366edcb/Source: 09005aef8366ede5
+Aptina Imaging reserves the right to change products or specifications without notice.
+MT9V034_DS - Rev. A 10/08 EN
+30
+©2008 Aptina Imaging Corporation. All rights reserved.
+ MT9V034: 1/3-Inch Wide-VGA Digital Image Sensor
+Registers
+Aptina Confidential and Proprietary
+0
+High Dynamic 
+Range Context A
+0 = Linear operation. If Linear mode is selected, then 
+Exposure Knee Point Auto Adjust must also be 
+enabled (R0x0A[8] = 1).
+1 = High Dynamic Range. Voltage and shutter width 
+must be correctly set for saturation control to 
+operate.
+0
+N
+0, 1
+W
+1
+Color/Mono 
+Sensor Control
+This bit controls some color-specific logic in Black 
+Level Correction.
+  0 = Monochrome
+  1 = Color
+It should generally be left at “0” for all part types, it is 
+not required to be set for color sensors to operate 
+properly. 
+When set, it applies an unequal offset to the color 
+planes.  For most applications on color parts the bit is 
+best left cleared (monochrome), especially for 
+machine vision applications where predictable image 
+offsets are required.
+For  Black Level Calibration (BLC), when this bit is set, 
+the sensor uses black level correction values from 
+one green plane, which are applied to all colors.  
+Since this bit applies offsets to the color plane, BLC 
+results may be affected.
+0
+Y
+0, 1
+W
+8
+High Dynamic 
+Range Context B
+0 = Linear operation. If Linear mode is selected, then 
+Exposure Knee Point Auto Adjust must also be 
+enabled (R0xD1[8] = 1).
+1 = High Dynamic Range. Voltage and shutter width 
+must be correctly set for saturation control to 
+operate.
+1
+N
+0, 1
+W
+0x1B (27) LED_OUT Control
+0
+Disable LED_OUT
+Disable LED_OUT output. 
+When cleared, the output pin LED_OUT is pulsed 
+HIGH when the sensor is undergoing exposure. 
+When enabled: If enabled (set to 1), and Invert 
+LED_OUT is disabled, the output pin LED_OUT is held 
+in logic LOW state.  If enabled and Invert LED_OUT is 
+enabled, output pin LED_OUT is held in a logic HIGH 
+state.
+0
+Y
+0, 1
+W
+1
+Invert LED_OUT
+Invert polarity of LED_OUT output.
+When set, the output pin LED_OUT is pulsed LOW 
+when the sensor is undergoing exposure.
+0
+Y
+0, 1
+W
+0x1C (28) ADC Companding Mode
+1:0
+ADC Mode 
+Context A
+0 = Invalid.
+1 = Invalid.
+2 = 10-bit linear.
+3 = 12-to10-bit companding.
+2
+N
+2, 3
+W
+9:8
+ADC Mode 
+Context B
+0 = Invalid.
+1 = Invalid.
+2 = 10-bit linear.
+3 = 12-to10-bit companding.
+3
+N
+2,3
+W
+Table 9: 
+Register Descriptions (continued)
+Bit
+Bit Name
+Bit Description
+Default in 
+Hex (Dec)
+Shadowed
+Legal 
+Values 
+(Dec)
+Read/
+Write
+
+===== PAGE 31 =====
+PDF: 09005aef8366edcb/Source: 09005aef8366ede5
+Aptina Imaging reserves the right to change products or specifications without notice.
+MT9V034_DS - Rev. A 10/08 EN
+31
+©2008 Aptina Imaging Corporation. All rights reserved.
+ MT9V034: 1/3-Inch Wide-VGA Digital Image Sensor
+Registers
+Aptina Confidential and Proprietary
+0x2C (44) – 0x3C (60) Analog Controls
+Note: These registers are not shadowed, but any change made does not take effect until the following new frame.
+0x2C (44) VREF_ADC Control
+2:0
+VREF_ADC 
+Voltage Level
+0 = VREF_ADC = 1.0V.
+1 = VREF_ADC = 1.1V.
+2 = VREF_ADC = 1.2V.
+3 = VREF_ADC = 1.3V.
+4 = VREF_ADC = 1.4V.(Note: Effective ADC reference 
+voltage is 1.0V.)
+5 = VREF_ADC = 1.5V.
+6 = VREF_ADC = 1.6V.
+7 = VREF_ADC = 2.1V.
+Range: 1.0–2.1V; Default: 1.4V
+Note: This register is not shadowed, but any change 
+made does not take effect until the following new 
+frame.
+4
+N
+0–7
+W
+0x31 (49) V1 Control Context A
+5:0
+V1 voltage level
+For bits (5:0) = 0 to 5,
+V_step = bits (5:0) * 200mV + 0.2V.
+Range: 0.2 - 1.2V
+For bits (5:0) = 6 to 63
+V_step = bits (5:0) * 23.5mV + 1.62V
+Range: 1.76-3.1V 
+Note: Equation and range are determined with the 
+assumption that VAA = 3.3V. They may vary with 
+actual VAA voltage.
+Default: 2.54V
+Usage: Vstep1 HDR voltage
+27
+(39)
+N
+0–63
+W
+0x32 (50) V2 Control Context A
+5:0
+V2 voltage level
+For bits (5:0) = 0 to 5,
+V_step = bits (5:0) * 200mV + 0.2V.
+Range: 0.2 - 1.2V
+For bits (5:0) = 6 to 63
+V_step = bits (5:0) * 23.5mV + 1.62V
+Range: 1.76-3.1V 
+Note: equation and range are determined with the 
+assumption that VAA = 3.3V. They may vary with 
+actual VAA voltage.
+Default: 2.23V
+Usage: Vstep2 HDR voltage
+1A
+(26)
+N
+0–63
+W
+Table 9: 
+Register Descriptions (continued)
+Bit
+Bit Name
+Bit Description
+Default in 
+Hex (Dec)
+Shadowed
+Legal 
+Values 
+(Dec)
+Read/
+Write
+
+===== PAGE 32 =====
+PDF: 09005aef8366edcb/Source: 09005aef8366ede5
+Aptina Imaging reserves the right to change products or specifications without notice.
+MT9V034_DS - Rev. A 10/08 EN
+32
+©2008 Aptina Imaging Corporation. All rights reserved.
+ MT9V034: 1/3-Inch Wide-VGA Digital Image Sensor
+Registers
+Aptina Confidential and Proprietary
+0x33 (51) V3 Control Context A
+5:0
+V3 voltage level
+For bits (5:0) = 0 to 5,
+V_step = bits (5:0) * 200mV + 0.2V.
+Range: 0.2 - 1.2V
+For bits (5:0) = 6 to 63
+V_step = bits (5:0) * 23.5mV + 1.62V
+Range: 1.76-3.1V 
+Note: equation and range are determined with the 
+assumption that VAA = 3.3V. They may vary with 
+actual VAA voltage.
+Default: 1.2V
+Usage: Vstep3 HDR voltage.
+05
+(5)
+N
+0–63
+W
+0x34 (52) V4 Control Context A
+5:0
+V4 voltage level
+For bits (5:0) = 0 to 5,
+V_step = bits (5:0) * 200mV + 0.2V.
+Range: 0.2 - 1.2V
+For bits (5:0) = 6 to 63
+V_step = bits (5:0) * 23.5mV + 1.62V 
+Range: 1.76-3.1V 
+Note: equation and range are determined with the 
+assumption that VAA = 3.3V. They may vary with 
+actual VAA voltage.
+Default: 0.8V
+Usage: Vstep HDR parking voltage, also provides 
+anti-blooming when Vstep is disabled.
+03
+(3)
+N
+0–63
+W
+0x35 (53) Analog Gain Context A
+6:0
+Global Analog 
+Gain
+Analog gain = bits (6:0) x 0.0625
+Range: 16 dec - 64dec for 1X-4X respectively
+Column amplifier common gain.
+Note: No exception detection is installed, user needs to 
+be cautious when programming
+10
+(16)
+N
+16–64
+W
+15
+Global Analog 
+Gain Attenuation
+When this bit is set, analog gain will be forced to 
+0.75X.
+0
+N
+0, 1
+W
+0x36 (54) Analog Gain Context B
+6:0
+Global Analog 
+Gain
+Analog gain = bits (6:0) x 0.0625
+Range: 16 dec -64dec for 1X-4X respectively
+Column amplifier common gain.
+Note: No exception detection is installed, user needs to 
+be cautious when programming
+10
+(16)
+N
+16–64
+W
+15
+Global Analog 
+Gain Attenuation
+When this bit is set, analog gain will be forced to 
+0.75X.
+1
+N
+0, 1
+W
+0x39 (57) V1 Control Context B
+Table 9: 
+Register Descriptions (continued)
+Bit
+Bit Name
+Bit Description
+Default in 
+Hex (Dec)
+Shadowed
+Legal 
+Values 
+(Dec)
+Read/
+Write
+
+===== PAGE 33 =====
+PDF: 09005aef8366edcb/Source: 09005aef8366ede5
+Aptina Imaging reserves the right to change products or specifications without notice.
+MT9V034_DS - Rev. A 10/08 EN
+33
+©2008 Aptina Imaging Corporation. All rights reserved.
+ MT9V034: 1/3-Inch Wide-VGA Digital Image Sensor
+Registers
+Aptina Confidential and Proprietary
+5:0
+V1 Voltage Level
+For bits (5:0) = 0 to 5,
+V_step = bits (5:0) * 200mV + 0.2V.
+Range: 0.2 - 1.2V
+For bits (5:0) = 6 to 63
+V_step = bits (5:0) * 23.5mV + 1.62V
+Range: 1.76-3.1V 
+Note: equation and range are determined with the 
+assumption that VAA = 3.3V. They may vary with 
+actual VAA voltage.
+Default: 2.54V
+Usage: Vstep 1 HDR voltage
+27
+(39)
+N
+0–63
+W
+0x3A (58) V2 Control Context B
+5:0
+V2 Voltage Level
+For bits (5:0) = 0 to 5,
+V_step = bits (5:0) * 200mV + 0.2V.
+Range: 0.2 - 1.2V
+For bits (5:0) = 6 to 63
+V_step = bits (5:0) * 23.5mV + 1.62V 
+Range: 1.76-3.1V 
+Note: Equation and range are determined with the 
+assumption that VAA = 3.3V. They may vary with 
+actual VAA voltage.
+Default: 2.51V
+Usage: Vstep2 HDR voltage
+36
+(38)
+N
+0–63
+W
+0x3B (59) V3 Control Context B
+5:0
+V3 Voltage Level
+For bits (5:0) = 0 to 5,
+V_step = bits (5:0) * 200mV + 0.2V.
+Range: 0.2 - 1.2V
+For bits (5:0) = 6 to 63
+V_step = bits (5:0) * 23.5mV + 1.62V 
+Range: 1.76-3.1V 
+Note: Equation and range are determined with the 
+assumption that VAA = 3.3V. They may vary with 
+actual VAA voltage.
+Default: 1.2V
+Usage: Vstep3 HDR voltage
+05
+(5)
+N
+0–63
+W
+0x3C (60) V4 Control Context B
+Table 9: 
+Register Descriptions (continued)
+Bit
+Bit Name
+Bit Description
+Default in 
+Hex (Dec)
+Shadowed
+Legal 
+Values 
+(Dec)
+Read/
+Write
+
+===== PAGE 34 =====
+PDF: 09005aef8366edcb/Source: 09005aef8366ede5
+Aptina Imaging reserves the right to change products or specifications without notice.
+MT9V034_DS - Rev. A 10/08 EN
+34
+©2008 Aptina Imaging Corporation. All rights reserved.
+ MT9V034: 1/3-Inch Wide-VGA Digital Image Sensor
+Registers
+Aptina Confidential and Proprietary
+5:0
+V4 Voltage Level
+For bits (5:0) = 0 to 5,
+V_step = bits (5:0) * 200mV + 0.2V.
+Range: 0.2 - 1.2V
+For bits (5:0) = 6 to 63
+V_step = bits (5:0) * 23.5mV + 1.62V
+Range: 1.76-3.1V 
+Note: Equation and range are determined with the 
+assumption that VAA = 3.3V. They may vary with 
+actual VAA voltage.
+Default: 0.8V
+Usage: Vstep HDR parking voltage, also provides 
+anti-blooming when Vstep is disabled.
+03
+(3)
+N
+0–63
+W
+0x42 (66) Frame Dark Average
+7:0
+Frame Dark 
+Average
+The value read is the frame averaged black level, that 
+is, used in the black level algorithm calculations.
+0
+R
+0x46 (70) Dark Average Thresholds
+7:0
+Lower threshold
+Lower threshold for targeted black level in ADC LSBs.
+1D
+(29)
+N
+0–255
+W
+15:8
+Upper threshold
+Upper threshold for targeted black level in ADC LSBs.
+23
+(35)
+N
+0–255
+W
+0x47 (71) Black Level Calibration Control
+0
+Manual Override
+Manual override of black level correction.
+1 = Override automatic black level correction with 
+programmed values. (R0x48).
+0 = Normal operation (default).
+0
+N
+0, 1
+W
+7:5
+Frames to 
+average over
+Two to the power of this value decide how many 
+frames to average over when the black level 
+algorithm is in the averaging mode. In this mode the 
+running frame average is calculated from the 
+following formula: 
+Running frame ave = Old running frame ave - (old 
+running frame ave)/2n + (new frame ave)/ 2n.
+4
+N
+0–7
+W
+0x48 (72) Black Level Calibration Value Context A
+7:0
+Black Level 
+Calibration Value
+Analog calibration offset: Negative numbers are 
+represented with two’s complement, which is shown 
+in the following formula: 
+Sign = bit 7 (0 is positive, 1 is negative).
+If positive offset value: Magnitude = bit 6:0.
+If negative offset value: Magnitude = not (bit 6:0) + 1.
+During two-wire serial interface read, this register 
+returns the user-programmed value when manual 
+override is enabled (R0x47 bit 0); otherwise, this 
+register returns the result obtained from the 
+calibration algorithm.
+–
+N
+–127 to 
+127
+RW
+0x4C (76) Black Level Calibration Value Step Size
+4:0
+Step Size of 
+Calibration Value
+This is the size calibration value may change 
+(positively or negatively) from frame to frame.
+Note: 1 calib LSB = ½ ADC LSB, assuming analog gain = 
+1.
+02
+N
+0–31
+W
+Table 9: 
+Register Descriptions (continued)
+Bit
+Bit Name
+Bit Description
+Default in 
+Hex (Dec)
+Shadowed
+Legal 
+Values 
+(Dec)
+Read/
+Write
+
+===== PAGE 35 =====
+PDF: 09005aef8366edcb/Source: 09005aef8366ede5
+Aptina Imaging reserves the right to change products or specifications without notice.
+MT9V034_DS - Rev. A 10/08 EN
+35
+©2008 Aptina Imaging Corporation. All rights reserved.
+ MT9V034: 1/3-Inch Wide-VGA Digital Image Sensor
+Registers
+Aptina Confidential and Proprietary
+0x70 (112) Row Noise Correction Control 
+0
+Enable Noise 
+Correction 
+Context A
+0 = Normal operation
+1 = Enable row noise cancellation algorithm. When 
+this bit is set, on a per row basis, the dark average will 
+be subtracted from each pixel in the row, and then a 
+constant (Reg 0x71) will be added.
+0
+N
+0, 1
+W
+1
+Use black level 
+average Context 
+A
+0 = Use the average value of the dark columns read 
+out in each row as dark average.
+1 = Use black level frame average from the dark rows 
+in the row noise correction algorithm for low gains. 
+Note that this frame average was taken before the 
+last adjustment of the offset DAC for that frame, so it 
+might be slightly off.
+0
+N
+0, 1
+W
+8
+Enable noise 
+correction 
+Context B
+0 = Normal operation
+1 = Enable row noise cancellation algorithm. When 
+this bit is set, on a per row basis, the dark average will 
+be subtracted from each pixel in the row, and then a 
+constant (Reg 0x71) will be added. 
+0
+N
+0, 1
+W
+9
+Use black level 
+average Context 
+B
+0 = Use the average value of the dark columns read 
+out in each row as dark average.
+1 = Use black level frame average from the dark rows 
+in the row noise correction algorithm for low gains. 
+Note that this frame average was taken before the 
+last adjustment of the offset DAC for that frame, so it 
+might be slightly off.
+0
+N
+0, 1
+W
+0x71 (113) Row Noise Constant
+9:0
+Row noise 
+constant
+Constant used in the row noise cancellation 
+algorithm. It should be set to the dark level targeted 
+by the black level algorithm plus the noise expected 
+between the averaged values of dark columns. At 
+default the constant is set to 42 LSB.
+2A
+(42)
+Y
+0–1023
+W
+0x72 (114) Pixel Clock, FRAME and LINE VALID Control
+0
+Invert LINE VALID
+Invert LINE_VALID. When set, LINE_VALID will be 
+reset to logic '0' when PDOUT is valid.
+0
+Y
+0, 1
+W
+1
+Invert Frame 
+Valid
+Invert FRAME_VALID. When set, FRAME_VALID is 
+reset to logic “0” when the frame is valid.
+0
+Y
+0, 1
+W
+2
+XOR Line Valid
+1 = LINE_VALID = “Continuous” LINE_VALID XOR 
+FRAME_VALID
+0 = LINE_VALID is determined by bit 3. Ineffective if 
+Continuous Line Valid is set.
+0
+Y
+0, 1
+W
+3
+Continuous Line 
+Valid
+1 = “Continuous” LINE_VALID (continue producing 
+LINE_VALID during vertical blank).
+0 = Normal LINE_VALID (default, no LINE_VALID 
+during vertical blank).
+0
+Y
+0, 1
+W
+4
+Invert Pixel Clock
+Invert pixel clock. When set, LINE_VALID, 
+FRAME_VALID, and PDOUT will be set up to the rising 
+edge of pixel clock, PIXCLK. When clear, they are set 
+up to the falling edge of PIXCLK.
+0
+Y
+0, 1
+W
+Table 9: 
+Register Descriptions (continued)
+Bit
+Bit Name
+Bit Description
+Default in 
+Hex (Dec)
+Shadowed
+Legal 
+Values 
+(Dec)
+Read/
+Write
+
+===== PAGE 36 =====
+PDF: 09005aef8366edcb/Source: 09005aef8366ede5
+Aptina Imaging reserves the right to change products or specifications without notice.
+MT9V034_DS - Rev. A 10/08 EN
+36
+©2008 Aptina Imaging Corporation. All rights reserved.
+ MT9V034: 1/3-Inch Wide-VGA Digital Image Sensor
+Registers
+Aptina Confidential and Proprietary
+0x7F (127) Digital Test Pattern
+9:0
+Two-wire Serial 
+Interface Test 
+Data
+The 10-bit test data in this register is used in place of 
+the data from the sensor. The data is inserted at the 
+beginning of the digital signal processing. Both test 
+enable (bit 13) and use two-wire serial interface (bit 
+10) must be set. 
+000
+N
+0–1023
+W
+10
+Use Two-wire 
+Serial Interface 
+Test Data
+0 = Use Gray Shade Test Pattern as test data.
+1 = Use Two-wire Serial Interface Test Data (bits 9:0) 
+as test data.
+0
+N
+0, 1
+W
+12:11
+Gray Shade Test 
+Pattern
+0 = None.
+1 = Vertical Shades.
+2 = Horizontal Shades.
+3 = Diagonal Shade.
+When bits (12:11) ≠ 0, the MT9V034 generates a gray 
+shaded test pattern to be used as digital test data. 
+Ineffective when Use Two-wire Serial Interface Test 
+Data (bit 10) is set.
+0
+N
+0–3
+W
+13
+Test Enable
+Enable the use of test data/gray-shaded test pattern 
+in the signal chain.
+The data will be inserted instead of data from the 
+ADCs.When using this mode, disable Row Noise 
+Correction (Reg0x70 bit 0 and bit 8). If Row Noise 
+Correction is enabled, the row-wise correction 
+algorithm will process the test data values and the 
+result will not be accurate.
+0
+Y
+0, 1
+W
+14
+Flip Two-Wire 
+Serial Interface 
+Test Data
+Use only when bit 10 is set. 
+When set, the Two-Wire Test Data (bits 9:0) will be 
+used in place of the data from ADC/memory on odd 
+columns, while complement of the same data will be 
+used on even columns.
+0
+N
+0, 1
+W
+0x80 (128) - 0x98 (152) Tiled Digital Gain
+3:0
+Tile Gain
+Context A
+Tile Digital Gain = Bits (3:0) * 0.25
+See  “Digital Gain” on page 58 for additional 
+information.
+4
+(4)
+Y
+1–15
+W
+7:4
+Sample Weight
+To indicate the weight of individual tile used in the 
+automatic gain/exposure control algorithm.
+See  “Automatic Gain Control and Automatic 
+Exposure Control” on page 61 for additional 
+information.
+F
+(15)
+Y
+1–15
+W
+11:8
+Tile Gain Context 
+B
+Tile Digital Gain = Bits (3:0) * 0.25
+See   “Digital Gain” on page 58 for additional 
+information.
+4
+(4)
+Y
+1–15
+W
+See  “Digital Gain” on page 58, for 0x99 (153) – 0xA4 (164) detailed descriptions.
+0x99 (153) Digital Tile Coordinate 1 - X-direction
+9:0
+X 0/5
+The starting x-coordinate of digital tiles X0_*.
+000
+(0)
+N
+0–752
+W
+0x9A (154) Digital Tile Coordinate 2 - X-direction
+Table 9: 
+Register Descriptions (continued)
+Bit
+Bit Name
+Bit Description
+Default in 
+Hex (Dec)
+Shadowed
+Legal 
+Values 
+(Dec)
+Read/
+Write
+
+===== PAGE 37 =====
+PDF: 09005aef8366edcb/Source: 09005aef8366ede5
+Aptina Imaging reserves the right to change products or specifications without notice.
+MT9V034_DS - Rev. A 10/08 EN
+37
+©2008 Aptina Imaging Corporation. All rights reserved.
+ MT9V034: 1/3-Inch Wide-VGA Digital Image Sensor
+Registers
+Aptina Confidential and Proprietary
+9:0
+X 1/5
+The starting x-coordinate of digital tiles X1_*.
+096
+(150)
+N
+0–752
+W
+0x9B (155) Digital Tile Coordinate 3 - X-direction
+9:0
+X 2/5
+The starting x-coordinate of digital tiles X2_*.
+12C
+(300)
+N
+0–752
+W
+0x9C (156) Digital Tile Coordinate 4 - X-direction
+9:0
+X 3/5
+The starting x-coordinate of digital tiles X3_*.
+1C2
+(450)
+N
+0–752
+W
+0x9D (157) Digital Tile Coordinate 5 - X-direction
+9:0
+X 4/5
+The starting x-coordinate of digital tiles X4_*.
+258
+(600)
+N
+0–752
+W
+0x9E (158) Digital Tile Coordinate 6 - X-direction
+9:0
+X 5/5
+The ending x-coordinate of digital tiles X4_*.
+2F0
+(752)
+N
+0–752
+W
+0x9F (159) Digital Tile Coordinate 1 - Y-direction
+8:0
+Y 0/5
+The starting y-coordinate of digital tiles *_Y0.
+000
+(0)
+N
+0–480
+W
+0xA0 (160) Digital Tile Coordinate 2 - Y-direction
+8:0
+Y 1/5
+The starting y-coordinate of digital tiles *_Y1.
+060
+(96)
+N
+0–480
+W
+0xA1 (161) Digital Tile Coordinate 3 - Y-direction
+8:0
+Y 2/5
+The starting y-coordinate of digital tiles *_Y2.
+0C0
+(192)
+N
+0–480
+W
+0xA2 (162) Digital Tile Coordinate 4 - Y-direction
+8:0
+Y 3/5
+The starting y-coordinate of digital tiles *_Y3.
+120
+(288)
+N
+0–480
+W
+0xA3 (163) Digital Tile Coordinate 5 - Y-direction
+8:0
+Y 4/5
+The starting y-coordinate of digital tiles *_Y4.
+180
+(384)
+N
+0–480
+W
+0xA4 (164) Digital Tile Coordinate 6 - Y-direction
+8:0
+Y 5/5
+The ending y-coordinate of digital tiles *_Y4.
+1E0
+(480)
+N
+0–480
+W
+0xA5 (165) AEC/AGC Desired Bin
+5:0
+Desired Bin
+User-defined “desired bin” that gives a measure of 
+how bright the image is intended to be.
+3A
+(58)
+Y
+1–64
+W
+0xA6 (166) AEC Update Frequency
+3:0
+Exp Skip Frame
+The number of frames that the AEC must skip before 
+updating the exposure register (R0xBB).
+2
+Y
+0–15
+W
+Table 9: 
+Register Descriptions (continued)
+Bit
+Bit Name
+Bit Description
+Default in 
+Hex (Dec)
+Shadowed
+Legal 
+Values 
+(Dec)
+Read/
+Write
+
+===== PAGE 38 =====
+PDF: 09005aef8366edcb/Source: 09005aef8366ede5
+Aptina Imaging reserves the right to change products or specifications without notice.
+MT9V034_DS - Rev. A 10/08 EN
+38
+©2008 Aptina Imaging Corporation. All rights reserved.
+ MT9V034: 1/3-Inch Wide-VGA Digital Image Sensor
+Registers
+Aptina Confidential and Proprietary
+0xA8 (168) AEC Low Pass Filter
+1:0
+Exp LPF
+This value plays in role in determining the 
+increment/decrement size of exposure value from 
+frame to frame. If current bin ≠ 0 (Reg0xBC),
+When Exp LPF = 0:
+   Actual new exposure = Calculated new exposure.
+When Exp LPF = 1:
+   if |(Calculated. new exp - current exp) | > (current 
+exp /4), 
+       Actual new exposure = Calculated new exposure, 
+otherwise 
+       Actual new exposure = Current exp +/- (calc new 
+exp/2)
+When Exp LPF = 2:
+   if |(Calculated new exp - current exp) | > (current 
+exp /4), 
+       Actual new exposure = Calc. new exposure, 
+otherwise 
+       Actual new exposure = Current exp +/- (calc new 
+exp/4)
+0
+Y
+0–2
+W
+0xA9 (169) AGC Output Update Frequency
+3:0
+Gain Skip Frame
+The number of frames that the AGC must skip before 
+updating the gain register (R0xBA).
+2
+Y
+0–15
+W
+0xAA (170) AGC Low Pass Filter
+1:0
+Gain LPF
+This value plays a role in determining the increment/
+decrement size of gain value from frame to frame.
+If current bin (R0xBC) ≠ 0 
+When Gain LPF = 0:
+Actual new gain = Calculated new gain
+When Exp LPF = 1:
+if |(Calculated new gain - current gain) | > (current 
+gain/4),
+Actual new gain = Calculated new gain, otherwise 
+Actual new gain = Current gain ± (calculated new 
+gain/2)
+When Exp LPF = 2:   
+if |(Calculated new gain - current gain) | > (current 
+gain /4),
+Actual new gain = Calculated new gain, otherwise
+Actual new gain = Current gain ± (calculated new 
+gain/4).
+2
+Y
+0–2
+W
+0xAB (171) Maximum Analog Gain
+Table 9: 
+Register Descriptions (continued)
+Bit
+Bit Name
+Bit Description
+Default in 
+Hex (Dec)
+Shadowed
+Legal 
+Values 
+(Dec)
+Read/
+Write
+
+===== PAGE 39 =====
+PDF: 09005aef8366edcb/Source: 09005aef8366ede5
+Aptina Imaging reserves the right to change products or specifications without notice.
+MT9V034_DS - Rev. A 10/08 EN
+39
+©2008 Aptina Imaging Corporation. All rights reserved.
+ MT9V034: 1/3-Inch Wide-VGA Digital Image Sensor
+Registers
+Aptina Confidential and Proprietary
+6:0
+Maximum 
+Analog Gain
+This register is used by the automatic gain control 
+(AGC) as the upper threshold of gain. This ensures 
+the new calibrated gain value will not exceed that 
+which MT9V034 supports.
+Range: 16 dec -64dec for 1X-4X respectively
+Note: No exception detection is installed, user needs to 
+be cautious when programming.
+40
+(64)
+N
+16–64
+W
+0xAC (172) Minimum Coarse Shutter Width
+15:0
+Minimum Coarse 
+Shutter Width 
+Total
+This register is used by the automatic exposure 
+control (AEC) as the lower threshold of exposure. This 
+ensures the new calibrated integration value will not 
+exceed that which MT9V034 supports.
+1
+N
+1–32765
+W
+0xAD (173) Maximum Coarse Shutter Width
+15:0
+Maximum 
+Coarse Shutter 
+Width Total
+This register is used by the automatic exposure 
+control (AEC) as the upper threshold of exposure. 
+This ensures the new calibrated integration value will 
+not exceed that which MT9V034 supports.
+01E0 
+(480)
+N
+1–32765
+W
+0xAE (174) AGC/AEC Bin Difference Threshold
+7:0
+Bin Difference 
+Threshold
+This register is used by the AEC if exposure reaches 
+the Minimum Coarse Shutter Width value (Reg0xAC). 
+Then if the difference between desired bin (Reg0xA5) 
+and current bin (Reg0xBC) is larger than the 
+threshold, the exposure will be increased.
+14
+(20)
+Y
+0–63
+W
+0xAF (175) AGC/AEC Enable
+0
+AEC Enable 
+Context A
+0 = Disable Automatic Exposure Control.
+1 = Enable Automatic Exposure Control.
+1
+Y
+0, 1
+W
+1
+AGC Enable 
+Context A
+0 = Disable Automatic Gain Control.
+1 = Enable Automatic Gain Control.
+1
+Y
+0, 1
+W
+8
+AEC Enable 
+Context B
+0 = Disable Automatic Exposure Control.
+1 = Enable Automatic Exposure Control.
+0
+Y
+0, 1
+W
+9
+AGC Enable 
+Contest B
+0 = Disable Automatic Gain Control.
+1 = Enable Control.
+0
+Y
+0, 1
+W
+0xB0 (176) AGC/AEC Pixel Count
+15-0
+Pixel Count
+The number of pixel used for the AEC/AGC 
+histogram.
+ABE0
+(44,000)
+Y
+0–65535
+W
+0xB1 (177) LVDS Master Control
+0
+PLL Bypass
+0 = Internal shift-CLK is driven by PLL. 
+1 = Internal shift-CLK is sourced from the 
+LVDS_BYPASS_CLK. 
+0
+Y
+0, 1
+W
+1
+LVDS Power-
+down
+0 = Normal operation.
+1 = Power-down LVDS block.
+1
+Y
+0, 1
+W
+2
+PLL Test Mode
+0 = Normal operation.
+1 = The PLL output frequency is equal to the system 
+clock frequency (26.6 MHz).
+0
+Y
+0, 1
+W
+3
+LVDS Test Mode
+0 = Normal operation.
+1 = The SER_DATAOUT_P drives a square wave in 
+both stereo and stand-alone modes). In stereo mode, 
+ensure that SER_DATAIN_P is logic “0.”
+0
+Y
+0, 1
+W
+0xB2 (178) LVDS Shift Clock Control
+Table 9: 
+Register Descriptions (continued)
+Bit
+Bit Name
+Bit Description
+Default in 
+Hex (Dec)
+Shadowed
+Legal 
+Values 
+(Dec)
+Read/
+Write
+
+===== PAGE 40 =====
+PDF: 09005aef8366edcb/Source: 09005aef8366ede5
+Aptina Imaging reserves the right to change products or specifications without notice.
+MT9V034_DS - Rev. A 10/08 EN
+40
+©2008 Aptina Imaging Corporation. All rights reserved.
+ MT9V034: 1/3-Inch Wide-VGA Digital Image Sensor
+Registers
+Aptina Confidential and Proprietary
+2:0
+Shift-clk Delay 
+Element Select
+The amount of shift-CLK delay that minimizes inter-
+sensor skew.
+0
+Y
+0–7
+W
+4
+LVDS Clock 
+Output Enable
+When set, the LVDS clock (SHFT_CLKOUT) pins are 
+disabled.  Has no effect on SER_DATAOUT pins. 
+1
+Y
+0, 1
+W
+0xB3 (179) LVDS Data Control
+2:0
+Data Delay 
+Element Select
+The amount of data delay that minimizes inter-
+sensor skew.
+0
+Y
+0–7
+W
+4
+LVDS Data Input 
+Enable
+When set, the LVDS Data Receiver (SER_DATAIN) pins 
+are disabled.  If this bit is changed, it is mandatory 
+that a soft reset (R0x0C) is then issued for proper 
+operation.
+1
+Y
+0, 1
+W
+0xB4 (180) LVDS Latency
+1:0
+Stream Latency 
+Select
+The amount of delay so that the two streams are in 
+sync. 
+0
+Y
+0–3
+W
+0xB5 (181) LVDS Internal Sync
+0
+LVDS Internal 
+Sync Enable
+When set, the MT9V034 generates sync pattern (data 
+with all zeros except start bit) on 
+LVDS_SER_DATA_OUT.
+0
+Y
+0, 1
+W
+0xB6 (182) LVDS Payload Control
+0
+Use 10-bit Pixel 
+Enable
+When set, all 10 bits will contain pixel (with 
+embedded controls) in standalone mode. If clear, 
+payload will be 8 bits of pixel with 2 bits of controls.
+0
+Y
+0, 1
+W
+0xB7 (183) Stereoscopy Error Control
+0
+Enable Stereo 
+Error Detect
+Set this bit to enable stereo error detect mechanism.
+0
+Y
+0, 1
+W
+1
+Enable Stick 
+Stereo Error Flag
+When set, the stereo error flag remains asserted 
+once an error is detected unless clear stereo error flag 
+(bit 2) is set.
+0
+Y
+0, 1
+W
+2
+Clear Stereo Error 
+Flag
+Set this bit to clear the stereoscopy error flag (R0xB8 
+returns to logic 0).
+0
+Y
+0, 1
+W
+0xB8 (184) Stereoscopy Error Flag
+0
+Stereoscopy Error 
+Flag
+Stereoscopy error status flag. It is also directly 
+connected to the ERROR output pin.
+R
+0xB9 (185) LVDS Data Output
+15:0
+Combo Reg
+This 16-bit value contains both 8-bit pixel values 
+from both stereoscopic master and slave sensors. It 
+can be used in diagnosis to determine how well in 
+sync the two sensors are. Captures the state when 
+master sensor has issued a reserved byte and slave 
+has not.
+Note: This register should be read from the 
+stereoscopic master sensor only.
+R
+0xBA (186) AGC Gain Output
+6:0
+AGC Gain
+Status register to report the current gain value 
+obtained from the AGC algorithm.
+10
+R
+0xBB (187) AEC Exposure Output
+15:0
+AEC Exposure
+Status register to report the current exposure value 
+obtained from the AEC algorithm.
+00C8
+(200)
+R
+Table 9: 
+Register Descriptions (continued)
+Bit
+Bit Name
+Bit Description
+Default in 
+Hex (Dec)
+Shadowed
+Legal 
+Values 
+(Dec)
+Read/
+Write
+
+===== PAGE 41 =====
+PDF: 09005aef8366edcb/Source: 09005aef8366ede5
+Aptina Imaging reserves the right to change products or specifications without notice.
+MT9V034_DS - Rev. A 10/08 EN
+41
+©2008 Aptina Imaging Corporation. All rights reserved.
+ MT9V034: 1/3-Inch Wide-VGA Digital Image Sensor
+Registers
+Aptina Confidential and Proprietary
+0xBC (188) AGC/AEC Current Bin
+5:0
+Current Bin
+Status register to report the current bin of the 
+histogram.
+R
+0xBF (191) Field Vertical Blank
+8:0
+Field Vertical 
+Blank
+The number of blank rows between odd and even 
+fields.
+Note: For interlace (both field) mode (Reg0x07 bits1:0) 
+only.
+Note: When Field Vertical Blank is set to 0, the blank 
+time between odd and even fields is one master clock 
+cycle.
+016
+(22)
+Y
+1–255
+W
+0xC0 (192) Monitor Mode Capture Control
+7:0
+Image Capture 
+Numb
+The number of frames to be captured during the 
+wake-up period when monitor mode is enabled.
+0A
+(10)
+Y
+1–255
+W
+0xC2 (194) Analog Controls
+6
+Reserved
+Reserved. Leave at “1”
+1
+N
+0, 1
+W
+7
+Anti-Eclipse 
+Enable
+Setting this bit turns on anti-eclipse circuitry.
+0
+N
+0, 1
+W
+13:11
+V_rst_lim 
+voltage Level
+V_rst_lim = bits [13:11] * 50mV + 1.90V
+Range: 1.90–2.25; Default: 1.95 V
+Usage:
+For anti-eclipse reference voltage control
+1
+N
+0–7
+W
+0xC6 (198) NTSC Frame Valid Control
+0
+Extend Frame 
+Valid
+When set, frame valid is extended for half-line in 
+length at the odd field.
+0
+Y
+0, 1
+W
+1
+Replace FV/LV 
+with Ped/Snyc
+When set, frame valid and line valid is replaced by 
+ped and sync signals respectively. 
+0
+Y
+0, 1
+W
+0xC7 (198) NTSC Horizontal Blank Control
+7:0
+Front porch 
+width
+The front porch width in number of master clock 
+cycles. NTSC standard is 1.5μsec ±0.1μsec
+16
+(22)
+N
+0–255
+W
+15:8
+Sync Width
+The sync pulse width in number of master clock cycle. 
+NTSC standard is 4.7μsec ±0.1μsec.
+44
+(68)
+N
+0–255
+W
+0xC8 (200) NTSC Vertical Blank Control
+7:0
+Equalizing Pulse 
+Width
+The pulse width in number of master clock cycles. 
+NTSC standard is 2.3μsec ±0.1μsec.
+21
+(33)
+N
+0–255
+W
+15:8
+Vertical Serration 
+Width
+The pulse width in number of master clock cycles. 
+NTSC standard is 4.7μsec ±0.1μsec.
+44
+(68)
+N
+0–255
+W
+0xC9 (201) Column Start Context B
+9:0
+Column Start
+The first column to be read out (not counting dark 
+columns that may be read). To window the image 
+down, set this register to the starting X value. 
+000
+(1)
+N
+0–752
+W
+0xCA (202) Row Start Context B
+8:0
+Row Start
+The first row to be read out (not counting any dark 
+rows that may be read). To window the image down, 
+set this register to the starting Y value. Setting a 
+value less than four is not recommended since the 
+dark rows should be read using R0x0D. 
+004
+(4)
+N
+4–2482
+W
+Table 9: 
+Register Descriptions (continued)
+Bit
+Bit Name
+Bit Description
+Default in 
+Hex (Dec)
+Shadowed
+Legal 
+Values 
+(Dec)
+Read/
+Write
+
+===== PAGE 42 =====
+PDF: 09005aef8366edcb/Source: 09005aef8366ede5
+Aptina Imaging reserves the right to change products or specifications without notice.
+MT9V034_DS - Rev. A 10/08 EN
+42
+©2008 Aptina Imaging Corporation. All rights reserved.
+ MT9V034: 1/3-Inch Wide-VGA Digital Image Sensor
+Registers
+Aptina Confidential and Proprietary
+0xCB (203) Window Height Context B
+8:0
+Window Height
+Number of rows in the image to be read out (not 
+counting any dark rows or border rows that may be 
+read). 
+1E0 
+(480)
+N
+1–480
+W
+0xCC (204) Window Width Context B
+9:0
+Window Width
+Number of columns in image to be read out (not 
+counting any dark columns or border columns that 
+may be read).
+2F0 
+(752)
+N
+1–752
+W
+0xCD(205) Horizontal Blanking Context B
+9:0
+Horizontal 
+Blanking
+Number of blank columns in a row.
+Minimum horizontal blanking is 61 for normal mode, 
+71 for column bin 2 mode, and 91 for column bin 4 
+mode
+05E
+(94)
+N
+61–71023
+W
+0xCE(206) Vertical Blanking Context B
+14:0
+Vertical Blanking
+Number of blank rows in a frame. V-Blank value must 
+meet the following minimums:
+Linear Mode:
+V-Blank (min) = (SW_total - SW1 + 7)
+                   = SW_total - R0x08 + 7
+If manual exposure, then SW_total = R0xD2.
+If auto-exposure mode then SW_total = R0xAD.
+High Dynamic Range Mode:
+ If Auto-Knee Point disabled, then above equations 
+apply. If Auto-Knee Point enabled, then
+V-Blank (min) = (t2 + t3 + 7).
+Note: Calculate t2 and t3 taking into account Auto 
+Exposure setting.
+Note: When Sequential Mode is enabled, this register 
+is ineffective. Vertical blank = exposure + 6 rows.
+002D
+(45)
+N
+2–32288
+W
+0xCF(207) Coarse Shutter Width 1 Context B
+14:0
+Coarse Shutter 
+Width 1
+The row number in which the first knee occurs. This 
+may be used when high dynamic range is enabled 
+(R0x0F[8] = 1) is enabled & exposure knee point auto 
+adjust is disabled (R0xD1[8] = 0). This register is not 
+shadowed, but any change made does not take effect 
+until the following new frame.
+This register minimum value is 2, for either linear or 
+HDR modes.
+Note: 
+t1 = Shutter width 1; 
+t2 = Shutter width 2 - Shutter width 1; 
+t3 = total integration - Shutter width 2
+1DE
+(478)
+N
+0–32765
+W
+0xD0(208) Coarse Shutter Width 2 Context B
+Table 9: 
+Register Descriptions (continued)
+Bit
+Bit Name
+Bit Description
+Default in 
+Hex (Dec)
+Shadowed
+Legal 
+Values 
+(Dec)
+Read/
+Write
+
+===== PAGE 43 =====
+PDF: 09005aef8366edcb/Source: 09005aef8366ede5
+Aptina Imaging reserves the right to change products or specifications without notice.
+MT9V034_DS - Rev. A 10/08 EN
+43
+©2008 Aptina Imaging Corporation. All rights reserved.
+ MT9V034: 1/3-Inch Wide-VGA Digital Image Sensor
+Registers
+Aptina Confidential and Proprietary
+14:0
+Coarse Shutter 
+Width 2
+The row number in which the second knee occurs. 
+This may be used only when high dynamic range is 
+enabled & exposure knee point auto adjust control 
+bit is disabled. This register is not shadowed, but any 
+change made does not take effect until the following 
+new frame.
+Note: 
+t1 = Shutter width 1; 
+t2 = Shutter width 2 - Shutter width 1; 
+t3 = total integration - Shutter width 2
+1DE
+(479)
+N
+0–32765
+W
+0xD1(209) Shutter Width Control Context B
+3:0
+T2 Ratio
+One-half to the power of this value indicates the 
+ratio of duration time t2, when saturation control 
+gate is adjusted to level V2, to total coarse 
+integration when exposure knee point auto adjust 
+control bit is enabled. This register is not shadowed, 
+but any change made does not take effect until the 
+following new frame.
+T2 = total coarse integration * (½)t2_ratio
+4
+N
+0–15
+W
+7:4
+T3 Ratio
+One-half to the power of this value indicates the 
+ratio of duration time t3, when saturation control 
+gate is adjusted to level V3, to total coarse 
+integration when exposure knee point auto adjust 
+control bit is enabled. This register is not shadowed, 
+but any change made does not take effect until the 
+following new frame.
+T3 = total coarse integration * (½)t3_ratio
+Note: t1 = total coarse integration - t2 - t3
+6
+N
+0–15
+W
+8
+Exposure Knee 
+Point Auto Adjust 
+Enable
+0 = Auto adjust disabled.
+1 = Auto adjust enabled.
+1
+N
+0,1
+W
+9
+Single Knee 
+Enable
+1 = Single knee enabled. 
+0
+N
+0,1
+W
+0xD2 (210) Coarse Shutter Width Total Context B
+14:0
+Coarse Shutter 
+Width Total
+Total integration time in number of rows. This value 
+is used only when AEC is disabled only (bit 0 of 
+Register 175). This register is not shadowed, but any 
+change made does not take effect until the following 
+new frame.
+1E0
+(480)
+N
+0–32765
+W
+0xD3 (211) Fine Shutter Width 1 Context A
+Table 9: 
+Register Descriptions (continued)
+Bit
+Bit Name
+Bit Description
+Default in 
+Hex (Dec)
+Shadowed
+Legal 
+Values 
+(Dec)
+Read/
+Write
+
+===== PAGE 44 =====
+PDF: 09005aef8366edcb/Source: 09005aef8366ede5
+Aptina Imaging reserves the right to change products or specifications without notice.
+MT9V034_DS - Rev. A 10/08 EN
+44
+©2008 Aptina Imaging Corporation. All rights reserved.
+ MT9V034: 1/3-Inch Wide-VGA Digital Image Sensor
+Registers
+Aptina Confidential and Proprietary
+10:0
+Fine Shutter 
+Width 1
+This register, combined with Coarse Shutter Width 1, 
+defines the time when the first knee occurs. This may 
+be used only when high dynamic range is enabled 
+and the exposure knee point auto-adjust control bit 
+is disabled. This register is not shadowed, but any 
+change made does not take effect until the following 
+new frame. Register units are master clock cycles.
+Operational maximum is (row time - 1)
+= (Window Width + HBLANK - 1) 
+Total maximum is HBLANK (R0x05) + 751
+= 1023 + 751 = 1774
+Notes:
+t1 = Shutter width 1
+t2 = Shutter width 2 - Shutter width 1
+t3 = Total integration - Shutter width 2
+0
+(0)
+N
+0–1774
+W
+0xD4 (212) Fine Shutter Width 2 Context A
+10:0
+Fine Shutter 
+Width 2
+This register, combined with Coarse Shutter Width 2, 
+defines the time when the second knee occurs. This 
+may be used only when high dynamic range is 
+enabled and the exposure knee point auto-adjust 
+control bit is disabled. This register is not shadowed, 
+but any change made does not take effect until the 
+following new frame. Register units are master clock 
+cycles.
+Maximum is HBLANK (R0x05) + 751
+= 1023 + 751 = 1774
+Notes:
+t1 = Shutter width 1
+t2 = Shutter width 2 - Shutter width 1
+t3 = Total integration - Shutter width 2
+0
+(0)
+N
+0–1774
+W
+0xD5 (213) Fine Shutter Width Total Context A
+10:0
+Fine Shutter 
+Width Total
+This register, combined with Coarse Shutter
+Width Total, defines the total integration time.
+This register is not shadowed, but any change
+made does not take effect until the following new 
+frame. Register units are master clock cycles.
+Maximum is HBLANK (R0x05) + 751
+= 1023 + 751 = 1774
+Note:
+When Coarse Shutter Width Total is zero, Minimum 
+Fine Shutter Width = 260
+0
+(0)
+N
+0–1774
+W
+0xD6 (214) Fine Shutter Width 1 Context B
+Table 9: 
+Register Descriptions (continued)
+Bit
+Bit Name
+Bit Description
+Default in 
+Hex (Dec)
+Shadowed
+Legal 
+Values 
+(Dec)
+Read/
+Write
+
+===== PAGE 45 =====
+PDF: 09005aef8366edcb/Source: 09005aef8366ede5
+Aptina Imaging reserves the right to change products or specifications without notice.
+MT9V034_DS - Rev. A 10/08 EN
+45
+©2008 Aptina Imaging Corporation. All rights reserved.
+ MT9V034: 1/3-Inch Wide-VGA Digital Image Sensor
+Registers
+Aptina Confidential and Proprietary
+10:0
+Fine Shutter 
+Width 1
+This register, combined with Coarse Shutter Width 1, 
+defines the time when the first knee occurs. This may 
+be used only when high dynamic range is enabled 
+and the exposure knee point auto adjust control bit is 
+disabled. This register is not shadowed, but any 
+change made does not take effect until the following 
+new frame. Register units are master clock cycles.
+Maximum is HBLANK (R0x05) + 751
+= 1023 + 751 = 1774
+Notes:
+t1 = Shutter width 1
+t2 = Shutter width 2 - Shutter width 1
+t3 = Total integration - Shutter width 2
+0
+(0)
+N
+0–1774
+W
+0xD7 (215) Fine Shutter Width 2 Context B
+10:0
+Fine Shutter 
+Width 2
+This register, combined with Coarse Shutter Width 2, 
+defines the time when the second knee occurs. This 
+may be used only when high dynamic range is 
+enabled and the exposure knee point auto adjust 
+control bit is disabled. This register is not shadowed, 
+but any change made does not take effect until the 
+following new frame. Register units are master clock 
+cycles.
+Maximum is HBLANK (R0x05) + 751
+= 1023 + 751 = 1774
+Notes:
+t1 = Shutter width 1
+t2 = Shutter width 2 - Shutter width 1
+t3 = Total integration - Shutter width 2
+0
+(0)
+N
+0–1774
+W
+0xD8 (216) Fine Shutter Width Total Context B
+10:0
+Fine Shutter 
+Width Total
+This register, combined with Coarse Shutter Width 
+Total, defines the total integration time. This register 
+is not shadowed, but any change made does not take 
+effect until the following new frame. Register units 
+are in master clock cycles.
+Maximum is HBLANK (R0x05) + 751
+= 1023 + 751 = 1774
+Note:
+When Coarse Shutter Width Total is zero,
+Minimum Fine Shutter Width = 260
+0
+(0)
+N
+0–1774
+W
+0xD9 (217) Monitor Mode
+10:0
+Monitor Mode 
+Enable
+Setting this bit puts the sensor into a cycle of 
+sleeping for approximately five minutes, and waking 
+up to capture a programmable number of frames 
+(Register 0XC0). Clearing this bit will resume normal 
+operation.
+0
+(0)
+Y
+0–1
+W
+Table 9: 
+Register Descriptions (continued)
+Bit
+Bit Name
+Bit Description
+Default in 
+Hex (Dec)
+Shadowed
+Legal 
+Values 
+(Dec)
+Read/
+Write
+
+===== PAGE 46 =====
+PDF: 09005aef8366edcb/Source: 09005aef8366ede5
+Aptina Imaging reserves the right to change products or specifications without notice.
+MT9V034_DS - Rev. A 10/08 EN
+46
+©2008 Aptina Imaging Corporation. All rights reserved.
+ MT9V034: 1/3-Inch Wide-VGA Digital Image Sensor
+Registers
+Aptina Confidential and Proprietary
+0xF0 (240) Bytewise Address
+Bytewise Address Special address to perform 8-bit reads and writes to 
+the sensor. See Two-Wire Interface description for 
+further details on how to use this functionality.
+0xFE (254) Register Lock
+15:0
+Register Lock 
+Code
+To lock all registers except Reg0xFE, program data 
+with 0xDEAD; to unlock access to all registers, 
+program data with 0xBEEF.
+To lock Registers 0x0D and 0x0E only, program data 
+with 0xDEAF; to unlock, program data with 0xBEEF. 
+While Reg0x0D and Reg0x0E are locked, any 
+subsequent writes to those registers will be ignored 
+until registers are unlocked.
+BEEF
+(48,879)
+N
+48879 
+(0xBEEF), 
+57005 
+(0xDEAD), 
+57007 
+(0xDEAF)
+W
+Table 9: 
+Register Descriptions (continued)
+Bit
+Bit Name
+Bit Description
+Default in 
+Hex (Dec)
+Shadowed
+Legal 
+Values 
+(Dec)
+Read/
+Write
+
+===== PAGE 47 =====
+PDF: 09005aef8366edcb/Source: 09005aef8366ede5
+Aptina Imaging reserves the right to change products or specifications without notice.
+MT9V034_DS - Rev. A 10/08 EN
+47
+©2008 Aptina Imaging Corporation. All rights reserved.
+ MT9V034: 1/3-Inch Wide-VGA Digital Image Sensor
+Feature Description
+Aptina Confidential and Proprietary
+Feature Description
+Operational Modes
+The MT9V034 works in master, snapshot, or slave mode. In master mode the sensor 
+generates the readout timing. In snapshot mode it accepts an external trigger to start 
+integration, then generates the readout timing. In slave mode the sensor accepts both 
+external integration and readout controls. The integration time is programmed through 
+the two-wire serial interface during master or snapshot modes, or controlled through an 
+externally generated control signal during slave mode.
+Master Mode
+There are two possible operation methods for master mode: simultaneous and sequen-
+tial. One of these operation modes must be selected through the two-wire serial inter-
+face. 
+Simultaneous Master Mode
+In simultaneous master mode, the exposure period occurs during readout. The frame 
+synchronization waveforms are shown in Figure 13 and Figure 14. The exposure and 
+readout happen in parallel rather than sequential, making this the fastest mode of oper-
+ation.
+Figure 13: 
+ Simultaneous Master Mode Synchronization Waveforms #1
+Readout Time > Exposure Time
+LED_OUT
+DOUT(9:0)
+LINE_VALID
+FRAME_VALID
+Exposure Time
+Vertical Blanking
+xxx
+xxx
+xxx
+
+===== PAGE 48 =====
+PDF: 09005aef8366edcb/Source: 09005aef8366ede5
+Aptina Imaging reserves the right to change products or specifications without notice.
+MT9V034_DS - Rev. A 10/08 EN
+48
+©2008 Aptina Imaging Corporation. All rights reserved.
+ MT9V034: 1/3-Inch Wide-VGA Digital Image Sensor
+Feature Description
+Aptina Confidential and Proprietary
+Figure 14: 
+ Simultaneous Master Mode Synchronization Waveforms #2
+When exposure time is greater than the sum of vertical blank and window height, the 
+number of vertical blank rows is increased automatically to accommodate the exposure 
+time.
+Sequential Master Mode
+In sequential master mode the exposure period is followed by readout. The frame 
+synchronization waveforms for sequential master mode are shown in Figure 15. The 
+frame rate changes as the integration time changes.
+Figure 15: 
+ Sequential Master Mode Synchronization Waveforms
+Snapshot Mode
+In snapshot mode the sensor accepts an input trigger signal which initiates exposure, 
+and is immediately followed by readout. Figure 16 shows the interface signals used in 
+snapshot mode. In snapshot mode, the start of the integration period is determined by 
+the externally applied EXPOSURE pulse that is input to the MT9V034. The integration 
+time is preprogrammed at R0x0B or R0xD2 through the two-wire serial interface. After 
+the frame's integration period is complete the readout process commences and the 
+syncs and data are output. Sensor in snapshot mode can capture a single image or a 
+sequence of images. The frame rate may only be controlled by changing the period of 
+the user supplied EXPOSURE pulse train. The frame synchronization waveforms for 
+snapshot mode are shown in Figure 17.
+Exposure Time > Readout Time
+LED_OUT
+DOUT(9:0)
+LINE_VALID
+FRAME_VALID
+Exposure Time
+Vertical Blanking
+xxx
+xxx
+xxx
+LED_OUT
+DOUT(9:0)
+LINE_VALID
+FRAME_VALID
+Exposure Time
+xxx
+xxx
+xxx
+
+===== PAGE 49 =====
+PDF: 09005aef8366edcb/Source: 09005aef8366ede5
+Aptina Imaging reserves the right to change products or specifications without notice.
+MT9V034_DS - Rev. A 10/08 EN
+49
+©2008 Aptina Imaging Corporation. All rights reserved.
+ MT9V034: 1/3-Inch Wide-VGA Digital Image Sensor
+Feature Description
+Aptina Confidential and Proprietary
+Figure 16: 
+ Snapshot Mode Interface Signals
+Figure 17: 
+ Snapshot Mode Frame Synchronization Waveforms
+Slave Mode
+In slave mode, the exposure and readout are controlled using the EXPOSURE, 
+STFRM_OUT, and STLN_OUT pins. When the slave mode is enabled, STFRM_OUT and 
+STLN_OUT become input pins.
+The start and end of integration are controlled by EXPOSURE and STFRM_OUT pulses, 
+respectively. While a STFRM_OUT pulse is used to stop integration, it is also used to 
+enable the readout process.
+After integration is stopped, the user provides STLN_OUT pulses to trigger row readout. 
+A full row of data is read out with each STLN_OUT pulse. The user must provide enough 
+time between successive STLN_OUT pulses to allow the complete readout of one row. 
+It is also important to provide additional STLN_OUT pulses to allow the sensors to read 
+the vertical blanking rows. It is recommended that the user program the vertical blank 
+register (R0x06) with a value of 4, and achieve additional vertical blanking between 
+frames by delaying the application of the STFRM_OUT pulse. 
+The elapsed time between the rising edge of STLN_OUT and the first valid pixel data is 
+calculated for context A by [horizontal blanking register (R0x05) + 4] clock cycles. For 
+context B, the time is (R0xCD + 4) clock cycles.
+CONTROLLER
+EXPOSURE
+SYSCLK
+PIXCLK
+LINE_VALID
+FRAME_VALID
+DOUT(9:0)
+MT9V034
+LED_OUT
+DOUT(9:0)
+LINE_VALID
+FRAME_VALID
+Exposure Time
+xxx
+xxx
+xxx
+EXPOSURE
+
+===== PAGE 50 =====
+PDF: 09005aef8366edcb/Source: 09005aef8366ede5
+Aptina Imaging reserves the right to change products or specifications without notice.
+MT9V034_DS - Rev. A 10/08 EN
+50
+©2008 Aptina Imaging Corporation. All rights reserved.
+ MT9V034: 1/3-Inch Wide-VGA Digital Image Sensor
+Feature Description
+Aptina Confidential and Proprietary
+Figure 18: 
+ Slave Mode Operation
+Signal Path
+The MT9V034 signal path consists of a programmable gain, a programmable analog 
+offset, and a 10-bit ADC. See  “Black Level Calibration” on page 59 for the programmable 
+offset operation description. 
+Figure 19: 
+ Signal Path
+On-Chip Biases 
+ADC Voltage Reference
+The ADC voltage reference is programmed through R0x2C, bits 2:0. The ADC reference 
+ranges from 1.0V to 2.1V. The default value is 1.4V. The increment size of the voltage 
+reference is 0.1V from 1.0V to 1.6V (R0x2C[2:0] values 0 to 6). At R0x2C[2:0] = 7, the refer-
+ence voltage jumps to 2.1V. 
+It is very important to preserve the correct values of the other bits in R0x2C. The default 
+register setting is 0x0004. This corresponds to 1.4V—at this setting 1mV input to the ADC 
+equals approximately 1 LSB.
+ 
+ 
+Exposure
+(input)
+STFRM_OUT
+(input)
+LED_OUT
+(output)
+STLN_OUT
+(input)
+LINE_VALID
+(output)
+Integration T ime
+Vertical Blanking
+Pixel Output
+(reset minus signal)
+Offset Correction
+Voltage (R0x48 or
+result of BLC)
+10 (12) bit ADC
+ADC Data
+(9:0)
+Gain Selection
+(R0x35 or R0x36 or 
+result of AGC)
+VREF
+(R0x2C)
+C2
+C1 
+Σ
+
+===== PAGE 51 =====
+PDF: 09005aef8366edcb/Source: 09005aef8366ede5
+Aptina Imaging reserves the right to change products or specifications without notice.
+MT9V034_DS - Rev. A 10/08 EN
+51
+©2008 Aptina Imaging Corporation. All rights reserved.
+ MT9V034: 1/3-Inch Wide-VGA Digital Image Sensor
+Feature Description
+Aptina Confidential and Proprietary
+V_Step Voltage Reference
+This voltage is used for pixel high dynamic range operations, programmable from R0x31 
+through R0x34 for Context A, or R0x39 through R0x3B for context B.
+Chip Version 
+Chip version register R0x00 is read-only.
+Window Control
+Registers Column Start A/B, Row Start A/B, Window Height A/B (row size), and Window 
+Width (column size) A/B control the size and starting coordinates of the window. 
+The values programmed in the window height and width registers are the exact window 
+height and width out of the sensor. The window start value should never be set below 
+four. 
+To read out the dark rows set bit 6 of R0x0D. In addition, bit 7 of R0x0D can be used to 
+display the dark columns in the image. Note that there are Show Dark settings only for 
+Context A.
+Blanking Control 
+Horizontal Blank and Vertical Blank registers R0x05 and R0x06 (B: 0xCD and R0xCE), 
+respectively, control the blanking time in a row (horizontal blanking) and between 
+frames (vertical blanking). 
+• Horizontal blanking is specified in terms of pixel clocks.
+• Vertical blanking is specified in terms of numbers of rows. 
+The actual imager timing can be calculated using Table 4 on page 13 and Table 5 on 
+page 14 which describe “Row Timing and FV/LV signals.” The minimum number of 
+vertical blank rows is 4. 
+
+===== PAGE 52 =====
+PDF: 09005aef8366edcb/Source: 09005aef8366ede5
+Aptina Imaging reserves the right to change products or specifications without notice.
+MT9V034_DS - Rev. A 10/08 EN
+52
+©2008 Aptina Imaging Corporation. All rights reserved.
+ MT9V034: 1/3-Inch Wide-VGA Digital Image Sensor
+Feature Description
+Aptina Confidential and Proprietary
+Pixel Integration Control 
+Total Integration
+Total integration time is the result of coarse shutter width and fine shutter width regis-
+ters, and depends also on whether manual or automatic exposure is selected. 
+The actual total integration time, tINT is defined as:
+tINT = tINTCoarse + tINTFint 
+(EQ 2)
+= (number of rows of integration x row time) + (number of pixels of integration x pixel time)
+where:
+Number of Rows of Integration 
+(Auto Exposure Control: Enabled)
+When automatic exposure control (AEC) is enabled, the number of rows of integration 
+may vary from frame to frame, with the limits controlled by R0xAC (minimum coarse 
+shutter width) and R0xAD (maximum coarse shutter width).
+Number of Rows of Integration 
+(Auto Exposure Control: Disabled)
+If AEC is disabled, the number of rows of integration equals the value in R0x0B.
+or
+If context B is enabled, the number of rows of integration equals the value in R0xD2.
+Number of Pixels of Integration
+The number of fine shutter width pixels is independent of AEC mode (enabled or 
+disabled):
+• Context A: the number of pixels of integration equals the value in R0xD5.
+• Context B: the number of pixels of integration equals the value in R0xD8.
+Row Timing
+Context A: Row time = (R0x04 + R0x05) master clock periods
+(EQ 3)
+Context B: Row time = (R0xCC + R0xCD) master clock periods
+(EQ 4)
+Typically, the value of the Coarse Shutter Width Total registers is limited to the number 
+of rows per frame (which includes vertical blanking rows), such that the frame rate is not 
+affected by the integration time. If the Coarse Shutter Width Total is increased beyond 
+the total number of rows per frame, the user must add additional blanking rows using 
+the Vertical Blanking registers as needed. See descriptions of the Vertical Blanking regis-
+ters, R0x06 and R0xCE in Table 8 on page 21 and Table 9 on page 25. 
+A second constraint is that tINT must be adjusted to avoid banding in the image from 
+light flicker. Under 60Hz flicker, this means the frame time must be a multiple of 1/120 of 
+a second. Under 50Hz flicker, the frame time must be a multiple of 1/100 of a second.
+
+===== PAGE 53 =====
+PDF: 09005aef8366edcb/Source: 09005aef8366ede5
+Aptina Imaging reserves the right to change products or specifications without notice.
+MT9V034_DS - Rev. A 10/08 EN
+53
+©2008 Aptina Imaging Corporation. All rights reserved.
+ MT9V034: 1/3-Inch Wide-VGA Digital Image Sensor
+Feature Description
+Aptina Confidential and Proprietary
+Changes to Integration Time
+With automatic exposure control disabled (R0xAF[0] for context A, or R0xAF[8] for 
+context B) and if the total integration time (R0x0B or R0xD2) is changed through the 
+two-wire serial interface while FV is asserted for frame n, the first frame output using the 
+new integration time is frame (n + 2). Similarly, when automatic exposure control is 
+enabled, any change to the integration time for frame n first appears in frame (n + 2) 
+output.
+The sequence is as follows:
+1. During frame n, the new integration time is held in the R0x0B or R0D2 live register.
+2. At the start of frame (n + 1), the new integration time is transferred to the exposure 
+control module. Integration for each row of frame (n + 1) has been completed using 
+the old integration time. The earliest time that a row can start integrating using the 
+new integration time is immediately after that row has been read for frame (n + 1). 
+The actual time that rows start integrating using the new integration time is depen-
+dent on the new value of the integration time.
+3. When frame (n + 1) is read out, it is integrated using the new integration time. If the 
+integration time is changed (R0x0B or R0xD2 written) on successive frames, each 
+value written is applied to a single frame; the latency between writing a value and it 
+affecting the frame readout remains at two frames.
+However, when automatic exposure control is disabled, if the integration time is 
+changed through the two-wire serial interface after the falling edge of FV for frame n, 
+the first frame output using the new integration time becomes frame (n + 3).
+Figure 20: 
+ Latency When Changing Integration
+FRAME_VALID
+Image Data
+Frame Start
+LED_OUT
+Output image with
+Int =  200 rows 
+Output
+image with
+Int = 300
+rows  
+Int = 300 rows  
+Int =  200 rows
+Int =  200 rows
+Int = 300 rows  
+New Integration
+Programmed
+Actual
+Integration
+
+===== PAGE 54 =====
+PDF: 09005aef8366edcb/Source: 09005aef8366ede5
+Aptina Imaging reserves the right to change products or specifications without notice.
+MT9V034_DS - Rev. A 10/08 EN
+54
+©2008 Aptina Imaging Corporation. All rights reserved.
+ MT9V034: 1/3-Inch Wide-VGA Digital Image Sensor
+Feature Description
+Aptina Confidential and Proprietary
+Exposure Indicator
+The exposure indicator is controlled by:
+• R0x1B LED_OUT Control
+The MT9V034 provides an output pin, LED_OUT, to indicate when the exposure takes 
+place. When R0x1B bit 0 is clear, LED_OUT is HIGH during exposure. By using R0x1B, bit 
+1, the polarity of the LED_OUT pin can be inverted.
+High Dynamic Range
+High dynamic range is controlled by:
+In the MT9V034, high dynamic range (by setting R0x0F, bit 0 or 8 to 1) is achieved by 
+controlling the saturation level of the pixel (HDR or high dynamic range gate) during the 
+exposure period. The sequence of the control voltages at the HDR gate is shown in 
+Figure 21. After the pixels are reset, the step voltage, V_Step, which is applied to HDR 
+gate, is set up at V1 for integration time t1, then to V2 for time t2, then V3 for time t3, and 
+finally it is parked at V4, which also serves as an antiblooming voltage for the photode-
+tector. This sequence of voltages leads to a piecewise linear pixel response, illustrated 
+(approximately) in Figure 21 and Figure 22 on page 55.
+Figure 21: 
+ Sequence of Control Voltages at the HDR Gate
+Context A
+Context B
+High Dynamic Enable
+R0x0F[0]
+R0x0F[8]
+Shutter Width 1
+R0x08
+R0xCF
+Shutter Width 2
+R0x09
+R0xD0
+Shutter Width Control
+R0x0A
+R0xD1
+V_Step Voltages
+R0x31-R0x34
+R0x39-R0x3C
+t2
+t3
+V4~0.8V
+Exposure
+t1
+HDR
+Voltage
+VAA (3.3V)
+V1~1.4V
+V2~1.2V
+V3~1.0V
+
+===== PAGE 55 =====
+PDF: 09005aef8366edcb/Source: 09005aef8366ede5
+Aptina Imaging reserves the right to change products or specifications without notice.
+MT9V034_DS - Rev. A 10/08 EN
+55
+©2008 Aptina Imaging Corporation. All rights reserved.
+ MT9V034: 1/3-Inch Wide-VGA Digital Image Sensor
+Feature Description
+Aptina Confidential and Proprietary
+Figure 22: 
+ Sequence of Voltages in a Piecewise Linear Pixel Response
+The parameters of the step voltage V_Step which takes values V1, V2, and V3 directly 
+affect the position of the knee points in Figure 22.
+Light intensities work approximately as a reciprocal of the partial exposure time. Typi-
+cally, t1 is the longest exposure, t2 shorter, and so on. Thus the range of light intensities is 
+shortest for the first slope, providing the highest sensitivity.
+The register settings for V_Step and partial exposures are:
+V1 = R0x31, bits 5:0 (Context B: R0x39, bits 5:0)
+V2 = R0x32, bits 5:0 (Context B: R0x3A, bits 5:0)
+V3 = R0x33, bits 5:0 (Context B: R0x3B, bits 5:0)
+V4 = R0x34, bits 5:0 (Context B: R0x3C, bits 5:0)
+tINT = t1 + t2 + t3
+There are two ways to specify the knee points timing, the first by manual setting and the 
+second by automatic knee point adjustment. Knee point auto adjust is controlled for 
+context A by R0x0A[8] (where default is ON), and for context B by R0xD1[8] (where 
+default is OFF).
+When the knee point auto adjust enabler is enabled (set HIGH), the MT9V034 calculates 
+the knee points automatically using the following equations:
+t1 = tINT – t2 – t3
+(EQ 5)
+t2 = tINT x (½)R0x0A[3:0] or R0xD1[3:0]
+(EQ 6)
+t3 = tINT x (½)R0x0A[7:4] or R0xD1[7:4]
+(EQ 7)
+As a default for auto exposure, t2 is 1/16 of tINT, t3 is 1/64 of tINT. 
+When the auto adjust enabler is disabled (set LOW), t1, t2, and t3 may be programmed 
+through the two-wire serial interface:
+t1 = Coarse SW1 (row-times) + Fine SW1 (pixel-times)
+(EQ 8)
+t2 = Coarse SW2 – Coarse SW1 + Fine SW2 - Fine SW1
+(EQ 9)
+t3 = Total Integration – t1 – t2
+(EQ 10)
+     = Coarse Total Shutter Width + Fine Shutter Width Total – t1 – t2
+dV1
+dV2
+dV3
+1/t1
+1/t2
+1/t3
+Light Intensity
+Output
+
+===== PAGE 56 =====
+PDF: 09005aef8366edcb/Source: 09005aef8366ede5
+Aptina Imaging reserves the right to change products or specifications without notice.
+MT9V034_DS - Rev. A 10/08 EN
+56
+©2008 Aptina Imaging Corporation. All rights reserved.
+ MT9V034: 1/3-Inch Wide-VGA Digital Image Sensor
+Feature Description
+Aptina Confidential and Proprietary
+For context A these become:
+t1 = R0x08 + R0xD3 
+(EQ 11)
+t2 = R0x09 - R0x08 + R0xD4 – R0xD3
+(EQ 12)
+t3 = R0x0B + R0xD4   – t1 – t2
+(EQ 13)
+For context B these are:
+t1 = R0xCF + R0xD6
+(EQ 14)
+t2 = R0xD0 - R0xCF + R0xD7 - R0xD6
+(EQ 15)
+t3 = R0xD2 + R0xD8   -t1 -t2
+(EQ 16)
+In all cases above, the coarse component of total integration time may be based on the 
+result of AEC or values in Reg0x0B and Reg0xD2, depending on the settings. 
+Similar to Fine Shutter Width Total registers, the user must not set the Fine Shutter 
+Width 1 or Fine Shutter Width 2 register to exceed the row time (Horizontal Blanking + 
+Window Width). The absolute maximum value for the Fine Shutter Width registers is 
+1774 master clocks.
+ADC Companding Mode
+By default, ADC resolution of the sensor is 10-bit. Additionally, a companding scheme of 
+12-bit into 10-bit is enabled by the ADC Companding Mode register. This mode allows 
+higher ADC resolution, which means less quantization noise at low-light, and lower 
+resolution at high light, where good ADC quantization is not so critical because of the 
+high level of the photon’s shot noise. 
+Figure 23: 
+ 12- to 10-Bit Companding Chart
+256 
+512 
+768 
+1,024 
+4,096
+2,048
+1,024
+512
+256
+4 to 1 Companding (1,536     384)
+8 to 1  Companding (2,048     256)
+10-bit
+Codes
+12-bit
+Codes
+2 to 1  Companding (256     128)
+No companding (256     256)
+
+===== PAGE 57 =====
+PDF: 09005aef8366edcb/Source: 09005aef8366ede5
+Aptina Imaging reserves the right to change products or specifications without notice.
+MT9V034_DS - Rev. A 10/08 EN
+57
+©2008 Aptina Imaging Corporation. All rights reserved.
+ MT9V034: 1/3-Inch Wide-VGA Digital Image Sensor
+Feature Description
+Aptina Confidential and Proprietary
+Gain Settings
+Changes to Gain Settings
+When the digital gain settings (R0x80–R0x98) are changed, the gain is updated on the 
+next frame start. However, the latency for an analog gain change to take effect depends 
+on the automatic gain control.
+If automatic gain control is enabled (R0xAF, bit 1 is set to HIGH), the gain changed for 
+frame n first appears in frame (n + 1); if the automatic gain control is disabled, the gain 
+changed for frame n first appears in frame (n + 2).
+Both analog and digital gain change regardless of whether the integration time is also 
+changed simultaneously.
+Figure 24: 
+ Latency of Analog Gain Change When AGC Is Disabled
+FRAME_VALID
+Image Data
+Frame Start
+Output image with
+Gain =  3.0X
+Output image with
+Gain = 3.5X
+Gain =  3.0X
+Gain =  3.5X
+Gain =  3.0X
+Gain =  3.5X
+New Gain
+Programmed
+Actual
+Gain
+
+===== PAGE 58 =====
+PDF: 09005aef8366edcb/Source: 09005aef8366ede5
+Aptina Imaging reserves the right to change products or specifications without notice.
+MT9V034_DS - Rev. A 10/08 EN
+58
+©2008 Aptina Imaging Corporation. All rights reserved.
+ MT9V034: 1/3-Inch Wide-VGA Digital Image Sensor
+Feature Description
+Aptina Confidential and Proprietary
+Analog Gain
+Analog gain is controlled by:
+• R0x35 Global Gain context A
+• R0x36 Global Gain context B
+The formula for gain setting is:
+Gain = Bits[6:0] x 0.0625
+(EQ 17)
+The analog gain range supported in the MT9V034 is 1X–4X with a step size of 
+6.25 percent. To control gain manually with this register, the sensor must NOT be in AGC 
+mode. When adjusting the luminosity of an image, it is recommended to alter exposure 
+first and yield to gain increases only when the exposure value has reached a maximum 
+limit.
+Analog gain = bits (6:0) x 0.0625 for values 16–31
+Analog gain = bits (6:0)/2 x 0.125 for values 32–64
+For values 16–31: each LSB increases analog gain 0.0625v/v. A value of 16 = 1X gain. 
+Range: 1X to 1.9375X.
+For values 32–64: each 2 LSB increases analog gain 0.125v/v (that is, double the gain 
+increase for 2 LSB). Range: 2X to 4X. Odd values do not result in gain increases; the gain 
+increases by 0.125 for values 32, 34, 36, and so on. 
+Digital Gain
+Digital gain is controlled by:
+• R0x99-R0xA4 Tile Coordinates
+• R0x80-R0x98 Tiled Digital Gain and Weight
+In the MT9V034, the gain logic divides the image into 25 tiles, as shown in Figure 25 on 
+page 59. The size and gain of each tile can be adjusted using the above digital gain 
+control registers. Separate tile gains can be assigned for context A and context B. 
+Registers 0x99–0x9E and 0x9F–0xA4 represent the coordinates X0/5–X5/5 and Y0/5–Y5/5 
+in Figure 25 on page 59, respectively.
+Digital gains of registers 0x80–0x98 apply to their corresponding tiles. The MT9V034 
+supports a digital gain of 0.25–3.75X.
+When binning is enabled, the tile offsets maintain their absolute values; that is, tile coor-
+dinates do not scale with row or column bin setting.
+Note:
+There is one exception, for the condition when Column Bin 4 is enabled (R0x0D[3:2] 
+or R0x0E[3:2] = 2). For this case, the value for Digital Tile Coordinate
+X–direction must be doubled. 
+The formula for digital gain setting is:
+Digital Gain = Bits[3:0] x 0.25
+(EQ 18)
+
+===== PAGE 59 =====
+PDF: 09005aef8366edcb/Source: 09005aef8366ede5
+Aptina Imaging reserves the right to change products or specifications without notice.
+MT9V034_DS - Rev. A 10/08 EN
+59
+©2008 Aptina Imaging Corporation. All rights reserved.
+ MT9V034: 1/3-Inch Wide-VGA Digital Image Sensor
+Feature Description
+Aptina Confidential and Proprietary
+Figure 25: 
+ Tiled Sample
+Black Level Calibration
+Black level calibration is controlled by:
+• Frame Dark Average: R0x42
+• Dark Average Thresholds: R0x46
+• Black Level Calibration Control: R0x47
+• Black Level Calibration Value: R0x48
+• Black Level Calibration Value Step Size: R0x4C
+The MT9V034 has automatic black level calibration on-chip, and if enabled, its result 
+may be used in the offset correction shown in Figure 26.
+Figure 26: 
+ Black Level Calibration Flow Chart
+X0/5     X1/5        X2/5    X3/5      X4/5                    X5/5
+Y0/5
+Y1/5
+Y2/5
+Y3/5
+Y4/5
+Y5/5
+x0_y0     x1_y0                                         x4_y0
+x0_y1     x1_y1                                         x4_y1
+x0_y2     x1_y2                                         x4_y2
+x0_y3     x1_y3                                         x4_y3
+x0_y4     x1_y4                                         x4_y4
+Pixel Output
+(reset minus signal)
+Offset Correction
+Voltage (R0x48 or
+result of BLC)
+10 (12) bit ADC
+ADC Data
+(9:0)
+Gain Selection
+(R0x35 or R0x36 or 
+result of AGC)
+VREF
+(R0x2C)
+C2
+C1 
+Σ
+
+===== PAGE 60 =====
+PDF: 09005aef8366edcb/Source: 09005aef8366ede5
+Aptina Imaging reserves the right to change products or specifications without notice.
+MT9V034_DS - Rev. A 10/08 EN
+60
+©2008 Aptina Imaging Corporation. All rights reserved.
+ MT9V034: 1/3-Inch Wide-VGA Digital Image Sensor
+Feature Description
+Aptina Confidential and Proprietary
+The automatic black level calibration measures the average value of pixels from 2 dark 
+rows (1 dark row if row bin 4 is enabled) of the chip. (The pixels are averaged as if they 
+were light-sensitive and passed through the appropriate gain.) 
+This row average is then digitally low-pass filtered over many frames (R0x47, bits 7:5) to 
+remove temporal noise and random instabilities associated with this measurement.
+Then, the new filtered average is compared to a minimum acceptable level, low 
+threshold, and a maximum acceptable level, high threshold. 
+If the average is lower than the minimum acceptable level, the offset correction voltage 
+is increased by a programmable offset LSB in R0x4C. (Default step size is 2 LSB Offset = 1 
+ADC LSB at analog gain = 1X.) 
+If it is above the maximum level, the offset correction voltage is decreased by 2 LSB 
+(default). 
+To avoid oscillation of the black level from below to above, the region the thresholds 
+should be programmed so the difference is at least two times the offset DAC step size.
+In normal operation, the black level calibration value/offset correction value is calcu-
+lated at the beginning of each frame and can be read through the two-wire serial inter-
+face from R0x48. This register is an 8-bit signed two’s complement value. 
+However, if R0x47, bit 0 is set to “1,” the calibration value in R0x48 is used rather than the 
+automatic black level calculation result. This feature can be used in conjunction with the 
+“show dark rows” feature (R0x0D[6]) if using an external black level calibration circuit. 
+The offset correction voltage is generated according to the following formulas:
+Offset Correction Voltage = (8-bit signed two’s complement calibration value,-127 to 127) × 0.5mV 
+(EQ 19)
+ADC input voltage = (Pixel Output Voltage + Offset Correction Voltage) × Analog Gain 
+(EQ 20)
+
+===== PAGE 61 =====
+PDF: 09005aef8366edcb/Source: 09005aef8366ede5
+Aptina Imaging reserves the right to change products or specifications without notice.
+MT9V034_DS - Rev. A 10/08 EN
+61
+©2008 Aptina Imaging Corporation. All rights reserved.
+ MT9V034: 1/3-Inch Wide-VGA Digital Image Sensor
+Feature Description
+Aptina Confidential and Proprietary
+Row-wise Noise Correction
+Row-wise noise correction is controlled by the following registers:
+• R0x70 Row Noise Control
+• R0x72 Row Noise Constant
+Row-wise noise cancellation is performed by calculating a row average from a set of opti-
+cally black pixels at the start of each row and then applying each average to all the active 
+pixels of the row. Read Dark Columns register bit and Row Noise Correction Enable 
+register bit must both be set to enable row-wise noise cancellation to be performed. The 
+behavior when Read Dark Columns register bit = 0 and Row Noise Correction Enable 
+register bit = 1 is undefined.
+The algorithm works as follows:
+Logical columns 755-790 in the pixel array provide 36 optically black pixel values. Of the 
+36 values, two smallest value and two largest values are discarded. The remaining 32 
+values are averaged by summing them and discarding the 5 LSB of the result. The 10-bit 
+result is subtracted from each pixel value on the row in turn. In addition, a positive 
+constant will be added (Reg0x71, bits 7:0). This constant should be set to the dark level 
+targeted by the black level algorithm plus the noise expected on the measurements of 
+the averaged values from dark columns; it is meant to prevent clipping from negative 
+noise fluctuations.
+Pixel value = ADC value – dark column average + R0x71[9:0]
+(EQ 21)
+Note that this algorithm does not work in color sensor.
+Automatic Gain Control and Automatic Exposure Control
+The integrated AEC/AGC unit is responsible for ensuring that optimal auto settings of 
+exposure and (analog) gain are computed and updated every frame. 
+AEC and AGC can be individually enabled or disabled by R0xAF. When AEC is disabled 
+(R0xAF[0] = 0), the sensor uses the manual exposure value in coarse and fine shutter 
+width registers. When AGC is disabled (R0xAF[1] = 0), the sensor uses the manual gain 
+value in R0x35 or R0x36. See “Pixel Integration Control” on page 52 for more informa-
+tion.
+
+===== PAGE 62 =====
+PDF: 09005aef8366edcb/Source: 09005aef8366ede5
+Aptina Imaging reserves the right to change products or specifications without notice.
+MT9V034_DS - Rev. A 10/08 EN
+62
+©2008 Aptina Imaging Corporation. All rights reserved.
+ MT9V034: 1/3-Inch Wide-VGA Digital Image Sensor
+Feature Description
+Aptina Confidential and Proprietary
+Figure 27: 
+ Controllable and Observable AEC/AGC Registers
+The exposure is measured in row-time by reading R0xBB. The exposure range is 
+1 to 2047. The gain is measured in gain-units by reading R0xBA. The gain range is 
+16 to 63 (unity gain = 16 gain-units; multiply by 1/16 to get the true gain).
+When AEC is enabled (R0xAF), the maximum auto exposure value is limited by R0xBD; 
+minimum auto exposure is limited by AEC Minimum Exposure, R0xAC. 
+Note:
+AEC does not support sub-row timing; calculated exposure values are rounded down 
+to the nearest row-time. For smoother response, manual control is recommended for 
+short exposure times. 
+When AGC is enabled (R0xAF), the maximum auto gain value is limited by R0xAB; 
+minimum auto gain is fixed to 16 gain-units.
+The exposure control measures current scene luminosity and desired output luminosity 
+by accumulating a histogram of pixel values while reading out a frame. All pixels are 
+used, whether in color or mono mode. The desired exposure and gain are then calcu-
+lated from this for subsequent frame.
+When binning is enabled,  tuning of the AEC may be required.  The histogram pixel 
+count register, R0xB0, may be adjusted to reflect the reduced pixel count.  Desired bin 
+register, R0xA5, may be adjusted as required.
+Pixel Clock Speed
+The pixel clock speed is same as the master clock (SYSCLK) at 26.66 MHz by default. 
+However, when column binning 2 or 4 (R0x0D or R0x0E, bit 2 or 3) is enabled, the pixel 
+clock speed is reduced by half and one-fourth of the master clock speed respectively. See 
+“Read Mode Options” on page 63 and “Column Binning” on page 65 for additional infor-
+mation.
+EXP.  LPF
+(R0xA8)
+1
+0
+1
+0
+EXP.  SKIP
+(R0xA6)
+Coarse Shutter 
+Width Total
+AEC ENABLE
+(R0xAF[0 or 8])
+MAX. EXPOSURE (R0xBD)
+MIN EXPOSURE (R0xAC)
+AEC
+UNIT
+To exposure
+timing control
+AEC
+OUTPUT
+R0xBB
+R0xBA
+To analog
+gain control
+HISTOGRAM
+GENERATOR
+UNIT
+AGC
+UNIT
+GAIN LPF
+(R0xAB)
+GAIN SKIP
+(R0xA9)
+MANUAL GAIN
+A or B
+AGC ENABLE
+(R0xAF[1 or 9])
+AGC OUTPUT
+MAX. GAIN
+(R0xAB)
+MIN GAIN
+DESIRED BIN
+(desired luminance)
+(R0xA5)
+CURRENT BIN
+(current luminance)
+(R0xBC)
+16
+
+===== PAGE 63 =====
+PDF: 09005aef8366edcb/Source: 09005aef8366ede5
+Aptina Imaging reserves the right to change products or specifications without notice.
+MT9V034_DS - Rev. A 10/08 EN
+63
+©2008 Aptina Imaging Corporation. All rights reserved.
+ MT9V034: 1/3-Inch Wide-VGA Digital Image Sensor
+Feature Description
+Aptina Confidential and Proprietary
+Hard Reset of Logic
+The RC circuit for the MT9V034 uses a 10kΩ resistor and a 0.1μF capacitor. The rise time 
+for the RC circuit is 1μs maximum.
+Soft Reset of Logic
+Soft reset of logic is controlled by:
+• R0x0C Reset
+Bit 0 is used to reset the digital logic of the sensor while preserving the existing two-wire 
+serial interface configuration. Furthermore, by asserting the soft reset, the sensor aborts 
+the current frame it is processing and starts a new frame. Bit 1 is a shadowed reset 
+control register bit to explicitly reset the automatic gain and exposure control feature.
+These two bits are self-resetting bits and also return to “0” during two-wire serial inter-
+face reads.
+STANDBY Control
+The sensor goes into standby mode by setting STANDBY to HIGH. Once the sensor 
+detects that STANDBY is asserted, it completes the current frame before disabling the 
+digital logic, internal clocks, and analog power enable signal. To release the sensor out 
+from the standby mode, reset STANDBY back to LOW. The LVDS must be powered to 
+ensure that the device is in standby mode. See "Appendix A – Power-
+On Reset and Standby Timing" on page 81 for more information on standby.
+Monitor Mode Control
+Monitor mode is controlled by:
+• R0xD9 Monitor Mode Enable
+• R0xC0 Monitor Mode Image Capture Control
+The sensor goes into monitor mode when R0xD9[0] is set to HIGH. In this mode, the 
+sensor first captures a programmable number of frames (R0xC0), then goes into a sleep 
+period for five minutes. The cycle of sleeping for five minutes and waking up to capture a 
+number of frames continues until R0xD9[0] is cleared to return to normal operation.
+In some applications when monitor mode is enabled, the purpose of capturing frames is 
+to calibrate the gain and exposure of the scene using automatic gain and exposure 
+control feature. This feature typically takes less than 10 frames to settle. In case a larger 
+number of frames is needed, the value of R0xC0 may be increased to capture more 
+frames.
+During the sleep period, none of the analog circuitry and a very small fraction of digital 
+logic (including a five-minute timer) is powered. The master clock (SYSCLK) is therefore 
+always required.
+Read Mode Options
+(Also see “Output Data Format” on page 12 and “Output Data Timing” on page 13.)
+Column Flip
+By setting bit 5 of R0x0D or R0x0E the readout order of the columns is reversed, as shown 
+in Figure 28 on page 64. 
+
+===== PAGE 64 =====
+PDF: 09005aef8366edcb/Source: 09005aef8366ede5
+Aptina Imaging reserves the right to change products or specifications without notice.
+MT9V034_DS - Rev. A 10/08 EN
+64
+©2008 Aptina Imaging Corporation. All rights reserved.
+ MT9V034: 1/3-Inch Wide-VGA Digital Image Sensor
+Feature Description
+Aptina Confidential and Proprietary
+Row Flip
+By setting bit 4 of R0x0D or R0x0E the readout order of the rows is reversed, as shown in 
+Figure 29 on page 64. 
+Figure 28: 
+ Readout of Six Pixels in Normal and Column Flip Output Mode
+Figure 29: 
+ Readout of Six Rows in Normal and Row Flip Output Mode
+Pixel Binning
+In addition to windowing mode in which smaller resolutions (CIF, QCIF) are obtained by 
+selecting a smaller window from the sensor array, the MT9V034 also provides the ability 
+to down-sample the entire image captured by the pixel array using pixel binning.
+ There are two resolution options: binning 2 and binning 4, which reduce resolution by 
+two or by four, respectively. Row and column binning are separately selected. Image 
+mirroring options will work in conjunction with binning.
+For column binning, either two or four columns are combined by averaging to create the 
+resulting column.  For row binning, the binning result value depends on the difference in 
+pixel values: for pixel signal differences of less than 200 LSB's, the result is the average of 
+the pixel values.  For pixel differences of greater than 200 LSB's, the result is the value of 
+the darker pixel value.
+Binning operation increases SNR but decreases resolution. Enabling row bin2 and row 
+bin4 improves frame rate by 2x and 4x, respectively. Column binning does not increase 
+the frame rate.
+LINE_VALID
+Normal readout
+       DOUT(9:0)
+Reverse readout
+       DOUT(9:0)
+P4,1
+(9:0)
+P4,n
+(9:0)
+P4,n-1
+(9:0)
+P4,n-2
+(9:0)
+P4,n-3
+(9:0)
+P4,n-4
+(9:0)
+P4,n-5
+(9:0)
+P4,2
+(9:0)
+P4,3
+(9:0)
+P4,4
+(9:0)
+P4,5
+(9:0)
+P4,6
+(9:0)
+LINE_VALID
+Normal readout
+       DOUT(9:0)
+Reverse readout
+       DOUT(9:0)
+Row4
+(9:0)
+Row5
+(9:0)
+Row6
+(9:0)
+Row7
+(9:0)
+Row8
+7(9:0)
+Row9
+(9:0)
+Row484
+(9:0)
+Row483
+(9:0)
+Row482
+(9:0)
+Row481
+(9:0)
+Row480
+7(9:0)
+Row479
+(9:0)
+
+===== PAGE 65 =====
+PDF: 09005aef8366edcb/Source: 09005aef8366ede5
+Aptina Imaging reserves the right to change products or specifications without notice.
+MT9V034_DS - Rev. A 10/08 EN
+65
+©2008 Aptina Imaging Corporation. All rights reserved.
+ MT9V034: 1/3-Inch Wide-VGA Digital Image Sensor
+Feature Description
+Aptina Confidential and Proprietary
+Row Binning
+By setting bit 0 or 1 of R0x0D or R0x0E, only half or one-fourth of the row set is read out, 
+as shown in Figure 30. The number of rows read out is half or one-fourth of the value set 
+in R0x03. The row binning result depends on the difference in pixel values: for pixel 
+signal differences less than 200 LSB's, the result is the average of the pixel values.
+For pixel differences of 200 LSB's or more, the result is the value of the darker pixel value.
+Column Binning
+For column binning, either two or four columns are combined by averaging to create the 
+result. In setting bit 2 or 3 of R0x0D or R0x0E, the pixel data rate is slowed down by a 
+factor of either two or four, respectively. This is due to the overhead time in the digital 
+pixel data processing chain. As a result, the pixel clock speed is also reduced accordingly.
+Figure 30: 
+ Readout of 8 Pixels in Normal and Row Bin Output Mode
+LINE_VALID
+Normal readout
+       DOUT(9:0)
+Row4
+(9:0)
+Row5
+(9:0)
+Row6
+(9:0)
+Row7
+(9:0)
+Row8
+(9:0)
+Row9
+(9:0)
+Row10
+(9:0)
+Row11
+(9:0)
+LINE_VALID
+Row Bin 2 readout
+       DOUT(9:0)
+Row4
+(9:0)
+Row6
+(9:0)
+Row8
+(9:0)
+LINE_VALID
+Row Bin 4 readout
+       DOUT(9:0)
+Row4
+(9:0)
+Row8
+(9:0)
+Row10
+(9:0)
+
+===== PAGE 66 =====
+PDF: 09005aef8366edcb/Source: 09005aef8366ede5
+Aptina Imaging reserves the right to change products or specifications without notice.
+MT9V034_DS - Rev. A 10/08 EN
+66
+©2008 Aptina Imaging Corporation. All rights reserved.
+ MT9V034: 1/3-Inch Wide-VGA Digital Image Sensor
+Feature Description
+Aptina Confidential and Proprietary
+Figure 31: 
+ Readout of 8 Pixels in Normal and Column Bin Output Mode
+Interlaced Readout
+The MT9V034 has two interlaced readout options. By setting R0x07[2:0] = 1, all the even-
+numbered rows are read out first, followed by a number of programmable field blanking 
+rows (set by R0xBF[7:0]), then the odd-numbered rows, and finally the vertical blanking 
+rows. By setting R0x07[2:0] = 2 only one field row is read out.
+Consequently, the number of rows read out is half what is set in the window height 
+register. The row start register determines which field gets read out; if the row start 
+register is even, then the even field is read out; if row start address is odd, then the odd 
+field is read out.
+_
+Normal readout
+       DOUT(9:0)
+PIXCLK
+       DOUT(9:0)
+PIXCLK
+       DOUT(9:0)
+PIXCLK
+D1
+(9:0)
+D2
+(9:0)
+D3
+(9:0)
+D4
+(9:0)
+D5
+(9:0)
+D6
+(9:0)
+D7
+(9:0)
+D8
+(9:0)
+LINE_VALID
+Column Bin 2 readout
+D12
+(9:0)
+D34
+(9:0)
+D56
+(9:0)
+D78
+(9:0)
+LINE_VALID
+Column Bin 4 readout
+       DOUT(9:0)
+D1234
+(9:0)
+D5678
+(9:0)
+
+===== PAGE 67 =====
+PDF: 09005aef8366edcb/Source: 09005aef8366ede5
+Aptina Imaging reserves the right to change products or specifications without notice.
+MT9V034_DS - Rev. A 10/08 EN
+67
+©2008 Aptina Imaging Corporation. All rights reserved.
+ MT9V034: 1/3-Inch Wide-VGA Digital Image Sensor
+Feature Description
+Aptina Confidential and Proprietary
+Figure 32: 
+ Spatial Illustration of Interlaced Image Readout
+When interlaced mode is enabled, the total number of blanking rows are determined by 
+both Field Blanking register (R0xBF) and Vertical Blanking register (R0x06 or R0xCE). 
+The followings are their equations.
+Field Blanking = R0xBF[7:0]
+(EQ 22)
+Vertical Blanking = R0x06[8:0] – R0xBF[7:0]   (context A) or R0xCE[8:0] – R0xBF[7:0]   (context B)
+(EQ 23)
+with 
+minimum vertical blanking requirement = 4 (absolute minimum to operate; see Vertical Blanking Registers 
+description for VBlank minimums for valid image output)
+(EQ 24)
+Similar to progressive scan, FV is logic LOW during the valid image row only. Binning 
+should not be used in conjunction with interlaced mode. 
+P4,1 P4,2 P4,3.....................................P4,n-1 P4,n
+P6,0 P6,1 P6,2.....................................P6,n-1 P6,n
+00 00 00 .................. 00 00 00
+00 00 00 .................. 00 00 00
+Pm-2,0 Pm-2,2.....................................Pm-2,n-2 Pm-2,n
+Pm,2 Pm,2.....................................Pm,n-1 Pm,n
+00 00 00 .................. 00 00 00
+00 00 00 .................. 00 00 00
+00 00 00 .................. 00 00 00
+00 00 00 .................. 00 00 00
+00 00 00 ..................................... 00 00 00
+00 00 00 ..................................... 00 00 00
+00 00 00 ............................................................................................. 00 00 00
+00 00 00 ............................................................................................. 00 00 00
+VALID IMAGE - Even Field
+HORIZONTAL
+BLANKING 
+VERTICAL BLANKING 
+P5,1 P5,2 P5,3.....................................P5,n-1 P5,n
+P7,0 P7,1 P7,2.....................................P7,n-1 P7,n
+Pm-3,1 Pm-3,2.....................................Pm-3,n-1 Pm-3,n
+Pm,1 Pm,1.....................................Pm,n-1 Pm,n
+VALID IMAGE - Odd Field
+FIELD BLANKING
+
+===== PAGE 68 =====
+PDF: 09005aef8366edcb/Source: 09005aef8366ede5
+Aptina Imaging reserves the right to change products or specifications without notice.
+MT9V034_DS - Rev. A 10/08 EN
+68
+©2008 Aptina Imaging Corporation. All rights reserved.
+ MT9V034: 1/3-Inch Wide-VGA Digital Image Sensor
+Feature Description
+Aptina Confidential and Proprietary
+LINE_VALID
+By setting bit 2 and 3 of R0x72, the LV signal can get three different output formats. The 
+formats for reading out four rows and two vertical blanking rows are shown in Figure 33. 
+In the last format, the LV signal is the XOR between the continuous LV signal and the FV 
+signal.
+Figure 33: 
+ Different LINE_VALID Formats
+LVDS Serial (Stand-Alone/Stereo) Output
+The LVDS interface allows for the streaming of sensor data serially to a standard off-the-
+shelf deserializer up to eight meters away from the sensor. The pixels (and controls) are 
+packeted—12-bit packets for stand-alone mode and 18-bit packets for stereoscopy 
+mode. All serial signalling (CLK and data) is LVDS. The LVDS serial output could either 
+be data from a single sensor (stand-alone) or stream-merged data from two sensors (self 
+and its stereoscopic slave pair). The appendices describe in detail the topologies for 
+both stand-alone and stereoscopic modes. 
+There are two standard deserializers that can be used. One for a stand-alone sensor 
+stream and the other from a stereoscopic stream. The deserializer attached to a stand-
+alone sensor is able to reproduce the standard parallel output (8-bit pixel data, LV, FV, 
+and PIXCLK). The deserializer attached to a stereoscopic sensor is able to reproduce 8-
+bit pixel data from each sensor (with embedded LV and FV) and pixel-clk. An additional 
+(simple) piece of logic is required to extract LV and FV from the 8-bit pixel data. Irrespec-
+tive of the mode (stereoscopy/stand-alone), LV and FV are always embedded in the pixel 
+data. 
+In stereoscopic mode, the two sensors run in lock-step, implying all state machines are 
+in the same state at any given time. This is ensured by the sensor-pair getting their sys-
+clks and sys-resets in the same instance. Configuration writes through the two-wire 
+serial interface are done in such a way that both sensors can get their configuration 
+updates at once. The inter-sensor serial link is designed in such a way that once the slave 
+PLL locks and the data-dly, shft-clk-dly and stream-latency-sel are configured, the 
+master sensor streams valid stereo content irrespective of any variation voltage and/or 
+temperature as long as it is within specification. The configuration values of data-dly, 
+shft-clk-dly and stream-latency-sel are either predetermined from the board-layout or 
+can be empirically determined by reading back the stereo-error flag. This flag is asserted 
+when the two sensor streams are not in sync when merged. The combo_reg is used for 
+out-of-sync diagnosis.
+Default
+FRAME_VALID
+LINE_VALID
+Continuously
+FRAME_VALID
+LINE_VALID
+XOR
+FRAME_VALID
+LINE_VALID
+
+===== PAGE 69 =====
+PDF: 09005aef8366edcb/Source: 09005aef8366ede5
+Aptina Imaging reserves the right to change products or specifications without notice.
+MT9V034_DS - Rev. A 10/08 EN
+69
+©2008 Aptina Imaging Corporation. All rights reserved.
+ MT9V034: 1/3-Inch Wide-VGA Digital Image Sensor
+Feature Description
+Aptina Confidential and Proprietary
+Figure 34: 
+ Serial Output Format for a 6x2 Frame
+Notes:
+1. External pixel values of 0, 1, 2, 3, are reserved (they only convey control information). Any raw pixel 
+of value 0, 1, 2 and 3 will be substituted with 4. 
+2. The external pixel sequence 1023, 0, 1023 is a reserved sequence (conveys control information for 
+legacy support of MT9V021 applications). Any raw pixel sequence of 1023, 0, 1023 will be substi-
+tuted with an output serial stream of 1023, 4, 1023.
+LVDS Output Format
+In stand-alone mode, the packet size is 12 bits (2 frame bits and 10 payload bits); 10-bit 
+pixels or 8-bit pixels can be selected. In 8-bit pixel mode (R0xB6[0] = 0), the packet 
+consists of a start bit, 8-bit pixel data (with sync codes), the line valid bit, the frame valid 
+bit and the stop bit. For 10-bit pixel mode (R0xB6[0] = 1), the packet consists of a start 
+bit, 10-bit pixel data, and the stop bit.
+In stereoscopic mode, the packet size is 18 bits (2 frame bits and 16 payload bits). The 
+packet consists of a start bit, the master pixel byte (with sync codes), the slave byte (with 
+sync codes), and the stop bit.
+Table 10: 
+LVDS Packet Format in Stand-Alone Mode
+(Stereoscopy Mode Bit De-Asserted)
+12-Bit Packet
+use_10-bit_pixels Bit
+De-Asserted
+(8-Bit Mode)
+use_10-bit_pixels Bit Asserted
+(10-Bit Mode)
+Bit[0]
+1'b1 (Start bit)
+1'b1 (Start bit)
+Bit[1]
+PixelData[2]
+PixelData[0]
+Bit2]
+PixelData[3]
+PixelData[1]
+Bit[3]
+PixelData[4]
+PixelData[2]
+Bit4]
+PixelData[5]
+PixelData[3]
+Bit[5]
+PixelData[6]
+PixelData[4]
+Bit[6]
+PixelData[7]
+PixelData[5]
+Bit[7]
+PixelData[8]
+PixelData[6]
+Bit[8]
+PixelData[9]
+PixelData[7]
+Bit[9]
+LINE_VALID
+PixelData[8]
+Bit[10]
+FRAME_VALID
+PixelData[9]
+Bit[11]
+1'b0 (Stop bit)
+1'b0 (Stop bit)
+Internal
+PIXCLK
+Internal
+Parallel
+Data
+Internal
+Line_Valid
+Internal
+Frame_Valid
+External
+Serial
+Data Out
+P41
+P43
+P42
+P44
+P45
+P46
+P54
+P55
+P56
+P52
+P51
+P53
+1023
+1023
+0
+1
+P41
+P42
+P46
+2
+1
+P44
+P43
+P45
+P51
+P52
+P56     2
+P54
+P53
+P55
+3
+
+===== PAGE 70 =====
+PDF: 09005aef8366edcb/Source: 09005aef8366ede5
+Aptina Imaging reserves the right to change products or specifications without notice.
+MT9V034_DS - Rev. A 10/08 EN
+70
+©2008 Aptina Imaging Corporation. All rights reserved.
+ MT9V034: 1/3-Inch Wide-VGA Digital Image Sensor
+Feature Description
+Aptina Confidential and Proprietary
+Control signals LV and FV can be reconstructed from their respective preceding and 
+succeeding flags that are always embedded within the pixel data in the form of reserved 
+words.
+When LVDS mode is enabled along with column binning (bin 2 or bin 4, R0x0D[3:2], the 
+packet size remains the same but the serial pixel data stream repeats itself depending on 
+whether 2X or 4X binning is set: 
+• For bin 2, LVDS outputs double the expected data (post-binning pixel 0,0 is output 
+twice in sequence, followed by pixel 0,1 twice, . . .).
+• For bin 4, LVDS outputs 4 times the expected data (pixel 0,0 is output 4 times in 
+sequence followed by pixel 0,1 times 4, . . .).
+The receiving hardware will need to undersample the output stream getting data either 
+every 2 clocks (bin 2) or every 4 (bin 4) clocks.
+If the sensor provides a pixel whose value is 0,1, 2, or 3 (that is, the same as a reserved 
+word) then the outgoing serial pixel value is switched to 4.
+Table 11: 
+LVDS Packet Format in Stereoscopy Mode (Stereoscopy Mode Bit Asserted)
+18-bit Packet
+Function
+Bit[0]
+1'b1 (Start bit)
+Bit[1]
+MasterSensorPixelData[2]
+Bit[2]
+MasterSensorPixelData[3]
+Bit[3]
+MasterSensorPixelData[4]
+Bit[4]
+MasterSensorPixelData[5]
+Bit[5]
+MasterSensorPixelData[6]
+Bit[6]
+MasterSensorPixelData[7]
+Bit[7]
+MasterSensorPixelData[8]
+Bit[8]
+MasterSensorPixelData[9]
+Bit[9]
+SlaveSensorPixelData[2]
+Bit[10]
+SlaveSensorPixelData[3]
+Bit[11]
+SlaveSensorPixelData[4]
+Bit[12]
+SlaveSensorPixelData[5]
+Bit[13]
+SlaveSensorPixelData[6]
+Bit[14]
+SlaveSensorPixelData[7]
+Bit[15]
+SlaveSensorPixelData[8]
+Bit[16]
+SlaveSensorPixelData[9]
+Bit[17]
+1'b0 (Stop bit)
+Table 12: 
+Reserved Words in the Pixel Data Stream
+Pixel Data Reserved Word
+Flag
+0
+Precedes frame valid assertion
+1
+Precedes line valid assertion
+2
+Succeeds line valid de-assertion
+3
+Succeeds frame valid de-assertion
+
+===== PAGE 71 =====
+PDF: 09005aef8366edcb/Source: 09005aef8366ede5
+Aptina Imaging reserves the right to change products or specifications without notice.
+MT9V034_DS - Rev. A 10/08 EN
+71
+©2008 Aptina Imaging Corporation. All rights reserved.
+ MT9V034: 1/3-Inch Wide-VGA Digital Image Sensor
+Feature Description
+Aptina Confidential and Proprietary
+LVDS Enable and Disable
+The Table 13 and Table 14 further explain the state of the LVDS output pins depending 
+on LVDS control settings. When the LVDS block is not used, it may be left powered down 
+to reduce power consumption. 
+Note:
+ERROR pin: When sensor is not in stereo mode, ERROR pin is at LOW.
+Table 13: 
+SER_DATAOUT_* state
+R0xB1[1] 
+LVDS power down
+R0xB3[4]
+LVDS data power down
+SER_DATAOUT_*
+0
+0
+Active
+0
+1
+Active
+1
+0
+Z
+1
+1
+Z
+Table 14: 
+SHFT_CLK_* state
+R0xB1[1] 
+LVDS power down
+R0xB2[4]
+LVDS shift-clk power down
+SHFT_CLKOUT_*
+0
+0
+Active
+0
+1
+Z
+1
+0
+Z
+1
+1
+Z
+
+===== PAGE 72 =====
+PDF: 09005aef8366edcb/Source: 09005aef8366ede5
+Aptina Imaging reserves the right to change products or specifications without notice.
+MT9V034_DS - Rev. A 10/08 EN
+72
+©2008 Aptina Imaging Corporation. All rights reserved.
+ MT9V034: 1/3-Inch Wide-VGA Digital Image Sensor
+Feature Description
+Aptina Confidential and Proprietary
+LVDS Data Bus Timing
+The LVDS bus timing waveforms and timing specifications are shown in Table 15 and 
+Figure 35.
+Figure 35: 
+ LVDS Timing
+Table 15: 
+LVDS AC Timing Specifications
+VPWR = 3.3V ±0.3V; TJ = – 30°C to +70°C; output load = 100 Ω; frequency 27 MHz 
+Parameter
+Minimum
+Typical
+Maximum
+Unit
+LVDS clock rise time
+–
+0.22
+0.30
+ns
+LVDS clock fall time
+–
+0.22
+0.30
+ns
+LVDS data rise time
+–
+0.28
+0.30
+ns
+LVDS data fall time
+–
+0.28
+0.30
+ns
+LVDS data setup time
+0.3
+0.67
+–
+ns
+LVDS data hold time
+0.1
+1.34
+–
+ns
+LVDS clock jitter
+–
+–
+92
+ps
+Data Rise/Fall Time
+(10% - 90%)
+Data Setup Time
+Data Hold Time
+LVDS Data Output
+(SER_DATAOUT_N/P)
+LVDS Clock Output
+(Shft_CLKOUT_N/P)
+Clock Rise/Fall Time
+(10% - 90%)
+Clock Jitter
+
+===== PAGE 73 =====
+PDF: 09005aef8366edcb/Source: 09005aef8366ede5
+Aptina Imaging reserves the right to change products or specifications without notice.
+MT9V034_DS - Rev. A 10/08 EN
+73
+©2008 Aptina Imaging Corporation. All rights reserved.
+ MT9V034: 1/3-Inch Wide-VGA Digital Image Sensor
+Electrical Specifications
+Aptina Confidential and Proprietary
+Electrical Specifications
+Table 16: 
+DC Electrical Characteristics Over Temperature
+VPWR = 3.3V ±0.3V; TJ = – 30°C to +70°C; Output load = 10pF; Frequency 13 MHz to 27 MHz; LVDS off
+Symbol
+Definition
+Condition
+Min.
+Typ.
+Max.
+Unit
+VIH
+Input HIGH voltage
+VPWR - 1.4
+–
+V
+VIL
+Input LOW voltage
+–
+1.3
+V
+IIN
+Input leakage current
+No pull-up resistor; 
+VIN = VPWR or VGND
+-5
+–
+5
+μA
+VOH
+Output HIGH voltage
+IOH = –4.0mA
+VPWR - 0.3
+–
+–
+V
+VOL
+Output LOW voltage
+IOL = 4.0mA
+–
+–
+0.3
+V
+IOH
+Output HIGH current
+VOH = VDD - 0.7
+-11
+–
+–
+mA
+IOL
+Output LOW current
+VOL = 0.7
+–
+–
+11
+mA
+IPWRA
+Analog supply current
+Default settings
+–
+12
+20
+mA
+IPIX
+Pixel supply current
+Default settings
+–
+1.1
+3
+mA
+IPWRD
+Digital supply current
+Default settings, CLOAD = 10pF
+–
+42
+60
+mA
+ILVDS
+LVDS supply current
+Default settings with LVDS on
+–
+13
+16
+mA
+IPWRA 
+Standby
+Analog standby supply current
+STDBY = VDD
+–
+0.2
+3
+μA
+IPWRD 
+Standby 
+Clock Off
+Digital standby supply current 
+with clock off
+STDBY = VDD, CLKIN = 0 MHz
+–
+0.1
+10
+μA
+IPWRD 
+Standby 
+Clock On
+Digital standby supply current 
+with clock on
+STDBY= VDD, CLKIN = 27 MHz
+–
+1
+2
+mA
+Table 17: 
+DC Electrical Characteristics 
+VPWR = 3.3V ±0.3V; TA = Ambient = 25°C
+Symbol
+Definition
+Condition
+Min.
+Typ.
+Max.
+Unit
+LVDS Driver DC Specifications
+|VOD|
+Output differential voltage
+RLOAD = 100 
+Ω ± 1%
+250
+–
+400
+mV
+|DVOD|
+Change in VOD between 
+complementary output states
+–
+–
+50
+mV
+VOS
+Output offset voltage
+1.0
+1.2
+1.4
+mV
+DVOS
+Pixel array current
+–
+–
+35
+mV
+IOS
+Digital supply current
+±10
+mA
+IOZ
+Output current when driver is tri-
+state
+±1
+μA
+LVDS Receiver DC Specifications
+VIDTH+
+Input differential
+| VGPD| < 925mV
+–100
+–
+100
+mV
+Iin
+Input current
+–
+–
+±20
+μA
+
+===== PAGE 74 =====
+PDF: 09005aef8366edcb/Source: 09005aef8366ede5
+Aptina Imaging reserves the right to change products or specifications without notice.
+MT9V034_DS - Rev. A 10/08 EN
+74
+©2008 Aptina Imaging Corporation. All rights reserved.
+ MT9V034: 1/3-Inch Wide-VGA Digital Image Sensor
+Electrical Specifications
+Aptina Confidential and Proprietary
+Note:
+This is a stress rating only, and functional operation of the device at these or any other conditions 
+above those indicated in the operational sections of this specification is not implied.
+Exposure to absolute maximum rating conditions for extended periods may affect 
+reliability.
+Table 18: 
+Absolute Maximum Ratings 
+Caution
+Stresses greater than those listed may cause permanent damage to the device. 
+Symbol
+Parameter
+Min.
+Max.
+Unit
+VSUPPLY
+Power supply voltage (all supplies)
+–0.3
+4.5
+V
+ISUPPLY
+Total power supply current
+–
+200
+mA
+IGND
+Total ground current
+–
+200
+mA
+VIN
+DC input voltage
+–0.3
+VDD + 0.3
+V
+VOUT
+DC output voltage
+–0.3
+VDD + 0.3
+V
+TSTGNote:
+Storage temperature
+–40
++125
+°C
+Table 19: 
+AC Electrical Characteristics
+VPWR = 3.3V ±0.3V; TJ = – 30°C to +70°C; Output Load = 10pF
+Symbol
+Definition
+Condition
+Min.
+Typ.
+Max.
+Unit
+SYSCLK
+Input clock frequency
+Note 1
+13.0
+26.6
+27.0
+MHz
+Clock duty cycle
+45.0
+50.0
+55.0
+%
+tR
+Input clock rise time
+–
+3
+5
+ns
+tF
+Input clock fall time
+–
+3
+5
+ns
+tPLHP
+SYSCLK to PIXCLK propagation delay
+CLOAD = 10pF
+4
+6
+8
+ns
+tPD
+PIXCLK to valid DOUT(9:0) propagation delay
+CLOAD = 10pF
+–3
+0.6
+3
+ns
+tSD
+Data setup time
+14
+16
+–
+ns
+tHD
+Data hold time
+14
+16
+–
+tPFLR
+PIXCLK to LV propagation delay
+CLOAD = 10pF
+5
+7
+9
+ns
+tPFLF
+PIXCLK to FV propagation delay
+CLOAD = 10pF
+5
+7
+9
+ns
+
+===== PAGE 75 =====
+PDF: 09005aef8366edcb/Source: 09005aef8366ede5
+Aptina Imaging reserves the right to change products or specifications without notice.
+MT9V034_DS - Rev. A 10/08 EN
+75
+©2008 Aptina Imaging Corporation. All rights reserved.
+ MT9V034: 1/3-Inch Wide-VGA Digital Image Sensor
+Electrical Specifications
+Aptina Confidential and Proprietary
+Propagation Delays for PIXCLK and Data Out Signals
+The pixel clock is inverted and delayed relative to the master clock. The relative delay 
+from the master clock (SYSCLK) rising edge to both the pixel clock (PIXCLK) falling edge 
+and the data output transition is typically 7ns. Note that the falling edge of the pixel 
+clock occurs at approximately the same time as the data output transitions. See Table 19 
+for data setup and hold times. 
+Figure 36: 
+ Propagation Delays for PIXCLK and Data Out Signals
+Propagation Delays for FRAME_VALID and LINE_VALID Signals
+The LV and FV signals change on the same rising master clock edge as the data output. 
+The LV goes HIGH on the same rising master clock edge as the output of the first valid 
+pixel's data and returns LOW on the same master clock rising edge as the end of the 
+output of the last valid pixel's data.
+As shown in the “Output Data Timing” on page 13, FV goes HIGH 143 pixel clocks before 
+the first LV goes HIGH. It returns LOW 23 pixel clocks after the last LV goes LOW. 
+Figure 37: 
+ Propagation Delays for FRAME_VALID and LINE_VALID Signals
+tPD
+tR
+tF
+tPLHP
+tHD
+tSD
+SYSCLK
+PIXCLK
+DOUT(9:0)
+PIXCLK
+FRAME_VALID
+LINE_VALID
+tPFLF
+tPFLR
+PIXCLK
+FRAME_VALID
+LINE_VALID
+
+===== PAGE 76 =====
+PDF: 09005aef8366edcb/Source: 09005aef8366ede5
+Aptina Imaging reserves the right to change products or specifications without notice.
+MT9V034_DS - Rev. A 10/08 EN
+76
+©2008 Aptina Imaging Corporation. All rights reserved.
+ MT9V034: 1/3-Inch Wide-VGA Digital Image Sensor
+Electrical Specifications
+Aptina Confidential and Proprietary
+Two-Wire Serial Bus Timing
+Detailed timing waveforms and parameters for the two-wire serial interface bus are 
+shown in Figure and Table 20.
+Figure 38: 
+ Two-wire Serial Bus Timing
+Table 20: 
+Two-Wire Serial Bus Timing Parameters
+Test Conditions: 25°C, 26.67 MHz, and 3.3V
+Symbol
+Parameter
+Condition
+Min.
+Typ.
+Max.
+Unit
+fSCLK
+Serial interface input clock frequency
+ 
+ 
+ 
+400
+kHz
+tSCLK
+Serial Input clock period
+ 
+ 
+ 
+2.5
+μsec
+ 
+SCLK duty cycle
+When active
+40
+50
+60
+%
+tr_sclk
+SCLK rise time
+ 
+ 
+165
+ 
+ns
+tf_sclk
+SCLK fall time
+ 
+ 
+6
+ 
+ns
+tr_sdat
+SDATA rise time
+1.5 kΩ pull-up 
+ 
+180
+ 
+ns
+tf_sdat
+SDATA fall time
+ 
+ 
+9
+ 
+ns
+tSRTS
+Start setup time
+WRITE/READ
+148
+150
+167
+ns
+tSRTH
+Start hold time
+WRITE/READ
+36.9
+36
+37.6
+ns
+tSDSW
+SDATA setup
+WRITE
+0
+5
+12
+ns
+tSDHW
+SDATA hold
+WRITE
+1.3
+36
+37
+ns
+tASW
+ACK setup time
+WRITE
+146
+146
+148
+ns
+tAHW
+ACK hold time
+WRITE
+98.9
+107
+144
+ns
+tSTPS
+Stop setup time
+WRITE/READ
+ 
+624
+ 
+ns
+tSTPH
+Stop hold time
+WRITE/READ
+ 
+1.61
+ 
+ns
+tASR
+ACK setup time
+READ
+192
+228
+229
+ns
+tAHR
+ACK hold time
+READ
+247
+284
+287
+ns
+tSDSR
+SDATA setup
+READ
+654
+655
+690
+ns
+tSDHR
+SDATA hold
+READ
+560
+595
+596
+ns
+CIN_SI
+Serial interface input pin capacitance
+ 
+ 
+3.5
+ 
+pF
+CLOAD_SD
+SDATA max load capacitance
+ 
+ 
+15
+ 
+pF
+RSD
+SDATA external pull-up resistor
+ 
+ 
+1.5
+ 
+kΩ
+SCLK
+SDATA
+SCLK
+SDATA
+Read Start
+Write Start
+ACK
+ACK
+Stop
+tr_clk
+tf_clk
+tr_sdat
+tf_sdat
+90%
+90%
+10%
+10%
+tSRTH
+tSCLK
+tSCHW tSDSW
+tASR
+tAHR
+tSTPS
+tSTPH
+Register Value
+Bit 0
+Register Address
+Bit 7
+Register Value
+Bit 0
+Register Value
+Bit 7
+Write Address
+Bit 7
+Write Address
+Bit 0
+Read Address
+Bit 7
+Read Address
+Bit 0
+tASW
+tAHW
+tSHDR tSDSR
+
+===== PAGE 77 =====
+PDF: 09005aef8366edcb/Source: 09005aef8366ede5
+Aptina Imaging reserves the right to change products or specifications without notice.
+MT9V034_DS - Rev. A 10/08 EN
+77
+©2008 Aptina Imaging Corporation. All rights reserved.
+ MT9V034: 1/3-Inch Wide-VGA Digital Image Sensor
+Electrical Specifications
+Aptina Confidential and Proprietary
+Minimum Master Clock Cycles
+In addition to the AC timing requirements described in Table 20 on page 76, the 
+two-wire serial bus operation also requires certain minimum master clock cycles 
+between transitions. These are specified in Figures 39 through 44, in units of master 
+clock cycles.
+Figure 39: 
+ Serial Host Interface Start Condition Timing
+ 
+Figure 40: 
+ Serial Host Interface Stop Condition Timing
+Note:
+All timing are in units of master clock cycle.
+Figure 41: 
+ Serial Host Interface Data Timing for Write
+Note:
+SDATA is driven by an off-chip transmitter.
+SCLK
+4
+SDATA
+4
+SCLK
+4
+SDATA
+4
+SCLK
+4
+SDATA
+4
+
+===== PAGE 78 =====
+PDF: 09005aef8366edcb/Source: 09005aef8366ede5
+Aptina Imaging reserves the right to change products or specifications without notice.
+MT9V034_DS - Rev. A 10/08 EN
+78
+©2008 Aptina Imaging Corporation. All rights reserved.
+ MT9V034: 1/3-Inch Wide-VGA Digital Image Sensor
+Electrical Specifications
+Aptina Confidential and Proprietary
+Figure 42: 
+ Serial Host Interface Data Timing for Read
+Note:
+SDATA is pulled LOW by the sensor, or allowed to be pulled HIGH by a pull-up resistor off-chip. 
+Figure 43: 
+ Acknowledge Signal Timing After an 8-Bit WRITE to the Sensor
+Figure 44: 
+ Acknowledge Signal Timing After an 8-Bit READ from the Sensor
+Note:
+After a READ, the master receiver must pull down SDATA to acknowledge receipt of data bits. When 
+read sequence is complete, the master must generate a “No Acknowledge” by leaving SDATA to 
+float HIGH. On the following cycle, a start or stop bit may be used.
+SCLK
+5
+SDATA
+SCLK
+Sensor pulls down
+SDATA pin
+6
+SDATA
+3
+SCLK
+Sensor tri-states SDATA pin
+(turns off pull down)
+7
+SDATA
+6
+
+===== PAGE 79 =====
+PDF: 09005aef8366edcb/Source: 09005aef8366ede5
+Aptina Imaging reserves the right to change products or specifications without notice.
+MT9V034_DS - Rev. A 10/08 EN
+79
+©2008 Aptina Imaging Corporation. All rights reserved.
+ MT9V034: 1/3-Inch Wide-VGA Digital Image Sensor
+Electrical Specifications
+Aptina Confidential and Proprietary
+Figure 45: 
+ Typical Quantum Efficiency – Color
+Figure 46: 
+ Typical Quantum Efficiency – Monochrome
+0
+5
+10
+15
+20
+25
+30
+35
+40
+45
+1150
+350
+450
+550
+650
+750
+850
+950
+1050
+Wavelength (nm)
+Quantum Efficiency (%)
+Blue
+Green (B)
+Green (R)
+Red
+0
+10
+20
+30
+40
+50
+60
+350
+450
+550
+650
+750
+850
+950
+1050
+1150
+Wavelength (nm)
+Quantum Efficiency (%)
+
+===== PAGE 80 =====
+PDF: 09005aef8366edcb/Source: 09005aef8366ede5
+Aptina Imaging reserves the right to change products or specifications without notice.
+MT9V034_DS - Rev. A 10/08 EN
+80
+©2008 Aptina Imaging Corporation. All rights reserved.
+ MT9V034: 1/3-Inch Wide-VGA Digital Image Sensor
+Package Dimensions
+Aptina Confidential and Proprietary
+Package Dimensions
+Figure 47: 
+ 48-Pin CLCC Package Outline Drawing
+ 
+Notes:
+1. All dimensions in millimeters.
+2. Optical center = Package center.
+Seating
+plane
+4.4
+11.43
+5.215
+5.715
+Lid material: borosilicate glass 0.55 thickness
+Wall material: alumina ceramic
+Substrate material: alumina ceramic 0.7 thickness
+8.8
+4.4
+5.715
+4.84
+5.215
+0.8
+TYP
+1.75
+0.8 TYP
+8.8
+48
+1
+10.9 ±0.1
+CTR
+47X
+1.0 ±0.2
+48X R 0.15
+48X
+0.40 ±0.05
+11.43
+10.9 ±0.1
+CTR
+Lead finish: 
+Au plating, 0.50 microns
+minimum thickness
+ 
+over Ni plating, 1.27 microns
+minimum thickness
+2.3 ±0.2
+1.7
+Note: 1. Optical center = package center.
+First
+clear
+pixel
+Optical
+center1
+C
+A
+B
+Optical
+area
+Optical area:
+Maximum rotation of optical area relative to package edges: 1º
+Maximum tilt of optical area relative to
+ 
+seating plane  A  : 50 microns
+Maximum tilt of optical area relative to
+ 
+top of cover glass  D  : 100 microns
+A
+D
+0.90
+for reference only
+1.400 ±0.125
+0.35
+for reference only
+V CTR
+Ø0.20 A B C
+H CTR
+Ø0.20 A B C
+Image
+sensor die:
+0.675 thickness
+0.10 A
+0.05
+0.2
+4X
+
+===== PAGE 81 =====
+PDF: 09005aef8366edcb/Source: 09005aef8366ede5
+Aptina Imaging reserves the right to change products or specifications without notice.
+MT9V034_DS - Rev. A 10/08 EN
+81
+©2008 Aptina Imaging Corporation. All rights reserved.
+ MT9V034: 1/3-Inch Wide-VGA Digital Image Sensor
+Appendix A – Power-On Reset and Standby Timing
+Aptina Confidential and Proprietary
+Appendix A – Power-On Reset and Standby Timing
+There are no constraints concerning the order in which the various power supplies are 
+applied; however, the MT9V034 requires reset in order operate properly at power-up. 
+Refer to Figure 48 for the power-up, reset, and standby sequences.
+Figure 48: 
+ Power-up, Reset, Clock and Standby Sequence
+Notes:
+1. All output signals are defined during initial power-up with RESET_BAR held LOW without SYSCLK 
+being active. To properly reset the rest of the sensor, during initial power-up, assert RESET_BAR (set 
+to LOW state) for at least 750ns after all power supplies have stabilized and SYSCLK is active (being 
+clocked). Driving RESET_BAR to LOW state does not put the part in a low power state.
+2. Before using two-wire serial interface, wait for 10 SYSCLK rising edges after RESET_BAR is de-
+asserted.
+3. Once the sensor detects that STANDBY has been asserted, it completes the current frame readout 
+before entering standby mode. The user must supply enough SYSCLKs to allow a complete frame 
+readout. See Table 4, “Frame Time,” on page 13 for more information.
+4. In standby, all video data and synchronization output signals are High-Z.
+5. In standby, the two-wire serial interface is not active.
+SYSCLK
+Two-Wire Serial I/F
+SCLK, SDATA
+RESET_BAR 
+VDD, VDDLVDS,
+VAA, VAAPIX
+DATA OUTPUT
+STANDBY
+MIN 10 SYSCLK cycles
+Pre-Standby
+Standby
+Wake
+ up
+Active
+Driven = 0
+Low-Power
+non-Low-Power
+Does not
+respond to
+serial
+interface
+when
+STANDBY = 1
+DOUT[9:0]
+Power
+   up
+non-Low-Power
+MIN 20 SYSCLK cycles
+MIN 10 SYSCLK cycles 
+Active
+Power
+down
+DOUT[9:0]
+Driven = 0
+Note 3
+MIN 10 SYSCLK cycles
+
+===== PAGE 82 =====
+10 Eunos Road 8 13-40, Singapore Post Center, Singapore 408600 prodmktg@aptina.com www.aptina.com
+Aptina, Aptina Imaging, DigitalClarity, and the Aptina logo are the property of Aptina Imaging Corporation
+All other trademarks are the property of their respective owners.
+This data sheet contains minimum and maximum limits specified over the power supply and temperature range set forth herein. Although considered final, 
+these specifications are subject to change, as further product development and data characterization sometimes occur. 
+ MT9V034: 1/3-Inch Wide-VGA Digital Image Sensor
+Revision History
+PDF: 09005aef8366edcb/Source: 09005aef8366ede5
+Aptina Imaging reserves the right to change products or specifications without notice.
+MT9V034_DS - Rev. A 10/08 EN
+82
+©2008 Aptina Imaging Corporation All rights reserved.
+Aptina Confidential and Proprietary
+Revision History
+Rev. A . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .10/17/08
+• Initial release
