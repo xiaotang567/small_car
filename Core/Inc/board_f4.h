@@ -159,6 +159,7 @@ extern volatile uint8_t  cam_curved;           /* ★ 2174 1 = 弯道（残差�
 extern volatile uint8_t  cam_track_ok;         /* ★ 2174 1 = 本帧有赛道 */
 extern volatile float    cam_line_k;           /* ★ 2175 中线拟合斜率 */
 extern volatile float    cam_line_b;           /* ★ 2175 中线拟合截距 */
+extern volatile float    cam_w_est;            /* ★ 2177 赛道宽度估计（像素）*/
 void cam_track_eval (void);                    /* ★ 2174 算直道/弯道 + 舵机偏差 */
 extern volatile uint8_t  cam_now;
 extern volatile uint8_t  cam_ahead;

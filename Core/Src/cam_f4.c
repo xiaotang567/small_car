@@ -2834,6 +2834,49 @@ volatile uint8_t cam_curved   = 0U;      /* 1 = 本帧判为弯道 */
 volatile uint8_t cam_track_ok = 0U;      /* 1 = 本帧有可用赛道 */
 volatile float   cam_line_k   = 0.0f;    /* ★ 2175 中线拟合：c(r) = k*r + b（r=行号）*/
 volatile float   cam_line_b   = 0.0f;
+volatile float   cam_w_est    = 0.0f;    /* ★ 2177 赛道宽度估计（像素）*/
+
+//-------------------------------------------------------------------------------------------------------------------
+// 函数简介     ★ FW=2177：**取某一行的赛道中心**，支持"只看见单边"
+//   急弯时赛道有一侧会跑出视野，那一边会贴到画面边缘（列 0/1 或 186/187）。
+//   贴边的边不可信 ⇒ 用**另一条边 + 宽度估计**补出中心：
+//       只有左边界：中心 = 左 + w/2
+//       只有右边界：中心 = 右 - w/2
+//   宽度估计 = 那些"两边都靠谱"的行的宽度的 EMA ⇒ 急弯时中线不会塌到画面中心，
+//   偏差该多大就多大 ⇒ 舵机才打得够（之前只能看见单边时误差被压小，轮子几乎不动）。
+// 返回参数     0xFF = 这一行没有可用信息
+//-------------------------------------------------------------------------------------------------------------------
+static uint8_t lf_row_center (int32_t r)
+{
+    int32_t l  = (cam_bound[r]   != 0xFFU) ? (int32_t)cam_bound[r]   : -1;
+    int32_t rr = (cam_bound_r[r] != 0xFFU) ? (int32_t)cam_bound_r[r] : -1;
+    int32_t lok = ((l >= 0) && (l > 1)) ? 1 : 0;
+    int32_t rok = ((rr >= 0) && (rr < (int32_t)CAM_TXW - 2)) ? 1 : 0;
+    float   w;
+
+    if ((0 != lok) && (0 != rok))
+    {
+        w = (float)(rr - l);
+        if ((w > 8.0f) && (w < (float)CAM_TXW - 4.0f))
+        {
+            cam_w_est = (cam_w_est < 1.0f) ? w : (cam_w_est * 0.9f + w * 0.1f);
+        }
+        return (uint8_t)((l + rr) / 2);
+    }
+    if ((0 != lok) && (cam_w_est > 8.0f))
+    {
+        int32_t c2 = l + (int32_t)(cam_w_est * 0.5f);
+        if (c2 > (int32_t)CAM_TXW - 2) { c2 = (int32_t)CAM_TXW - 2; }
+        return (uint8_t)c2;
+    }
+    if ((0 != rok) && (cam_w_est > 8.0f))
+    {
+        int32_t c2 = rr - (int32_t)(cam_w_est * 0.5f);
+        if (c2 < 1) { c2 = 1; }
+        return (uint8_t)c2;
+    }
+    return 0xFFU;
+}
 
 void cam_track_eval (void)
 {
@@ -2846,10 +2889,12 @@ void cam_track_eval (void)
 
     for (r = 0; r < (int32_t)CAM_H; r++)
     {
-        if ((cam_bound[r] != 0xFFU) && (cam_bound_r[r] != 0xFFU) &&
-            (cam_bound_r[r] > cam_bound[r]))
+        uint8_t cen = lf_row_center(r);
+
+        cam_center[r] = cen;
+        if (0xFFU != cen)
         {
-            float c = ((float)cam_bound[r] + (float)cam_bound_r[r]) * 0.5f;
+            float c = (float)cen;
 
             sx  += (float)r;
             sy  += c;
@@ -2870,10 +2915,9 @@ void cam_track_eval (void)
 
     for (r = r_lo; r <= r_hi; r++)
     {
-        if ((cam_bound[r] != 0xFFU) && (cam_bound_r[r] != 0xFFU) &&
-            (cam_bound_r[r] > cam_bound[r]))
+        if (0xFFU != cam_center[r])
         {
-            float c  = ((float)cam_bound[r] + (float)cam_bound_r[r]) * 0.5f;
+            float c  = (float)cam_center[r];
             float d  = k * (float)r + b - c;
 
             if (d < 0.0f) { d = -d; }

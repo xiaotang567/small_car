@@ -108,7 +108,7 @@
 #define CTRL_SERVO_POS_MIN      1700         /* ★ 2026-11-07：按用户实测的安全行程改（原来 1048） */
 #define CTRL_SERVO_POS_MAX      3024         /* ★ 用户实测最大（4000 会顶） */
 #define CTRL_SERVO_POS_CENTER   2748         /* ★ 默认中位（开机摆到这里，原来 2048） */
-#define CTRL_SERVO_SPEED        3400         /* 目标速度（步/秒，原工程 SERVO_RUN_SPEED） */
+#define CTRL_SERVO_SPEED        9000         /* ★ 2177：3400 -> 9000（高速打舵，原来太慢跟不上）*/
 
 /* ---- MPU9250 ---- */
 #define CTRL_IMU_ADDR           0x68         /* AD0 接地 = 0x68（原工程硬编码） */
@@ -140,6 +140,7 @@ void     ctrl_imu_tick (void);                 /* imu_f4.c：读 IMU + 喂 yaw *
 void     ctrl_servo_tick (void);               /* servo_f4.c：舵机状态机 */
 void     ctrl_steer_from_cam (void);           /* ★ 2174 摄像头巡线 → 舵机 */
 extern volatile uint8_t  g_steer_enable;       /* ★ 1 = 视觉打舵开（默认开）*/
+extern volatile uint8_t  g_steer_sweep;        /* ★ 2177 1 = 左右扫舵测试 */
 extern volatile uint32_t g_steer_manual_until; /* ★ 手动打舵优先到这一刻（ms）*/
 extern volatile float    g_steer_sign;         /* ★ 2175 方向 +1/-1 */
 extern volatile float    g_steer_kp;           /* ★ 2175 直道 P */

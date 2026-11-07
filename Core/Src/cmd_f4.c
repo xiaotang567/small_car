@@ -149,7 +149,7 @@ static void cam_cmd_status (void)
        DRP = 发送看门狗**主动放弃**的帧数（一直飙 ⇒ 链路/模块发不动）✓
        DST = DMA 停摆看门狗重启采集的次数（>0 ⇒ 采集链卡过，但已经自己救回来了）✓
        SELF= 连续 2 秒没有完整帧 ⇒ 重启采集的次数（和 DST 一起看）✓ */
-    sprintf(b, "CFG f=%u g=%u x=%u y=%u (%ux%u) d=%u CST=%u RV=%06lX LINE=%u FW=2176 EDG=%lu EL=%u ER=%u DRP=%lu DST=%lu SELF=%lu TH=%u\r\n",
+    sprintf(b, "CFG f=%u g=%u x=%u y=%u (%ux%u) d=%u CST=%u RV=%06lX LINE=%u FW=2177 EDG=%lu EL=%u ER=%u DRP=%lu DST=%lu SELF=%lu TH=%u\r\n",
             (unsigned)cam_cmd_fps, (unsigned)cam_cmd_gap_ms,
             (unsigned)cam_cmd_dx, (unsigned)cam_cmd_dy,
             (unsigned)(CAM_TXW / cam_cmd_dx), (unsigned)(CAM_H / cam_cmd_dy),
@@ -651,6 +651,14 @@ static void cam_cmd_line (char *s)
                     float sg = (float)cam_cmd_snum(a + 1);
                     g_steer_sign = (sg < 0.0f) ? -1.0f : 1.0f;
                     sprintf(b, "ACK sg: sign=%d\r\n", (int)g_steer_sign);
+                    cmd_txt(b);
+                    return;
+                }
+                if ((*a == 't') || (*a == 'T'))
+                {
+                    g_steer_sweep = (0U == g_steer_sweep) ? 1U : 0U;
+                    sprintf(b, "ACK st: sweep=%u (center +-300, 200ms)\r\n",
+                            (unsigned)g_steer_sweep);
                     cmd_txt(b);
                     return;
                 }

@@ -634,9 +634,10 @@ void ctrl_servo_tick (void)
 #define STEER_I_LIMIT    600.0f   /* 积分限幅（像素·次）：抹掉安装/机械中位偏差 */
 #define STEER_I_LEAK     0.985f   /* 没线时积分泄放系数 */
 #define STEER_E_LIMIT    90.0f    /* 误差限幅（像素），防跑飞 */
-#define STEER_SLEW       100      /* 每 20ms 最多变多少步 */
+#define STEER_SLEW       400      /* ★ 2177：每 20ms 最多变 400 步（=20000 步/秒，舵机自己会限速）*/
 
 volatile uint8_t  g_steer_enable       = 1U;   /* 1 = 视觉打舵开 */
+volatile uint8_t  g_steer_sweep        = 0U;   /* ★ 2177 1 = 左右扫舵测试（st 命令）*/
 volatile uint32_t g_steer_manual_until = 0U;   /* 手动打舵优先到这个时刻(ms) */
 volatile float    g_steer_sign         = 1.0f; /* ★ 方向：+1 / -1 */
 volatile float    g_steer_kp           = 5.0f; /* 直道 P */
@@ -656,6 +657,19 @@ void ctrl_steer_from_cam (void)
 {
     float   e, de, u, kp, kd;
     int32_t target;
+
+    /* ★ 2177：**左右扫舵测试**（命令 st 切换）：中位±300，每 200ms 换向
+       —— 用来肉眼确认"舵机到底能打多快"，和视觉无关 */
+    if (0U != g_steer_sweep)
+    {
+        int32_t tgt = (((HAL_GetTick() / 200U) & 1U) != 0U)
+                    ? ((int32_t)CTRL_SERVO_POS_CENTER + 300)
+                    : ((int32_t)CTRL_SERVO_POS_CENTER - 300);
+
+        s_steer_last = tgt;
+        (void)ctrl_servo_set_pos((uint16_t)tgt);
+        return;
+    }
 
     if (0U == g_steer_enable) { return; }                  /* 关掉了 */
     if (HAL_GetTick() < g_steer_manual_until) { return; }   /* 手动优先 3 秒 */
