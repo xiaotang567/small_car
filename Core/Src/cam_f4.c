@@ -2832,6 +2832,8 @@ volatile int32_t cam_err_near = 0;
 volatile int32_t cam_err_dir  = 0;
 volatile uint8_t cam_curved   = 0U;      /* 1 = 本帧判为弯道 */
 volatile uint8_t cam_track_ok = 0U;      /* 1 = 本帧有可用赛道 */
+volatile float   cam_line_k   = 0.0f;    /* ★ 2175 中线拟合：c(r) = k*r + b（r=行号）*/
+volatile float   cam_line_b   = 0.0f;
 
 void cam_track_eval (void)
 {
@@ -2882,6 +2884,8 @@ void cam_track_eval (void)
     /* 行号越大 = 画面越靠下 = 离车越近 ⇒ "近处"用 r_hi */
     cam_err_near = (int32_t)(k * (float)r_hi + b - (float)(CAM_TXW / 2));
     cam_err_dir  = (int32_t)(k * (float)(r_lo - r_hi));
+    cam_line_k   = k;            /* ★ 2175：给舵机 PID 用的直线拟合参数 */
+    cam_line_b   = b;
     cam_curved   = (res > 1.6f) ? 1U : 0U;
     cam_track_ok = 1U;
 }

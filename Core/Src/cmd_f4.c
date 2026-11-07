@@ -149,7 +149,7 @@ static void cam_cmd_status (void)
        DRP = 发送看门狗**主动放弃**的帧数（一直飙 ⇒ 链路/模块发不动）✓
        DST = DMA 停摆看门狗重启采集的次数（>0 ⇒ 采集链卡过，但已经自己救回来了）✓
        SELF= 连续 2 秒没有完整帧 ⇒ 重启采集的次数（和 DST 一起看）✓ */
-    sprintf(b, "CFG f=%u g=%u x=%u y=%u (%ux%u) d=%u CST=%u RV=%06lX LINE=%u FW=2174 EDG=%lu EL=%u ER=%u DRP=%lu DST=%lu SELF=%lu TH=%u\r\n",
+    sprintf(b, "CFG f=%u g=%u x=%u y=%u (%ux%u) d=%u CST=%u RV=%06lX LINE=%u FW=2175 EDG=%lu EL=%u ER=%u DRP=%lu DST=%lu SELF=%lu TH=%u\r\n",
             (unsigned)cam_cmd_fps, (unsigned)cam_cmd_gap_ms,
             (unsigned)cam_cmd_dx, (unsigned)cam_cmd_dy,
             (unsigned)(CAM_TXW / cam_cmd_dx), (unsigned)(CAM_H / cam_cmd_dy),
@@ -641,6 +641,49 @@ static void cam_cmd_line (char *s)
                 const char *a = s + 1;
 
                 while (*a == ' ') { a ++; }
+
+                /* ★ FW=2175：舵机 PID 在线调参（不用重烧）
+                   sg <±1>                        方向
+                   sp <kp×10> <ki×10> <kd×10>     直道增益
+                   sc <kp×10> <kd×10>             弯道增益                */
+                if ((*a == 'g') || (*a == 'G'))
+                {
+                    float sg = (float)cam_cmd_snum(a + 1);
+                    g_steer_sign = (sg < 0.0f) ? -1.0f : 1.0f;
+                    sprintf(b, "ACK sg: sign=%d\r\n", (int)g_steer_sign);
+                    cmd_txt(b);
+                    return;
+                }
+                if ((*a == 'p') || (*a == 'P'))
+                {
+                    const char *p1 = a + 1;
+                    const char *p2 = cam_cmd_next(p1);
+                    const char *p3 = cam_cmd_next(p2);
+
+                    g_steer_kp = (float)cam_cmd_snum(p1) / 10.0f;
+                    g_steer_ki = (float)cam_cmd_snum(p2) / 10.0f;
+                    g_steer_kd = (float)cam_cmd_snum(p3) / 10.0f;
+                    sprintf(b, "ACK sp: kp=%d.%d ki=%d.%d kd=%d.%d\r\n",
+                            (int)g_steer_kp, (int)(g_steer_kp * 10) % 10,
+                            (int)g_steer_ki, (int)(g_steer_ki * 10) % 10,
+                            (int)g_steer_kd, (int)(g_steer_kd * 10) % 10);
+                    cmd_txt(b);
+                    return;
+                }
+                if ((*a == 'c') || (*a == 'C'))
+                {
+                    const char *p1 = a + 1;
+                    const char *p2 = cam_cmd_next(p1);
+
+                    g_steer_kp_cur = (float)cam_cmd_snum(p1) / 10.0f;
+                    g_steer_kd_cur = (float)cam_cmd_snum(p2) / 10.0f;
+                    sprintf(b, "ACK sc: kp=%d.%d kd=%d.%d\r\n",
+                            (int)g_steer_kp_cur, (int)(g_steer_kp_cur * 10) % 10,
+                            (int)g_steer_kd_cur, (int)(g_steer_kd_cur * 10) % 10);
+                    cmd_txt(b);
+                    return;
+                }
+
                 if (0 == *a) { break; }                 /* 单单一个 s ⇒ 回状态 */
 
                 v = cam_cmd_num(a);

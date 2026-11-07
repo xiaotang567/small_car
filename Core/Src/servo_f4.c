@@ -611,39 +611,89 @@ void ctrl_servo_tick (void)
 }
 
 //-------------------------------------------------------------------------------------------------------------------
-// ★★★ FW=2174：**摄像头巡线 → 舵机** ★★★
-//   输入（cam_f4.c 里 cam_track_eval() 算好）：
-//     cam_err_near  近处中线相对画面中心的偏差（像素，右为正）
-//     cam_err_dir   远处中线相对近处的偏移（右为正）= 赛道拐向，直道上≈0
-//     cam_curved    1 = 弯道（中线拟合残差大）；0 = 直道
-//   输出：舵机目标 = 中位 + SIGN × (KP×err_near + KD×err_dir)
-//     · 直道 KD_STR（小）：主要跟近处偏差，不乱提前打舵
-//     · 弯道 KD_CUR（大）：用"拐向"提前打舵 —— 过弯靠的就是这一项
-//   ⚠️ STEER_SIGN：手推时先看方向，反了就改成 (-1.0f) 重烧一次
+// ★★★ FW=2175：**摄像头巡线 → 舵机（PID + 直道/弯道增益调度）** ★★★
+//   误差 e = 前瞻点(row = STEER_R_AHEAD)的中线列 - 画面中心列，**右为正**
+//       中线用 cam_f4.c 拟合好的直线 c(r) = k*r + b 直接求值 ⇒ 天然"看远一点"
+//   PID：
+//       u = KP*e + KI*Σe + KD*(e - e_prev)
+//       Σe 限幅 ±STEER_I_LIMIT（抗积分饱和）；没线时积分慢慢泄掉
+//   增益调度（"动态 PID"）：
+//       直道 cv=0：KP_STR / KD_STR（稳、不提前打）
+//       弯道 cv=1：KP_CUR / KD_CUR（D 更大 ⇒ 提前打舵）
+//   输出：servo = 中位 + SIGN*u，限幅 1700..3024，每 20ms 最多变 STEER_SLEW 步
+//   ⚠️ 全部增益都能在线改（不用重烧）：
+//        `sg <±1>`        方向（反了就 -1）
+//        `sp <kp×10> <ki×10> <kd×10>`   直道增益
+//        `sc <kp×10> <kd×10>`           弯道增益
+//        `vs 0/1`          关/开视觉打舵
 //-------------------------------------------------------------------------------------------------------------------
-#define STEER_KP        4.0f     /* 近处偏差 → 舵机步数/像素 */
-#define STEER_KD_STR    5.0f     /* 直道：拐向前馈 */
-#define STEER_KD_CUR    9.0f     /* 弯道：拐向前馈（更大 = 更早打舵）*/
-#define STEER_SIGN      (+1.0f)  /* ★ 方向反了改成 (-1.0f) */
-#define STEER_SLEW      80       /* 每个控制周期(20ms)最多变多少步，防止舵机被打 */
+#define STEER_R_AHEAD    100      /* 前瞻行号（0=最远，119=最近）*/
+#define STEER_I_LIMIT    400.0f   /* 积分限幅（像素·次）：只用来抹掉很小的静态偏差 */
+#define STEER_I_LEAK     0.985f   /* 没线时积分泄放系数 */
+#define STEER_E_LIMIT    90.0f    /* 误差限幅（像素），防跑飞 */
+#define STEER_SLEW       100      /* 每 20ms 最多变多少步 */
 
 volatile uint8_t  g_steer_enable       = 1U;   /* 1 = 视觉打舵开 */
 volatile uint32_t g_steer_manual_until = 0U;   /* 手动打舵优先到这个时刻(ms) */
+volatile float    g_steer_sign         = 1.0f; /* ★ 方向：+1 / -1 */
+volatile float    g_steer_kp           = 5.0f; /* 直道 P */
+volatile float    g_steer_ki           = 0.10f;/* 直道 I */
+volatile float    g_steer_kd           = 10.0f;/* 直道 D */
+volatile float    g_steer_kp_cur       = 4.5f; /* 弯道 P */
+volatile float    g_steer_kd_cur       = 16.0f;/* 弯道 D（更大 = 更早打舵）*/
+volatile float    g_steer_err          = 0.0f; /* 诊断：当前误差 */
+volatile float    g_steer_i            = 0.0f; /* 诊断：积分项 */
+
 static   int32_t  s_steer_last         = CTRL_SERVO_POS_CENTER;
+static   float    s_e_prev             = 0.0f;
+static   uint8_t  s_e_ok               = 0U;
 
 void ctrl_steer_from_cam (void)
 {
+    float   e, de, u, kp, kd;
     int32_t target;
-    float   kd;
 
-    if (0U == g_steer_enable) { return; }                    /* 已关掉 */
-    if (HAL_GetTick() < g_steer_manual_until) { return; }     /* 手动优先 3 秒 */
-    if (0U == cam_track_ok) { return; }                      /* 这一帧没线 ⇒ 保持 */
+    if (0U == g_steer_enable) { return; }                  /* 关掉了 */
+    if (HAL_GetTick() < g_steer_manual_until) { return; }   /* 手动优先 3 秒 */
 
-    kd = (0U != cam_curved) ? STEER_KD_CUR : STEER_KD_STR;
+    if (0U == cam_track_ok)
+    {
+        g_steer_i *= STEER_I_LEAK;                 /* 没线：积分慢慢泄掉，保持位置 */
+        return;
+    }
 
-    target = (int32_t)CTRL_SERVO_POS_CENTER
-           + (int32_t)(STEER_SIGN * (STEER_KP * (float)cam_err_near + kd * (float)cam_err_dir));
+    /* ── 误差：前瞻点的中线列 - 画面中心列 ── */
+    e = (cam_line_k * (float)STEER_R_AHEAD + cam_line_b) - (float)(CAM_TXW / 2);
+    if (e >  STEER_E_LIMIT) { e =  STEER_E_LIMIT; }
+    if (e < -STEER_E_LIMIT) { e = -STEER_E_LIMIT; }
+
+    if (0U == s_e_ok) { s_e_prev = e; s_e_ok = 1U; }
+    de = e - s_e_prev;
+    s_e_prev = e;
+
+    /* ── 增益调度：直道/弯道用不同的一套 ── */
+    if (0U != cam_curved)
+    {
+        kp = g_steer_kp_cur;
+        kd = g_steer_kd_cur;
+    }
+    else
+    {
+        kp = g_steer_kp;
+        kd = g_steer_kd;
+    }
+
+    /* ★ 2175：**只在"接近中心"时积分**（|e|<20px），并且在偏离时缓慢泄放
+       —— 不然过弯时误差很大，积分会一路顶到限幅，出弯后舵机半天回不来（实测就是这个）*/
+    if ((e < 20.0f) && (e > -20.0f)) { g_steer_i += e; }
+    else                             { g_steer_i *= 0.90f; }
+    if (g_steer_i >  STEER_I_LIMIT) { g_steer_i =  STEER_I_LIMIT; }
+    if (g_steer_i < -STEER_I_LIMIT) { g_steer_i = -STEER_I_LIMIT; }
+
+    u = kp * e + g_steer_ki * g_steer_i + kd * de;
+    g_steer_err = e;
+
+    target = (int32_t)CTRL_SERVO_POS_CENTER + (int32_t)(g_steer_sign * u);
 
     if (target < (int32_t)CTRL_SERVO_POS_MIN) { target = (int32_t)CTRL_SERVO_POS_MIN; }
     if (target > (int32_t)CTRL_SERVO_POS_MAX) { target = (int32_t)CTRL_SERVO_POS_MAX; }
