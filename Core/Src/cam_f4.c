@@ -1851,39 +1851,6 @@ uint8_t cam_sccb_read_reg (uint16_t reg, uint16_t *val)
     return sccb_read_reg(reg, val);
 }
 
-/* ★★★ 2026-11-07（FW=2137）：**带重试的 SCCB 读写** ★★★
-   现场抓包（FW=2135）：BIN=0（初始化失败）、SH=778（读 0x0B 失败，变量保留了上一次
-   0x0D 的值）、EDG=0（没帧）。⇒ SCCB 事务**时好时坏**。
-   板子上没有外部上拉，只靠 STM32 内部约 40kΩ，边沿本来就勉强；
-   拆掉 51 后这两根线是直接飞到传感器，更容易受干扰。
-   ⇒ 每个寄存器操作重试最多 8 次（每次隔 1ms），把偶发失败吃掉；
-     这样"能不能出图"就不再取决于某一次的运气。*/
-uint8_t cam_sccb_read_retry (uint16_t reg, uint16_t *val)
-{
-    uint8_t t, r = 1U;
-
-    for (t = 0U; t < 8U; t++)
-    {
-        r = cam_sccb_read_reg(reg, val);
-        if (0U == r) { return 0U; }
-        HAL_Delay(1);
-    }
-    return r;
-}
-
-uint8_t cam_sccb_write_retry (uint16_t reg, uint16_t val)
-{
-    uint8_t t, r = 1U;
-
-    for (t = 0U; t < 8U; t++)
-    {
-        r = cam_sccb_write_reg(reg, val);
-        if (0U == r) { return 0U; }
-        HAL_Delay(1);
-    }
-    return r;
-}
-
 // 写一个寄存器（返回 0 = 成功）—— 序列：addr(W) + reg(1B) + data(2B)
 uint8_t cam_sccb_write_reg (uint16_t reg, uint16_t val)
 {
@@ -1969,22 +1936,6 @@ uint8_t cam_sccb_set_bin4 (void)
     uint16_t v   = 0U;
     uint8_t  err = 0U;
 
-    /* ★★★ 2026-11-07（FW=2136）：**先给传感器一次软复位** ★★★
-       现场抓包（FW=2135）：
-           BIN=0            -> cam_bin_ok=0，初始化失败
-           SH=778(=0x030A)  -> 读 0x0B 却读回 0x0D 的值，**读数据错位**
-           EDG=0            -> 一帧都没有
-       说明传感器被前面那几次寄存器实验写进了异常状态
-       （手册开头就警告：改保留寄存器会让器件进入 unknown state）。
-       手册 Table 8：**R0x0C = Reset**（写 bit0=1）⇒ 让传感器重新初始化一遍。
-       复位后等 30ms 再按正常流程配置。*/
-    (void)cam_sccb_write_retry(0x0CU, 0x0001U);        /* 软复位 */
-    HAL_Delay(30);
-
-    /* 复位后回读 R0x00（芯片版本，MT9V034 应为 0x13xx）确认 SCCB 恢复正常 */
-    if (0U == cam_sccb_read_retry(0x00U, &v)) { cam_id_rd = v; }
-    else                                    { cam_id_rd = 0xFFFFU; }
-
     // 🔥🔥🔥 2026-10-20 重大更正：**R0x0D 是 Context A 的 Read Mode，R0x0E 是 Context B 的！**
     //   （手册 P29 原文：`0x0E (14)  Read Mode Context B`）
     //   传感器默认跑在 **Context A** ⇒ **行 bin 也必须写在 R0x0D 里**！
@@ -1993,7 +1944,7 @@ uint8_t cam_sccb_set_bin4 (void)
     //      —— 这就是"DCMI 看到的行数和固件假设的 120 对不上"的深层原因之一 ✓
     //   ✅ 正确写法：**R0x0D[3:2] = 2（列 bin4）且 R0x0D[1:0] = 2（行 bin4）**，两个都在 R0x0D ✓
     //      （0b1010 = 0x0A；保留位 [9:8]=3 用读-改-写保住 ✓）
-    if (0U == cam_sccb_read_retry(0x0DU, &v))
+    if (0U == cam_sccb_read_reg(0x0DU, &v))
     {
         // ★★ 2026-10-20 实测定论：行 bin4（[1:0]=2）在这颗芯片上**无法成帧**（CAM1：PF 有时钟、RISR=0 永久为 0）✗
         //    而**只做列 bin4**（[3:2]=2，[1:0]=0 → 输出 188×480）曾经出过几千张完整帧 ✓✓
@@ -2003,7 +1954,7 @@ uint8_t cam_sccb_set_bin4 (void)
         //    出厂默认曝光 443 行 > 120 → 永远完不成帧 —— 那才是当时“行 bin4 不成帧”的真凶手 ✓）
         //    掩码 ~0x0F：[3:2]=2（列 bin4）且 [1:0]=2（行 bin4）⇒ 0x0A ✓
         v = (uint16_t)((v & (uint16_t)~0x000FU) | 0x000AU);
-        (void)cam_sccb_write_retry(0x0DU, v);
+        (void)cam_sccb_write_reg(0x0DU, v);
     }
     else { err = 1U; }
 
@@ -2015,24 +1966,12 @@ uint8_t cam_sccb_set_bin4 (void)
     //         （SR=0000 / RIS=0000）** ✗✗ —— DCMI 这边怎么重启都没用，因为根本没帧可同步 ✓
     //   ⇒ 必须把快门压到帧内（120 行以内，取 100 行 ≈ 3.7ms 曝光）✓
     //   （想更亮/更暗：后续可以做成命令，动态改 R0x0B ✓）
-    /* ★★★ 2026-11-07（FW=2133）：**亮度改由 AEC 的"目标亮度"寄存器控制，绝不碰 R0xAF** ★★★
-       手册依据（《MT9V034-数据手册》Table 8）：
-         0xA5 = **AEC/AGC Desired Bin**，默认 0x003A(58) —— 自动曝光**瞄准的画面亮度**
-         0xAB = Max Analog Gain     默认 0x0040
-         0xAC = AEC Minimum Exposure 默认 0x0001
-         0xAD = AEC Maximum Exposure 默认 0x01E0
-         0xAF = AEC/AGC Enable      默认 0x0003（上电就是开的）
-       ⇒ 为什么写 0x0B（快门）没用：AEC 开着，每帧都按"目标亮度"重算曝光把它改掉；
-       ⇒ 为什么写 0xAF=0 会**没图**：这颗模组上动它会让器件进未知状态（手册也警告过
-         乱写保留位会让器件异常），所以**永远不要碰 0xAF**；
-       ⇒ 正确做法：**保持 AEC 开着**，只改它瞄准的目标亮度 `0xA5` —— 数值越小画面越暗。
-          默认 58（≈92% 亮度，几乎全白），我们用 cam_bright(默认 40) 覆盖它。*/
-    if (0U == cam_sccb_read_retry(0x0BU, &v))
+    if (0U == cam_sccb_read_reg(0x0BU, &v))
     {
         {   /* ★ 硬上限：行 bin4 后一帧只有 120 行，快门一旦 ≥ 它，帧永远结束不了 */
             uint8_t sh = cam_shutter;
             if (sh > 110U) { sh = 110U; }
-            (void)cam_sccb_write_retry(0x0BU, sh);
+            (void)cam_sccb_write_reg(0x0BU, sh);
         }
     }
     else { err = 1U; }
@@ -2040,10 +1979,10 @@ uint8_t cam_sccb_set_bin4 (void)
     HAL_Delay(10);
 
     // ★ 回读验证（只看 R0x0D：[3:2] 必须是 2，[1:0] 必须是 2）
-    if (0U != cam_sccb_read_retry(0x0DU, &v)) { err = 1U; }
+    if (0U != cam_sccb_read_reg(0x0DU, &v)) { err = 1U; }
     cam_r0d = v;
     cam_r0e = 0U;                       // （R0x0E 是 Context B，不再使用）
-    if (0U != cam_sccb_read_retry(0x0BU, &v)) { err = 1U; }
+    if (0U != cam_sccb_read_reg(0x0BU, &v)) { err = 1U; }
     cam_r0e = v;                        // ★ 复用 R0E 字段报"快门回读值"（正常应为 100=0x64）
 
     if ((0U == err) && ((cam_r0d & 0x000CU) == 0x0008U) && ((cam_r0d & 0x0003U) == 0x0002U))
@@ -2058,8 +1997,7 @@ uint8_t cam_sccb_set_bin4 (void)
     return cam_bin_ok;
 }
 
-volatile uint16_t cam_id_rd = 0xFFFFU;   /* ★ 软复位后回读的 R0x00（应 0x13xx）*/
-volatile uint8_t cam_shutter = 100U;  // ★★ 曝光 R0x0B（行数）：范围 1..110，1 = 最暗，110 = 最亮
+volatile uint8_t cam_shutter = 100U;  // ★★ 曝光 R0x0B（行数）—— **必须 < 一帧行数（行 bin4 后 = 120）**
                                       //   ⚠️ 原来写 150：150 > 120 ⇒ 传感器**永远完不成一帧**
                                       //      ⇒ PCLK 一直在跑（PF 有值）但 VSYNC/HREF 一个边沿都没有
                                       //      ⇒ DCMI 的 SR/RIS 全 0、DMA 的 NDTR 一动不动 ✓ 实测完全吻合
@@ -2096,12 +2034,8 @@ volatile uint8_t  cam_bound[120];
 volatile uint8_t  cam_bound_r[120];
 volatile uint8_t  cam_center[120];     // 每行的亮/暗交界列（0xFF = 无）
 volatile uint8_t  cam_thresh = 0;     // 本帧实际用的二值化阈值（诊断用）
-
-/* ★★★ 2026-11-07（FW=2124）：**手动阈值**（用户要求二值化不再用自动 Otsu）★★★
-   0        = 自动（Otsu，原来的行为）
-   1..255   = 固定阈值，直接用这个值二值化
-   命令：`th <n>`（见 cmd_f4.c），上位机【阈值】按钮循环切换。*/
-volatile uint8_t  cam_thresh_manual = 0U;     /* ★ 默认 = **自动 Otsu**（不会全黑）；按【阈值±】才切手动 */
+/* ★ 2026-11-07：**手动阈值**（0 = 自动 Otsu；1..255 = 固定阈值）—— 命令 `th <n>` */
+volatile uint8_t  cam_thresh_manual = 0U;
 
 //-------------------------------------------------------------------------------------------------------------------
 // ★★★ 帧率画进图像（**单片机自己画**，电脑只负责收）★★★
@@ -2702,11 +2636,7 @@ void board_cam_analyze (void)
     float    best = -1.0f;
     uint8_t  T = 128;
 
-    /* ★★★ 2026-11-07（FW=2124）：**手动阈值优先，不再用自动 Otsu** ★★★
-       用户要求二值化改成手动阈值（现场光照固定，自动阈值反而会跟着地面反光乱跳）。
-         cam_thresh_manual == 0   ⇒ 仍走 Otsu（保留原来的自动方式，便于对比）
-         cam_thresh_manual != 0   ⇒ 直接用这个固定值，**连直方图都不算**（省 ~2ms/帧）
-       命令：`th 0` 回自动；`th 80` 固定 80。上位机【阈值】按钮循环切换。*/
+    /* ★ 2026-11-07：**手动阈值优先**（cam_thresh_manual 非 0 就直接用，连直方图都不算）*/
     if (0U != cam_thresh_manual)
     {
         T = cam_thresh_manual;
