@@ -319,8 +319,8 @@ static void servo_set_baud (uint32_t bps)
     g_servo_baud = bps;
 }
 
-/* 非阻塞取一个字节：有数据返回 0，没有返回 1 */
-static uint8_t servo_query_byte (uint8_t *d)
+/* 非阻塞取一个字节：有数据返回 0，没有返回 1（只碰硬件寄存器） */
+static uint8_t servo_hw_byte (uint8_t *d)
 {
     if (0U != (UART4->SR & USART_SR_RXNE))
     {
@@ -331,14 +331,55 @@ static uint8_t servo_query_byte (uint8_t *d)
     return 1U;
 }
 
-/* 读一个字节，**自己数圈数超时**（原工程 hx_rx_byte 的写法）*/
+/* ★★★ 2026-11-07（FW=2105）：**软件 FIFO** ★★★
+   现场：把 PC10(TX) 和 PC11(RX) 短接做回环，结果是"发 1644B / 只收 549B"。
+   原因不是引脚坏，而是 **F4 的 UART 只有 1 个字节的接收寄存器**：
+   1Mbps 下字节间隔只有 **10µs**，而同步驱动在发送时 CPU 一直盯着 TXE 位、
+   没空读 RX ⇒ 回显在发送过程中就一个个 **溢出（ORE）丢掉了**。
+   （这跟 MSPM0 原工程注释里说的"要手动打开 FIFO，否则 1 个字节缓冲接不住"是同一件事。）
+   ⇒ 这里补一个 64 字节软件 FIFO，并规定：**任何等待循环里都要顺手把硬件 RDR 搬进 FIFO**。
+      这样"等 TXE 的那 10µs"也在收字节，回环就能发多少收多少。
+   ⚠️ 真正的舵机是"收完整帧再回话"，本来不会和发送重叠 ⇒ 这条对真机没有副作用。*/
+#define SERVO_FIFO_SIZE     (64U)
+
+static uint8_t  g_srv_fifo[SERVO_FIFO_SIZE];
+static uint16_t g_srv_fifo_head = 0U;
+static uint16_t g_srv_fifo_tail = 0U;
+
+/* 把硬件 RDR 里现有的字节全部搬进 FIFO（不等待、不阻塞）*/
+static void servo_rx_pump (void)
+{
+    uint8_t  d;
+    uint16_t next;
+
+    while (0U == servo_hw_byte(&d))
+    {
+        next = (uint16_t)((g_srv_fifo_head + 1U) % SERVO_FIFO_SIZE);
+        if (next == g_srv_fifo_tail) { return; }         /* FIFO 满：丢（和硬件溢出等效）*/
+        g_srv_fifo[g_srv_fifo_head] = d;
+        g_srv_fifo_head = next;
+    }
+}
+
+/* 从 FIFO 里取一个字节：有返回 0，没有返回 1 */
+static uint8_t servo_fifo_get (uint8_t *d)
+{
+    if (g_srv_fifo_tail == g_srv_fifo_head) { return 1U; }
+    *d = g_srv_fifo[g_srv_fifo_tail];
+    g_srv_fifo_tail = (uint16_t)((g_srv_fifo_tail + 1U) % SERVO_FIFO_SIZE);
+    return 0U;
+}
+
+/* 读一个字节，**自己数圈数超时**（原工程 hx_rx_byte 的写法）
+   ★ 等待期间必须不停 servo_rx_pump()，否则 10µs 就溢出了 */
 static uint8_t servo_rx_byte (uint8_t *d)
 {
     uint32_t guard = SERVO_RX_WAIT_LOOPS;
 
     while (guard --)
     {
-        if (0U == servo_query_byte(d)) { return 0U; }
+        servo_rx_pump();                        /* ★ 每圈都把硬件 RDR 搬进 FIFO */
+        if (0U == servo_fifo_get(d)) { return 0U; }
     }
     return 1U;
 }
@@ -349,7 +390,10 @@ static void servo_rx_flush (void)
     uint8_t d;
     uint8_t n = 0U;
 
-    while ((n < 64U) && (0U == servo_query_byte(&d))) { n ++; }
+    servo_rx_pump();                            /* 先把硬件里的搬进 FIFO */
+    while ((n < 200U) && (0U == servo_fifo_get(&d))) { n ++; }
+    g_srv_fifo_head = 0U;
+    g_srv_fifo_tail = 0U;
 }
 
 /* 组一帧发出去（原工程 hx_tx_frame）*/
@@ -378,7 +422,15 @@ static void servo_tx_frame (uint8_t id, uint8_t inst, const uint8_t *params, uin
     {
         uint32_t guard = SERVO_TX_WAIT_LOOPS;
 
-        while ((0U == (UART4->SR & USART_SR_TXE)) && (0U != (-- guard))) { }
+        /* ★★★ 2026-11-07（FW=2105）：**等 TXE 的空隙里也要搬 RX** ★★★
+           1Mbps 下一个字节只有 10µs，而 F4 的接收寄存器只有 1 个字节。
+           如果发送期间只顾着盯 TXE，回显就会一个个溢出丢掉 ——
+           现场"发 1644B / 只收 549B"就是这个。这里顺手搬进软件 FIFO，
+           回环就能做到"发多少收多少"。*/
+        while ((0U == (UART4->SR & USART_SR_TXE)) && (0U != (-- guard)))
+        {
+            servo_rx_pump();
+        }
         if (0U == guard) { break; }
         UART4->DR = buf[i];
         g_srv_tx_bytes ++;
