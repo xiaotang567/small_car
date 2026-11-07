@@ -2682,9 +2682,8 @@ static uint8_t lf_row_runs (uint8_t r)
 
 static void lf_trace_track (void)
 {
-    const int32_t cx = (int32_t)CAM_TXW / 2;
-    int32_t r, dir;
-    int32_t seed_r = -1, sl = -1, sr = -1;
+    int32_t r, c;
+    int32_t l = -1, rg = -1;
 
     for (r = 0; r < (int32_t)CAM_H; r++)
     {
@@ -2694,70 +2693,55 @@ static void lf_trace_track (void)
         lf_real_r[r]   = 0U;
     }
 
-    /* ① 种子：最底行往上，第一条"穿过画面中心列 + 够宽"的白段 */
-    for (r = (int32_t)CAM_H - 2; r >= (int32_t)CAM_H / 2; r--)
+    /* ① 种子 = **最下面一行**（FW=2170）
+          · 左边界：从左边数，第一个白点
+          · 右边界：从右边数，第一个白点
+       （不再要求"穿过画面中心""宽度≥10"——就是最底行白区间的最左白和最右白）*/
+    r = (int32_t)CAM_H - 1;
+
+    for (c = 0; c < (int32_t)CAM_TXW; c++)
     {
-        uint8_t n = lf_row_runs((uint8_t)r);
-        uint8_t j;
+        if (disp_img[r][c] == 255U) { l = c; break; }
+    }
+    for (c = (int32_t)CAM_TXW - 1; c >= 0; c--)
+    {
+        if (disp_img[r][c] == 255U) { rg = c; break; }
+    }
+    if ((l < 0) || (rg < 0) || (rg <= l)) { return; }   /* 最底行没有白 ⇒ 这一帧没有线 */
+
+    cam_bound[r]   = (uint8_t)l;
+    cam_bound_r[r] = (uint8_t)rg;
+    lf_real_l[r]   = 1U;
+    lf_real_r[r]   = 1U;
+
+    /* ② **只往上走，不往下走**（FW=2170）
+       每一行只认同"和上一行区间有重叠"的白段（8 邻域意义上相连）；
+       找不到 ⇒ 立刻结束，剩下的行留空（不猜、不外推）*/
+    for (r = (int32_t)CAM_H - 2; r >= 0; r--)
+    {
+        uint8_t n     = lf_row_runs((uint8_t)r);
+        uint8_t j, bestj = 0xFFU;
+        int32_t bestov = 0;
 
         for (j = 0U; j < n; j++)
         {
-            if ((cx >= (int32_t)lf_rs[j]) && (cx <= (int32_t)lf_re[j]) &&
-                (((int32_t)lf_re[j] - (int32_t)lf_rs[j]) >= LF_MIN_RUN))
-            {
-                seed_r = r;
-                sl = (int32_t)lf_rs[j];
-                sr = (int32_t)lf_re[j];
-                cam_bound[seed_r]   = (uint8_t)sl;
-                cam_bound_r[seed_r] = (uint8_t)sr;
-                lf_real_l[seed_r]   = 1U;
-                lf_real_r[seed_r]   = 1U;
-                break;
-            }
+            int32_t a  = (int32_t)lf_rs[j];
+            int32_t b  = (int32_t)lf_re[j];
+            int32_t ov;
+
+            ov = ((b < rg) ? b : rg) - ((a > l) ? a : l) + 1;   /* 与上一行区间重叠长度 */
+            if (ov <= 0) { continue; }                          /* 中间隔着黑 ⇒ 不相连 */
+            if (ov > bestov) { bestov = ov; bestj = j; }
         }
-        if (seed_r >= 0) { break; }
-    }
-    if (seed_r < 0) { return; }
 
-    /* ②③ 从种子往上、往下各走一遍：**只认同 8 邻域连通的下一行**
-       ★ FW=2169：**找不到就立刻结束，绝不估算**。
-         之前这里会"用上一行的位置硬填最多 4 行"，结果就是隔着一条黑缝也画出了线
-         （你在上位机上看到的那些孤立红点）。现在的规则和 8 邻域一致：
-           下一行的白段必须和本行区间**有重叠**（= 8 邻域意义上相连）才继续，
-           否则这一侧到此为止，剩下的行一律 0xFF（上位机不画）✓ */
-    for (dir = -1; dir <= 1; dir += 2)
-    {
-        int32_t rr = seed_r + dir;
-        int32_t l  = sl;
-        int32_t rg = sr;
+        if (0xFFU == bestj) { break; }            /* ★ 收不到就结束 */
 
-        while ((rr >= 0) && (rr < (int32_t)CAM_H))
-        {
-            uint8_t n     = lf_row_runs((uint8_t)rr);
-            uint8_t j, bestj = 0xFFU;
-            int32_t bestov = 0;
-
-            for (j = 0U; j < n; j++)
-            {
-                int32_t a  = (int32_t)lf_rs[j];
-                int32_t b  = (int32_t)lf_re[j];
-                int32_t ov;
-
-                ov = ((b < rg) ? b : rg) - ((a > l) ? a : l) + 1;   /* 与上一行区间重叠长度 */
-                if (ov <= 0) { continue; }                          /* 中间隔着黑 ⇒ 不相连 */
-                if (ov > bestov) { bestov = ov; bestj = j; }
-            }
-
-            if (0xFFU == bestj) { break; }        /* ★ 收不到就结束，不猜 */
-
-            l  = (int32_t)lf_rs[bestj];
-            rg = (int32_t)lf_re[bestj];
-            cam_bound[rr]   = (uint8_t)l;
-            cam_bound_r[rr] = (uint8_t)rg;
-            lf_real_l[rr]   = 1U;
-            lf_real_r[rr]   = 1U;
-            rr += dir;
-        }
+        l  = (int32_t)lf_rs[bestj];
+        rg = (int32_t)lf_re[bestj];
+        cam_bound[r]   = (uint8_t)l;
+        cam_bound_r[r] = (uint8_t)rg;
+        lf_real_l[r]   = 1U;
+        lf_real_r[r]   = 1U;
     }
 
     /* 老算法留着备查，这里显式引用一下（免得"定义了没引用"的编译告警）*/
