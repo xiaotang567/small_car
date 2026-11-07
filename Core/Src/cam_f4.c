@@ -2002,10 +2002,18 @@ uint8_t cam_sccb_set_bin4 (void)
        ⇒ 把 Table 8 里**所有有默认值的主寄存器**逐个写回出厂值，
          再重新配 bin4 + 快门，尽量把芯片从任何未知状态拉回。*/
     {
+        /* ★★★ 2026-11-07（FW=2158）：**修正 0x20 / 0x24 的默认值** ★★★
+           2144 那版我在这张表里**凭空写了 0x20=0x0007、0x24=0x0002**，
+           而手册 Table 8 的默认值是 **0x20=0x01C1、0x24=0x0010**。
+           这两个是 Reserved 寄存器，手册开头就警告：
+             "Writing and changing the value of a reserved register (word or bit)
+              puts the device in an unknown state and may damage the device."
+           ⇒ 这就是"写坏了寄存器、图像再也没回来"的确切来源。
+           现在全部按手册 Table 8 的真实默认值写回。*/
         static const uint8_t  regs[14] = {0x01,0x02,0x03,0x04,0x05,0x06,0x07,
                                           0x08,0x09,0x0A,0x0B,0x0F,0x20,0x24};
         static const uint16_t vals[14] = {0x0001,0x0004,0x01E0,0x02F0,0x005E,0x002D,0x0388,
-                                          0x01BB,0x01D9,0x0164,0x01E0,0x0100,0x0007,0x0002};
+                                          0x01BB,0x01D9,0x0164,0x01E0,0x0100,0x01C1,0x0010};
         uint8_t k;
 
         for (k = 0U; k < 14U; k++)
