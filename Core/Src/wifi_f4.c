@@ -636,6 +636,16 @@ uint8_t wifi_f4_is_ready (void)
     return wf_ready;
 }
 
+/* ★★★ 2026-11-07（FW=2099）：**外部判定"链路已死"时，强制走重连** ★★★
+   为什么需要它：模块被复位 / 掉线 / 揣着半死 socket 时，**SPI 写照样成功**
+   （模块照收，只是发不出去）⇒ `wifi_f4_send()` 不报错 ⇒ `wf_ready` 一直是 1
+   ⇒ 板子永远以为"还连着"，一直往黑洞里发 ⇒ 上位机永远"已连接 + 0 B/s"，只能断电。
+   ⇒ 由 app.c 用"上位机保活"当见证人：收不到保活就调这个函数，把链路判死重连。*/
+void wifi_f4_force_relink (void)
+{
+    wf_ready = 0U;
+}
+
 uint8_t wifi_f4_last_err (void)
 {
     return wf_last_err;

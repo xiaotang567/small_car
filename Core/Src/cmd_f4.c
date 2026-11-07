@@ -149,7 +149,7 @@ static void cam_cmd_status (void)
        DRP = 发送看门狗**主动放弃**的帧数（一直飙 ⇒ 链路/模块发不动）✓
        DST = DMA 停摆看门狗重启采集的次数（>0 ⇒ 采集链卡过，但已经自己救回来了）✓
        SELF= 连续 2 秒没有完整帧 ⇒ 重启采集的次数（和 DST 一起看）✓ */
-    sprintf(b, "CFG f=%u g=%u x=%u y=%u (%ux%u) d=%u CST=%u RV=%06lX LINE=%u FW=2098 EDG=%lu EL=%u ER=%u DRP=%lu DST=%lu SELF=%lu\r\n",
+    sprintf(b, "CFG f=%u g=%u x=%u y=%u (%ux%u) d=%u CST=%u RV=%06lX LINE=%u FW=2099 EDG=%lu EL=%u ER=%u DRP=%lu DST=%lu SELF=%lu\r\n",
             (unsigned)cam_cmd_fps, (unsigned)cam_cmd_gap_ms,
             (unsigned)cam_cmd_dx, (unsigned)cam_cmd_dy,
             (unsigned)(CAM_TXW / cam_cmd_dx), (unsigned)(CAM_H / cam_cmd_dy),
@@ -168,6 +168,12 @@ static void cam_cmd_status (void)
 //   上位机看包头 pkt[6] 的最高位（1 = 打包）自动解包；按 `z` 可切回未打包（排障用）✓
 uint8_t cam_pack = 1U;
 
+/* ★★ 2026-11-07（FW=2099）：**上位机保活计数** ★★
+   上位机每 2 秒发一行 `!`。它只用来证明"下行还通"，不回任何包。
+   app.c 用它当见证人：见过 `!` 之后，6 秒收不到就判定链路死（模块被复位/掉线），
+   强制重连（连续失败会整模块硬复位）—— 修"已连接但 0 B/s、只能断电"。*/
+uint8_t cam_ka_seen = 0U;
+
 static void cam_cmd_line (char *s)
 {
     char     b[96];
@@ -181,6 +187,12 @@ static void cam_cmd_line (char *s)
 
     switch (c)
     {
+        /* ★ 保活：上位机每 2 秒发一行 `!`。**只记一笔，绝不回包**（回包会把控制台刷满）。
+           它同时说明"PC → 模块 → 板子"这条路还通着。*/
+        case '!':
+            cam_ka_seen = 1U;
+            return;
+
         case 'f':
             cam_cmd_fps = (uint16_t)cam_cmd_num(s + 1);
             if (cam_cmd_fps > 30U) { cam_cmd_fps = 30U; }

@@ -131,6 +131,12 @@ class App(object):
         self.txt_ok = 0             # 板子报的文本发送成功次数（包头第10字节）
         self.txt_fail = 0           # 板子报的文本抢不到窗口的次数（包头第11字节）
         self.warn_zero = False      # 只提示一次"运行但输出 0"
+        # ★ 2026-11-07：S 心跳里带着板子的"复位来源 / 上次 HardFault 现场"，
+        #   以前完全没解析（等于把最重要的证据丢了）。现在变化时打到日志里。
+        self.fw_seen = None
+        self.fault_seen = None
+        self.t_keep = 0.0           # 上次发保活的时刻
+        self.t_rx = time.time()     # 上次收到任何字节的时刻
 
         # ---- 窗口 ----
         self.root = tk.Tk()
@@ -825,9 +831,44 @@ class App(object):
 
             if ln.startswith('T '):
                 self.on_tele(ln[2:])
+            elif ln.startswith('S '):
+                self.on_stat(ln[2:])
             elif ln.startswith('ACK') or ln.startswith('CFG') or ln.startswith('CAM'):
                 self.log(ln)
                 self._ack_seen(ln)          # ★ 收到回执 ⇒ 这条命令不用再重发
+
+    # ---- S 心跳：只关心"固件版本 / 复位来源 / 上次 HardFault 现场"，变化时打一行 ----
+    def on_stat(self, s):
+        d = {}
+        for tok in s.split():
+            if '=' in tok:
+                k, v = tok.split('=', 1)
+                d[k] = v
+        fw = d.get('FW')
+        if fw and fw != self.fw_seen:
+            self.fw_seen = fw
+            self.log('板子固件 FW=%s（心跳在线）' % fw)
+
+        rst = d.get('RST', '??')
+        pc  = d.get('PC', '00000000')
+        cf  = d.get('CF', '0000')
+        ba  = d.get('BA', '00000000')
+        if pc not in ('00000000', '') or cf not in ('0000', ''):
+            key = (rst, pc, cf)
+            if key != self.fault_seen:
+                self.fault_seen = key
+                # RST 位：bit0=欠压 BOR / bit1=引脚复位 / bit2=上电 / bit3=软件 / bit4=IWDG
+                try:
+                    r = int(rst, 16)
+                except Exception:
+                    r = -1
+                why = []
+                for bit, name in ((0, '欠压BOR'), (1, '引脚复位'), (2, '上电'), (3, '软件复位'),
+                                  (4, '看门狗'), (5, '窗口看门狗'), (6, '低功耗')):
+                    if r >= 0 and (r >> bit) & 1:
+                        why.append(name)
+                self.log('⚠ 板子上次运行异常：RST=%s(%s) PC=%s CF=%s BA=%s'
+                         % (rst, '/'.join(why) or '?', pc, cf, ba))
 
     def on_tele(self, s):
         d = {}
@@ -1006,13 +1047,28 @@ def run():
             conn.sendall(b's\n')          # 问一下状态（顺便确认下行通）
         except Exception:
             pass
+        app.t_keep = 0.0
+        app.t_rx = time.time()
 
         while True:
+            # ★ 2026-11-07：**每 2 秒发一个保活 `!`**（板子只计数、不回包）。
+            #   板子靠它判断"上行还通不通"：模块被复位/掉线后 SPI 写照样成功，
+            #   板子自己发现不了链路已死 ⇒ 会一直"已连接 + 0 B/s"。
+            #   有了保活，板子 6 秒收不到就会自己重连/整模块复位。
+            now = time.time()
+            if (now - app.t_keep) >= 2.0:
+                app.t_keep = now
+                try:
+                    conn.sendall(b'!\n')
+                except Exception:
+                    pass
+
             try:
                 d = conn.recv(8192)
                 if not d:
                     print('[对方断开]')
                     break
+                app.t_rx = time.time()
                 app.feed(d)
             except socket.timeout:
                 pass

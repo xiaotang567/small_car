@@ -32,6 +32,10 @@ extern uint8_t           cam_if_tries;
 extern volatile uint32_t cam_rx_bytes;
 extern volatile uint8_t  cam_rx_dump[32];
 extern volatile uint32_t cam_rx_dump_i;
+/* ★ 2026-11-07（FW=2099）：**上位机保活**。上位机每 2 秒发一行 `!`（只更新接收计数、不回包）。
+   板子见过 `!` 之后才开始"6 秒收不到保活 ⇒ 判链路死 ⇒ 重连/整模块复位"的看门狗。
+   ⚠️ 不设这个门槛：老版本上位机根本不发保活，一开机就会被判死、反复复位模块。*/
+extern uint8_t           cam_ka_seen;
 
 /* ★ 边界数组包（0xFD）的发送统计：上位机 `s` 里回 EL/ER/EDG，
    用来确认"新固件在发边界数组"+"这一帧左右各爬到多少行"（不用看图也能判断） */

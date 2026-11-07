@@ -91,6 +91,10 @@ uint8_t  wifi_f4_init(void);
 uint8_t  wifi_f4_retry(void);
 // 模块是否就绪（可以发数据了）
 uint8_t  wifi_f4_is_ready(void);
+/* ★ 外部判死链路（app.c 用"上位机保活"当见证人）：清 wf_ready ⇒ 主循环会走 wifi_f4_retry()
+   /（连续失败后）wifi_f4_init() 整模块复位。修的是"模块被复位/掉线后 SPI 写照样成功、
+   板子永远以为还连着"这个死局。*/
+void     wifi_f4_force_relink(void);
 // 上一次 init/retry 的结果：0=成功 1=模块没应答 2=连不上热点 3=连不上电脑
 uint8_t  wifi_f4_last_err(void);
 // 发送（自动按 4088 字节分片）。返回 0 = 全部发出去
