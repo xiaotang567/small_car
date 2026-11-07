@@ -1104,6 +1104,14 @@ class App(object):
                 self.v_rb.set('有岛 %dx%d@%d (未启用)' % (iw, ih, ir))
             else:
                 self.v_rb.set('无 常宽%d' % wn)
+            # ★ 按钮状态**跟着板子的真实状态走**（不再猜默认值）⇒ 点一下就是取反
+            on = bool(int(d['rb']))
+            if on != self.rb_on:
+                self.rb_on = on
+                try:
+                    self.btn_rb.configure(bg=C_ON if on else C_BTN)
+                except Exception:
+                    pass
         if 'm' in d:
             self.mode_gray = (int(d['m']) == 0)
             self.refresh_buttons()

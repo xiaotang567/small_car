@@ -2864,19 +2864,23 @@ volatile float   cam_w_est    = 120.0f;  /* ★ 2183 赛道宽度估计（像素
 #define RB_SIDE_MIN       8      /* 洞两侧的白各至少 8px */
 #define RB_EXT_MIN        6      /* ★ 块的垂直高度 ≥6 行才算岛（单行黑缝不算） */
 #define RB_WID_MIN       20      /* ★ 块的最大宽度 ≥20px 才算岛 */
-#define RB_ROW_LO        26      /* 找岛的行范围。★ 不能更小：最上面 2~20 行里有板子自己画的 FPS/R2 文字，
+#define RB_CX_LO         35      /* ★ 最宽那一行的洞心要在画面中段（太靠边 = 赛道外的黑） */
+#define RB_CX_HI        155
+#define RB_ROW_LO        24      /* 找岛的行范围。★ 不能更小：最上面 2~20 行里有板子自己画的 FPS/R2 文字，
                                     文字左边的空白会被当成"洞"（实测第 20 行有个 72px 的假洞）*/
-#define RB_ROW_HI       102
-#define RB_OPEN_ROWS     10      /* 开阔区：74~114 这 41 行里至少 10 行"白铺到画面边" */
-#define RB_CONFIRM        3      /* 连续 3 帧有岛 ⇒ 进环岛 */
-#define RB_RELEASE        8      /* 连续 8 帧既没岛也不开阔 ⇒ 出环岛 */
-#define RB_HOLD_MS     2500U     /* 进过环岛以后，最少保持 2.5 秒（路过岛的时候岛会短暂消失）*/
-#define RB_KEEP          20      /* 岛边缘离车中线至少留 20px */
+#define RB_ROW_HI       100      /* ★ 洞一直连到这一行还没结束 ⇒ 它连到画面下面去了，不是岛 */
+#define RB_BELOW_OFF      5      /* 判"岛下面还是白"往下数第几行开始看 */
+#define RB_BELOW_ROWS     3
+#define RB_BELOW_WHITE  0.40f
+#define RB_CONFIRM        3      /* 连续 3 帧有岛 ⇒ 进环岛（"有开头就可以了"）*/
+#define RB_RELEASE        8      /* 连续 8 帧没岛 ⇒ 出环岛 */
+#define RB_HOLD_MS     2000U     /* 看到岛以后至少保持 2 秒直走（环岛中间本来就是直线）*/
+#define RB_KEEP          20      /* 岛边离车中线至少留 20px */
 #define RB_MAX_HOLE       8      /* 一行最多同时跟 8 个洞（走连通块用）*/
 
 volatile uint8_t cam_island    = 0U;
 volatile uint8_t cam_wide      = 0U;
-volatile uint8_t cam_rb_enable = 0U;      /* ★ 默认**关**：先保证正常赛道能跑；命令 `rb 1` 打开 */
+volatile uint8_t cam_rb_enable = 1U;      /* 默认开；命令 `rb 0` 可随时关掉（界面上有按钮）*/
 volatile int32_t cam_hole_w    = 0;
 volatile int32_t cam_hole_row  = 0;
 volatile int32_t cam_hole_h    = 0;       /* ★ 岛这块在垂直方向有多少行 */
@@ -2892,30 +2896,15 @@ static   uint32_t rb_t_last = 0U;    /* 上一次"看到岛"的时刻 */
 static uint8_t rb_cm_r0[RB_MAX_HOLE];
 static uint8_t rb_cm_r1[RB_MAX_HOLE];
 static uint8_t rb_cm_w [RB_MAX_HOLE];
+static uint8_t rb_cm_wl[RB_MAX_HOLE];     /* 最宽那一行：洞的左右边界（判 cx / 躲岛用）*/
+static uint8_t rb_cm_wr[RB_MAX_HOLE];
 static uint8_t rb_cm_n = 0U;
 /* 上一行的洞（用于连通） */
 static uint8_t rb_pa[RB_MAX_HOLE], rb_pb[RB_MAX_HOLE], rb_pc[RB_MAX_HOLE], rb_pn = 0U;
 
-static uint8_t rb_open_rows (void)
-{
-    int32_t r;
-    uint8_t cnt = 0U;
-
-    for (r = 74; r <= 114; r++)
-    {
-        int32_t l  = (cam_bound[r]   != 0xFFU) ? (int32_t)cam_bound[r]   : -1;
-        int32_t rr = (cam_bound_r[r] != 0xFFU) ? (int32_t)cam_bound_r[r] : -1;
-
-        if ((l < 0) || (rr < 0) || (rr <= l)) { continue; }
-        /* 只有"白铺到画面两边"才算开阔区 —— 宽度不可靠：这个场地的赛道本身就有 155px 宽 */
-        if ((l <= 2) && (rr >= (int32_t)CAM_TXW - 2)) { cnt ++; }
-    }
-    return cnt;
-}
-
 static void rb_detect (void)
 {
-    int32_t r, best_h = 0, best_w = 0, b_row = 0;
+    int32_t r, best_h = 0, best_w = 0, b_row = 0, best_l = 0, best_r = 0;
     uint8_t n, j;
 
     rb_cm_n = 0U;
@@ -2952,12 +2941,18 @@ static void rb_detect (void)
                 if (used[k]) { continue; }
                 if (ov > ov_best) { ov_best = ov; bi = k; }
             }
+            /* 和上一行的洞比：重叠 ≥上一行那个洞的 50% ⇒ 同一块（"垂直连通"）*/
             if ((bi >= 0) && ((ov_best * 2) >= (int32_t)(rb_pb[bi] - rb_pa[bi] + 1)))
             {
                 used[bi] = 1U;
                 ci = rb_pc[bi];
                 rb_cm_r1[ci] = (uint8_t)r;
-                if (gw > (int32_t)rb_cm_w[ci]) { rb_cm_w[ci] = (uint8_t)gw; }
+                if (gw > (int32_t)rb_cm_w[ci])
+                {
+                    rb_cm_w[ci]  = (uint8_t)gw;
+                    rb_cm_wl[ci] = (uint8_t)a;
+                    rb_cm_wr[ci] = (uint8_t)b;
+                }
             }
             else if (rb_cm_n < RB_MAX_HOLE)
             {
@@ -2966,6 +2961,8 @@ static void rb_detect (void)
                 rb_cm_r0[ci] = (uint8_t)r;
                 rb_cm_r1[ci] = (uint8_t)r;
                 rb_cm_w [ci] = (uint8_t)gw;
+                rb_cm_wl[ci] = (uint8_t)a;
+                rb_cm_wr[ci] = (uint8_t)b;
             }
             else
             {
@@ -2979,52 +2976,54 @@ static void rb_detect (void)
         rb_pn = cn;
     }
 
-    /* 挑"最高的那一块"，高度 ≥RB_EXT_MIN 且宽度 ≥RB_WID_MIN 才算岛 */
+    /* ── ② 挑出"像岛"的那一块 ──
+       判据（都是在实拍帧上量出来的，见 tools/rb_shape.py）：
+         · 高 ≥6 行、最宽 ≥20px（单行一条黑缝不算）
+         · 最宽那一行的洞心在画面中段 35..155（太靠边 = 赛道外的黑）
+         · 这块**没有一直连到画面下面**（连到下面的是"赛道边的黑"，不是岛）
+         · 块下面 5~7 行还是白的（岛是"长在白地当中的"）*/
     {
         uint8_t ci;
 
         for (ci = 0U; ci < rb_cm_n; ci++)
         {
-            int32_t h = (int32_t)rb_cm_r1[ci] - (int32_t)rb_cm_r0[ci] + 1;
+            int32_t h  = (int32_t)rb_cm_r1[ci] - (int32_t)rb_cm_r0[ci] + 1;
+            int32_t cx = ((int32_t)rb_cm_wl[ci] + (int32_t)rb_cm_wr[ci]) / 2;
+            int32_t rr, cnt_w = 0, cnt_n = 0;
 
-            if ((h >= RB_EXT_MIN) && ((int32_t)rb_cm_w[ci] >= RB_WID_MIN) && (h > best_h))
+            if (h < RB_EXT_MIN)                     { continue; }
+            if ((int32_t)rb_cm_w[ci] < RB_WID_MIN)  { continue; }
+            if ((cx < RB_CX_LO) || (cx > RB_CX_HI)) { continue; }
+            if ((int32_t)rb_cm_r1[ci] >= RB_ROW_HI) { continue; }   /* 连到画面下面 ⇒ 不是岛 */
+
+            for (rr = (int32_t)rb_cm_r1[ci] + RB_BELOW_OFF;
+                 (rr < (int32_t)rb_cm_r1[ci] + RB_BELOW_OFF + RB_BELOW_ROWS) && (rr < (int32_t)CAM_H); rr++)
+            {
+                int32_t c2;
+                for (c2 = (int32_t)rb_cm_wl[ci]; c2 <= (int32_t)rb_cm_wr[ci]; c2++)
+                {
+                    cnt_n ++;
+                    if (disp_img[rr][c2] == 255U) { cnt_w ++; }
+                }
+            }
+            if ((cnt_n <= 0) || ((float)cnt_w < RB_BELOW_WHITE * (float)cnt_n)) { continue; }
+
+            if (h > best_h)
             {
                 best_h = h;
                 best_w = (int32_t)rb_cm_w[ci];
-                b_row  = (int32_t)rb_cm_r1[ci];      /* 记最下面一行（离车最近） */
+                b_row  = (int32_t)rb_cm_r1[ci];
+                best_l = (int32_t)rb_cm_wl[ci];
+                best_r = (int32_t)rb_cm_wr[ci];
             }
         }
     }
-    cam_island = (best_h >= RB_EXT_MIN) ? 1U : 0U;
-    cam_hole_h = best_h;
-    cam_hole_w = best_w;
+    cam_island   = (best_h >= RB_EXT_MIN) ? 1U : 0U;
+    cam_hole_h   = best_h;
+    cam_hole_w   = best_w;
     cam_hole_row = b_row;
-    cam_hole_l = 0;
-    cam_hole_r = 0;
-    if ((0U != cam_island) && (b_row > 0))
-    {
-        /* 用最下面那一行重新取洞的左右边界（给"躲岛"用） */
-        uint8_t ca2[RB_MAX_HOLE], cb2[RB_MAX_HOLE], cn2 = 0U;
-
-        n = lf_row_runs((uint8_t)b_row);
-        for (j = 0U; (uint8_t)(j + 1U) < n; j++)
-        {
-            int32_t wl = (int32_t)lf_re[j]      - (int32_t)lf_rs[j]      + 1;
-            int32_t wr = (int32_t)lf_re[j + 1U] - (int32_t)lf_rs[j + 1U] + 1;
-            int32_t a  = (int32_t)lf_re[j] + 1;
-            int32_t b  = (int32_t)lf_rs[j + 1U] - 1;
-
-            if ((wl < RB_SIDE_MIN) || (wr < RB_SIDE_MIN)) { continue; }
-            if ((a < 3) || (b > (int32_t)CAM_TXW - 3))    { continue; }
-            if ((b - a + 1) < RB_HOLE_MIN) { continue; }
-            if (cn2 < RB_MAX_HOLE) { ca2[cn2] = (uint8_t)a; cb2[cn2] = (uint8_t)b; cn2 ++; }
-        }
-        if (cn2 > 0U)
-        {
-            cam_hole_l = (int32_t)ca2[cn2 - 1U];
-            cam_hole_r = (int32_t)cb2[cn2 - 1U];
-        }
-    }
+    cam_hole_l   = best_l;      /* 岛（最宽那行）的左右边界，躲岛用 */
+    cam_hole_r   = best_r;
 
     /* ── ② 进入/退出（滞回）── */
     if (0U != cam_island)
@@ -3046,10 +3045,11 @@ static void rb_detect (void)
     }
     else if (0U != cam_wide)
     {
-        int32_t still_open = ((rb_open_rows() >= RB_OPEN_ROWS) || (0U != cam_island)) ? 1 : 0;
-        int32_t hold_ok    = ((HAL_GetTick() - rb_t_last) < RB_HOLD_MS) ? 1 : 0;
+        /* ★ 用户口径："环岛中间就是直线，所以有开头就可以了"
+           ⇒ 退出条件就一条：**连续 8 帧看不到岛、并且离上次看到岛已过 2 秒** */
+        int32_t hold_ok = ((HAL_GetTick() - rb_t_last) < RB_HOLD_MS) ? 1 : 0;
 
-        if ((0 == still_open) && (0 == hold_ok) && (rb_miss >= RB_RELEASE))
+        if ((0 == hold_ok) && (rb_miss >= RB_RELEASE))
         {
             cam_wide = 0U;
             rb_hit   = 0U;
