@@ -1851,6 +1851,39 @@ uint8_t cam_sccb_read_reg (uint16_t reg, uint16_t *val)
     return sccb_read_reg(reg, val);
 }
 
+/* ★★★ 2026-11-07（FW=2137）：**带重试的 SCCB 读写** ★★★
+   现场抓包（FW=2135）：BIN=0（初始化失败）、SH=778（读 0x0B 失败，变量保留了上一次
+   0x0D 的值）、EDG=0（没帧）。⇒ SCCB 事务**时好时坏**。
+   板子上没有外部上拉，只靠 STM32 内部约 40kΩ，边沿本来就勉强；
+   拆掉 51 后这两根线是直接飞到传感器，更容易受干扰。
+   ⇒ 每个寄存器操作重试最多 8 次（每次隔 1ms），把偶发失败吃掉；
+     这样"能不能出图"就不再取决于某一次的运气。*/
+uint8_t cam_sccb_read_retry (uint16_t reg, uint16_t *val)
+{
+    uint8_t t, r = 1U;
+
+    for (t = 0U; t < 8U; t++)
+    {
+        r = cam_sccb_read_reg(reg, val);
+        if (0U == r) { return 0U; }
+        HAL_Delay(1);
+    }
+    return r;
+}
+
+uint8_t cam_sccb_write_retry (uint16_t reg, uint16_t val)
+{
+    uint8_t t, r = 1U;
+
+    for (t = 0U; t < 8U; t++)
+    {
+        r = cam_sccb_write_reg(reg, val);
+        if (0U == r) { return 0U; }
+        HAL_Delay(1);
+    }
+    return r;
+}
+
 // 写一个寄存器（返回 0 = 成功）—— 序列：addr(W) + reg(1B) + data(2B)
 uint8_t cam_sccb_write_reg (uint16_t reg, uint16_t val)
 {
@@ -1945,11 +1978,11 @@ uint8_t cam_sccb_set_bin4 (void)
        （手册开头就警告：改保留寄存器会让器件进入 unknown state）。
        手册 Table 8：**R0x0C = Reset**（写 bit0=1）⇒ 让传感器重新初始化一遍。
        复位后等 30ms 再按正常流程配置。*/
-    (void)cam_sccb_write_reg(0x0CU, 0x0001U);        /* 软复位 */
+    (void)cam_sccb_write_retry(0x0CU, 0x0001U);        /* 软复位 */
     HAL_Delay(30);
 
     /* 复位后回读 R0x00（芯片版本，MT9V034 应为 0x13xx）确认 SCCB 恢复正常 */
-    if (0U == cam_sccb_read_reg(0x00U, &v)) { cam_id_rd = v; }
+    if (0U == cam_sccb_read_retry(0x00U, &v)) { cam_id_rd = v; }
     else                                    { cam_id_rd = 0xFFFFU; }
 
     // 🔥🔥🔥 2026-10-20 重大更正：**R0x0D 是 Context A 的 Read Mode，R0x0E 是 Context B 的！**
@@ -1960,7 +1993,7 @@ uint8_t cam_sccb_set_bin4 (void)
     //      —— 这就是"DCMI 看到的行数和固件假设的 120 对不上"的深层原因之一 ✓
     //   ✅ 正确写法：**R0x0D[3:2] = 2（列 bin4）且 R0x0D[1:0] = 2（行 bin4）**，两个都在 R0x0D ✓
     //      （0b1010 = 0x0A；保留位 [9:8]=3 用读-改-写保住 ✓）
-    if (0U == cam_sccb_read_reg(0x0DU, &v))
+    if (0U == cam_sccb_read_retry(0x0DU, &v))
     {
         // ★★ 2026-10-20 实测定论：行 bin4（[1:0]=2）在这颗芯片上**无法成帧**（CAM1：PF 有时钟、RISR=0 永久为 0）✗
         //    而**只做列 bin4**（[3:2]=2，[1:0]=0 → 输出 188×480）曾经出过几千张完整帧 ✓✓
@@ -1970,7 +2003,7 @@ uint8_t cam_sccb_set_bin4 (void)
         //    出厂默认曝光 443 行 > 120 → 永远完不成帧 —— 那才是当时“行 bin4 不成帧”的真凶手 ✓）
         //    掩码 ~0x0F：[3:2]=2（列 bin4）且 [1:0]=2（行 bin4）⇒ 0x0A ✓
         v = (uint16_t)((v & (uint16_t)~0x000FU) | 0x000AU);
-        (void)cam_sccb_write_reg(0x0DU, v);
+        (void)cam_sccb_write_retry(0x0DU, v);
     }
     else { err = 1U; }
 
@@ -1994,12 +2027,12 @@ uint8_t cam_sccb_set_bin4 (void)
          乱写保留位会让器件异常），所以**永远不要碰 0xAF**；
        ⇒ 正确做法：**保持 AEC 开着**，只改它瞄准的目标亮度 `0xA5` —— 数值越小画面越暗。
           默认 58（≈92% 亮度，几乎全白），我们用 cam_bright(默认 40) 覆盖它。*/
-    if (0U == cam_sccb_read_reg(0x0BU, &v))
+    if (0U == cam_sccb_read_retry(0x0BU, &v))
     {
         {   /* ★ 硬上限：行 bin4 后一帧只有 120 行，快门一旦 ≥ 它，帧永远结束不了 */
             uint8_t sh = cam_shutter;
             if (sh > 110U) { sh = 110U; }
-            (void)cam_sccb_write_reg(0x0BU, sh);
+            (void)cam_sccb_write_retry(0x0BU, sh);
         }
     }
     else { err = 1U; }
@@ -2007,10 +2040,10 @@ uint8_t cam_sccb_set_bin4 (void)
     HAL_Delay(10);
 
     // ★ 回读验证（只看 R0x0D：[3:2] 必须是 2，[1:0] 必须是 2）
-    if (0U != cam_sccb_read_reg(0x0DU, &v)) { err = 1U; }
+    if (0U != cam_sccb_read_retry(0x0DU, &v)) { err = 1U; }
     cam_r0d = v;
     cam_r0e = 0U;                       // （R0x0E 是 Context B，不再使用）
-    if (0U != cam_sccb_read_reg(0x0BU, &v)) { err = 1U; }
+    if (0U != cam_sccb_read_retry(0x0BU, &v)) { err = 1U; }
     cam_r0e = v;                        // ★ 复用 R0E 字段报"快门回读值"（正常应为 100=0x64）
 
     if ((0U == err) && ((cam_r0d & 0x000CU) == 0x0008U) && ((cam_r0d & 0x0003U) == 0x0002U))
