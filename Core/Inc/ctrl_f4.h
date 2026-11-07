@@ -79,7 +79,7 @@
    1 = 默认单线：数据只走 **PC10** 一根线（UART4 HDSEL + PC10 开漏+上拉）
    0 = 默认全双工：PC10=TX / PC11=RX
    运行时仍可用 `r -1`（单线）/ `r -2`（全双工）切换，不用重烧。*/
-#define CTRL_SERVO_HALF_DUPLEX_DEFAULT  0
+#define CTRL_SERVO_HALF_DUPLEX_DEFAULT  1
 #define CTRL_SERVO_ID           1            /* 总线上那颗舵机的 ID */
 #define CTRL_SERVO_POS_MIN      1048         /* 安全限位（原工程 2048 ± 1000） */
 #define CTRL_SERVO_POS_MAX      3048

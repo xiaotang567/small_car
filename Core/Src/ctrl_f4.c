@@ -396,6 +396,20 @@ static void servo_rx_flush (void)
     g_srv_fifo_tail = 0U;
 }
 
+/* ★ 总线方向控制（单线半双工；对应老版本里 TC 中断里那段"放开 PC10"）
+   PC10 是 UART4_TX，MODER 的 [21:20] 两位：10 = 复用推挽，00 = 输入(高阻)。
+   推挽的时候总线由板子驱动；放开以后靠外部上拉（和 PC11 的内部上拉）维持空闲高，
+   舵机才有机会把线拉低回话。*/
+static void servo_bus_drive (void)
+{
+    GPIOC->MODER = (GPIOC->MODER & ~(3UL << 20)) | (2UL << 20);   /* 推挽 AF */
+}
+
+static void servo_bus_release (void)
+{
+    GPIOC->MODER &= ~(3UL << 20);                                  /* 高阻输入 */
+}
+
 /* 组一帧发出去（原工程 hx_tx_frame）*/
 static void servo_tx_frame (uint8_t id, uint8_t inst, const uint8_t *params, uint8_t n)
 {
@@ -418,6 +432,12 @@ static void servo_tx_frame (uint8_t id, uint8_t inst, const uint8_t *params, uin
 
     servo_rx_flush();
 
+    /* ★★★ 2026-11-07（FW=2106）：**单线总线：说话之前先把 PC10 切回推挽 AF** ★★★
+       官方的 F103 例程能直接推挽通，是因为中间有幻尔的**调试板**（半双工转换在那里做）。
+       我们是把舵机直接并在 PC10/PC11 上：如果不主动释放，PC10 会一直推挽拉高，
+       舵机想回话时就被顶住 ⇒ 永远收不到应答。*/
+    if (0U != g_servo_half) { servo_bus_drive(); }
+
     for (i = 0U; i < g_srv_last_tx_len; i ++)
     {
         uint32_t guard = SERVO_TX_WAIT_LOOPS;
@@ -434,6 +454,18 @@ static void servo_tx_frame (uint8_t id, uint8_t inst, const uint8_t *params, uin
         if (0U == guard) { break; }
         UART4->DR = buf[i];
         g_srv_tx_bytes ++;
+    }
+
+    /* ★ 发完**等最后一个位真的移出去（TC）**再放开总线 —— 早放会截断最后一个字节 */
+    if (0U != g_servo_half)
+    {
+        uint32_t guard = SERVO_TX_WAIT_LOOPS;
+
+        while ((0U == (UART4->SR & USART_SR_TC)) && (0U != (-- guard)))
+        {
+            servo_rx_pump();
+        }
+        servo_bus_release();            /* PC10 → 高阻，总线交给舵机 */
     }
     g_srv_tx_cnt ++;
 }
@@ -630,11 +662,14 @@ uint8_t ctrl_servo_rx_pin (void)
     return (0U != (GPIOC->IDR & GPIO_PIN_11)) ? 1U : 0U;
 }
 
-/* 运行时切换"单线/全双工"：同步轮询下两者接线都一样（PC10/PC11 并到总线），
-   这里只记一个标志供上位机显示，不再切引脚模式。*/
+/* 运行时切换"单线/全双工"
+   单线（half=1）：PC10 发完立刻放成高阻，总线和 PC11 一起交给舵机（默认）；
+   全双工（half=0）：PC10 一直是推挽 TX、PC11 是 RX（中间有调试板时才这么接）。*/
 void ctrl_servo_set_half (uint8_t half)
 {
     g_servo_half = (0U != half) ? 1U : 0U;
+
+    if (0U == g_servo_half) { servo_bus_drive(); }     /* 全双工：一直由板子驱动 */
 }
 
 void ctrl_servo_init (void)
@@ -673,6 +708,9 @@ void ctrl_servo_init (void)
     g_servo_err      = 0U;
     g_servo_boot     = 0U;
     g_servo_speed_ok = 0U;
+
+    /* ★ 默认走"单线半双工"（发完放开 PC10），和现场把 PC10/PC11 并到一根线上的接法一致 */
+    ctrl_servo_set_half((uint8_t)CTRL_SERVO_HALF_DUPLEX_DEFAULT);
 
     /* 等舵机上电初始化（原工程 system_delay_ms(300)；用 DWT 延时，不依赖 SysTick）*/
     ctrl_delay_us(300000UL);
