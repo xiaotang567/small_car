@@ -66,7 +66,7 @@ static void cam_send_gray (void);
 
 /* ★ 2026-11-06：**停图传**开关（`s 2` 停 / `s 3` 恢复）
    用途：调遥测/命令时让链路完全空闲，把"图传占满链路"这个变量彻底排除掉。
-   ★ 2026-11-07（FW=2117）：**默认改回"发图"**（用户要求把图传弄回来）。
+   ★ 2026-11-07（FW=2118）：**默认改回"发图"**（用户要求把图传弄回来）。
      要临时停：上位机点【停图传】（`s 2`）或者发 `s 2`。*/
 uint8_t cam_img_off = 0U;
 
@@ -1005,7 +1005,7 @@ void app_loop (void)
         //     MD  = 当前采集模式（0 = 752 宽 / 1 = 188 宽）
         //     BIN = 188×120 配置是否成功（1 = 已写并回读一致）
         //     R0D/R0E = 两个 Read Mode 寄存器的**回读值**（列 bin 在 R0D[3:2]、行 bin 在 R0E[1:0]）
-        sprintf(buf, "S f=%lu V=%lu VS=%lu LG=%lu TO=%lu F=%u FL=%u P=%u RX=%lu CAM=%u ID=%04X N=%u MD=%u BIN=%u R0D=%04X W=%u E=%u K=%lu R=%04lX IE=%04lX MI=%04lX LW=%lu GP=%lu FW=2117 LM=%lu RST=%02lX PC=%08lX CF=%04lX BA=%08lX\r\n",
+        sprintf(buf, "S f=%lu V=%lu VS=%lu LG=%lu TO=%lu F=%u FL=%u P=%u RX=%lu CAM=%u ID=%04X N=%u MD=%u BIN=%u R0D=%04X W=%u E=%u K=%lu R=%04lX IE=%04lX MI=%04lX LW=%lu GP=%lu FW=2118 LM=%lu RST=%02lX PC=%08lX CF=%04lX BA=%08lX\r\n",
                 (unsigned long)cam_frame_cnt, (unsigned long)cam_vsync_isr_cnt,
                 (unsigned long)cam_vs_cap_cnt,
                 (unsigned long)disp_lag_max,
