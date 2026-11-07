@@ -21,3 +21,7 @@ tools/cam_log.txt
 tools/cam_pol*.png
 tools/cam_frame.png
 tools/cam_frame.pgm
+tools/log_*.txt
+MDK-ARM/build_log.txt
+.workbuddy/
+tools/_track_now.png
