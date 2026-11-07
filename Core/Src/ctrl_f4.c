@@ -290,30 +290,30 @@ static uint8_t servo_checksum (const uint8_t *p, uint8_t n)
     return (uint8_t)((~sum) & 0xFFU);
 }
 
-/* 改波特率：F4 的 BRR = 整数分频<<4 | 小数。
-   ⚠️ 16 倍过采样（OVER8=0）下 USARTDIV 最大 4095，APB1=42MHz 时最低只能到 ≈10255bps；
-      更低的波特率必须切 OVER8=1（8 倍过采样）。*/
+/* 改波特率 —— ★★★ 2026-11-07（FW=2108）：**这里原来算错了 16 倍，舵机一直没通过话** ★★★
+   错的写法（沿用了很久）：
+       div = fCK / bps;              // 42MHz / 1M = 42，以为这是"整数分频"
+       UART4->BRR = div << 4;        // → 672
+   实际上 OVER8=0 时：
+       波特率 = fCK / (16 × USARTDIV)     ⇒   USARTDIV = fCK/(16×bps)
+       而 BRR  = USARTDIV × 16           ⇒   **BRR = fCK / bps**（整数就是完整的 BRR，不用再移 4 位！）
+   ⇒ 旧写法把 BRR 写成 672 ⇒ USARTDIV = 42 ⇒ 实际波特率 = 42e6/(16×42) = **62500**。
+      1Mbps 的舵机收到的是一串 62.5k 的乱码，当然一辈子不应答；
+      而 PC10/PC11 回环测试照样通（收发两边一样错）。
+   正确：BRR = round(fCK / bps)。1M → 42 (=0x2A)，115200 → 365。两者都 ≤ 65535，
+   所以根本用不着 OVER8（BRR 最大 65535 ⇒ 最低约 641bps）。*/
 static void servo_set_baud (uint32_t bps)
 {
-    uint32_t div;
+    uint32_t brr;
 
     if (0U == bps) { return; }
-    div = (CTRL_APB1_HZ_LOCAL + (bps / 2U)) / bps;
+
+    brr = (CTRL_APB1_HZ_LOCAL + (bps / 2U)) / bps;   /* ★ BRR 本身 = fCK/baud（OVER8=0）*/
+    if (0U == brr) { brr = 1U; }
 
     UART4->CR1 &= (uint16_t)(~USART_CR1_UE);
-
-    if (div <= 4095U)
-    {
-        UART4->CR1 &= (uint16_t)(~USART_CR1_OVER8);
-        UART4->BRR  = (uint16_t)(div << 4);
-    }
-    else
-    {
-        uint32_t d8 = (CTRL_APB1_HZ_LOCAL + (4U * bps)) / (8U * bps);
-        UART4->CR1 |= USART_CR1_OVER8;
-        UART4->BRR  = (uint16_t)((d8 & 0x0FFFU) << 4);
-    }
-
+    UART4->CR1 &= (uint16_t)(~USART_CR1_OVER8);      /* 16 倍过采样 */
+    UART4->BRR  = (uint16_t)(brr & 0xFFFFU);         /* ★ 不再 << 4 */
     UART4->CR1 |= USART_CR1_UE;
     UART4->CR1 |= (uint16_t)(USART_CR1_TE | USART_CR1_RE);
     g_servo_baud = bps;
