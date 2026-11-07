@@ -1386,6 +1386,27 @@ volatile uint32_t dbg_vsync_khz = 0;
    判读：>0  ⇒ 传感器确实在发 VSYNC（那问题就在 DCMI 同步/配置）
          =0  ⇒ 这根线上根本没有帧同步（传感器没在出帧，或这根线没通）
    测完会把 PB7 还给 DCMI（AF13）。*/
+/* ★ 2026-11-07（FW=2154）：**用 GPIO 轮询直接数 PA4(HREF) 和 PB7(VSYNC) 的边沿** ★
+   目的：PCLK 已经在跑（K=19801），DCMI 也使能了，但 DMA 一个字节没搬
+        ⇒ 缺 HREF/VSYNC。这里直接看这两根线到底有没有在跳。
+   ⚠️ 轮询会占用 CPU 20ms，只在诊断命令里调。*/
+void cam_pin_probe (uint32_t *href_edges, uint32_t *vsync_edges)
+{
+    uint32_t h = 0U, v = 0U, lh = 9U, lv = 9U;
+    uint32_t t0 = HAL_GetTick();
+
+    while ((HAL_GetTick() - t0) < 20U)
+    {
+        uint32_t a = (GPIOA->IDR & GPIO_PIN_4) ? 1U : 0U;   /* PA4 = DCMI_HSYNC */
+        uint32_t b = (GPIOB->IDR & GPIO_PIN_7) ? 1U : 0U;   /* PB7 = DCMI_VSYNC */
+
+        if (a != lh) { h ++; lh = a; }
+        if (b != lv) { v ++; lv = b; }
+    }
+    *href_edges  = h;
+    *vsync_edges = v;
+}
+
 uint32_t board_vsync_probe (void)
 {
     board_vsync_measure();

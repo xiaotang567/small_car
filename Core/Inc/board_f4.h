@@ -159,6 +159,7 @@ extern volatile uint16_t cam_fps10;
 extern volatile float    lf_dbg_a, lf_dbg_b, lf_dbg_c, lf_dbg_dev;     // 每行交界列（0xFF=无）
 extern volatile uint8_t  cam_thresh;         // 本帧实际阈值
 uint32_t board_vsync_probe (void);
+void     cam_pin_probe (uint32_t *href_edges, uint32_t *vsync_edges);
 void     cam_dump_regs_line (uint8_t base);   // ★ 开机自动 dump 相机寄存器的一行   // ★ 直接数 PB7(VSYNC) 边沿（绕开 DCMI）
 extern volatile uint8_t  cam_thresh_manual;  // ★ 0=自动Otsu；1..255=手动
 extern volatile uint8_t  cam_shutter;        // 曝光 R0x0B（行数，`e <n>` 可调）
