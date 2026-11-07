@@ -81,7 +81,7 @@
 #define CTRL_SPEED_KP_X1000     1500         /* Kp = 1.500 */
 #define CTRL_SPEED_KI_X1000     150          /* Ki = 0.150（每个控制周期） */
 #define CTRL_SPEED_I_LIMIT      2500         /* 积分限幅（占空比单位） */
-#define CTRL_SPEED_DUTY_MAX     5000         /* 输出上限 50%（防烧电机，别乱改大） */
+#define CTRL_SPEED_DUTY_MAX     8000         /* ★ 2026-11-07：500RPM 在 50% 就顶住了 ⇒ 放到 80%（原 5000） */
 #define CTRL_SPEED_SIGN_AUTO    1            /* 1 = 反馈极性自动识别 */
 
 /* ---- 舵机（幻尔 HX 总线舵机）----
