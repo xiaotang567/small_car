@@ -71,8 +71,9 @@ C_WAIT    = '#b8860b'      # ★ 命令"已发出、等板子回执"时按钮变
 #   'rpm' —— 走速度环闭环（需要编码器读数正确）
 PWM_PRESETS = (10, 20, 30, 50)          # 占空比 %
 RPM_PRESETS = (300, 600, 1000, 1500)
-SERVO_LEFT, SERVO_MID, SERVO_RIGHT = 1300, 2048, 2800
-SERVO_MIN, SERVO_MAX = 1048, 3048
+SERVO_MID = 2748                       # ★ 2026-11-07 用户实测：默认中位
+SERVO_MIN, SERVO_MAX = 1700, 4000      # ★ 安全行程（左/右快捷档就取这两个端点）
+SERVO_LEFT, SERVO_RIGHT = SERVO_MIN, SERVO_MAX
 
 
 def local_ip():
@@ -314,7 +315,7 @@ class App(object):
         for c in range(5):
             f.columnconfigure(c, weight=1)
 
-        self.lbl_srv = tk.Label(f, text='目标  2048', bg=C_PANEL, fg=C_FG,
+        self.lbl_srv = tk.Label(f, text='目标  %d' % SERVO_MID, bg=C_PANEL, fg=C_FG,
                                 font=('Microsoft YaHei', 11, 'bold'))
         self.lbl_srv.grid(row=0, column=0, columnspan=5, sticky='w', padx=6, pady=(4, 2))
 

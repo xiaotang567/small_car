@@ -85,9 +85,9 @@
 #define CTRL_SERVO_HALF_DUPLEX_DEFAULT  0   /* ★ 有幻尔调试板 ⇒ 全双工：PC10=TX/PC11=RX 分开走，
                                                绝对不要把这两根线并在一起（并了就是两个输出对拉）*/
 #define CTRL_SERVO_ID           1            /* 总线上那颗舵机的 ID */
-#define CTRL_SERVO_POS_MIN      1048         /* 安全限位（原工程 2048 ± 1000） */
-#define CTRL_SERVO_POS_MAX      3048
-#define CTRL_SERVO_POS_CENTER   2048         /* 4096 步 = 360° ⇒ 0.0879°/步 */
+#define CTRL_SERVO_POS_MIN      1700         /* ★ 2026-11-07：按用户实测的安全行程改（原来 1048） */
+#define CTRL_SERVO_POS_MAX      4000         /* ★ 原来 3048 */
+#define CTRL_SERVO_POS_CENTER   2748         /* ★ 默认中位（开机摆到这里，原来 2048） */
 #define CTRL_SERVO_SPEED        3400         /* 目标速度（步/秒，原工程 SERVO_RUN_SPEED） */
 
 /* ---- MPU9250 ---- */
