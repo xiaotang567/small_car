@@ -14,6 +14,7 @@
 
 /* 寻线参数 */
 #define LF_SEED_ROW        112                 /* 种子行：车头附近，不被遮挡 */
+#define CAM_MIRROR          1       /* ★ FW=2172：摄像头倒装 ⇒ 左右镜像（0 = 不镜像）*/
 #define LF_USE_8NEIGHBOR    1
 
 
@@ -859,16 +860,26 @@ static void cam_frame_boundary (void)
 //-------------------------------------------------------------------------------------------------------------------
 static void cam_copy_whole_frame (uint16_t start_row)
 {
-    uint32_t r;
+    uint32_t r, c;
     const uint8_t *flat = &cam_image[0][0];
 
     for (r = 0U; r < (uint32_t)CAM_H; r++)
     {
         uint32_t src = ((uint32_t)start_row + r) % (uint32_t)cam_ring_rows;
+        const uint8_t *s = &flat[src * (uint32_t)cam_row_bytes];
+        uint8_t       *d = &disp_img[(uint32_t)(CAM_H - 1U) - r][0];
 
-        (void)memcpy(&disp_img[(uint32_t)(CAM_H - 1U) - r][0],
-                     &flat[src * (uint32_t)cam_row_bytes],
-                     (size_t)CAM_TXW);
+        /* ★ FW=2172：摄像头是**倒装**的 ⇒ 行号要翻（下面 CAM_H-1-r），列也要翻
+           （不然左右就是反的）。整帧 120×188 = 22560 字节，逐字节反向拷贝约 0.2ms，
+           远小于一帧 20ms，可以忽略。不想镜像就把 CAM_MIRROR 改成 0。*/
+#if (CAM_MIRROR != 0)
+        for (c = 0U; c < (uint32_t)CAM_TXW; c++)
+        {
+            d[c] = s[(uint32_t)CAM_TXW - 1U - c];
+        }
+#else
+        (void)memcpy(d, s, (size_t)CAM_TXW);
+#endif
     }
 }
 
