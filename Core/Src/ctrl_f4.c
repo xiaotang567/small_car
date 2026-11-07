@@ -187,7 +187,7 @@ void ctrl_encoder_clear (void)
 uint8_t ctrl_encoder_z_cnt (void) { return (uint8_t)(g_enc_z & 0xFFU); }
 
 /* 每 20ms 由 board_ctrl_tick() 调：取增量 → 清 CNT → 算 M 法转速 */
-static void encoder_tick (void)
+static void encoder_tick (uint32_t dt_ms)
 {
     int32_t d;
 
@@ -203,9 +203,12 @@ static void encoder_tick (void)
     g_enc_delta  = d;
     g_enc_total += d;
 
-    /* RPM×10 = ΔN × 600000 / (CPR × 周期ms)   —— 必须 int64，原工程踩过 int32 溢出 */
+    if (0U == dt_ms) { dt_ms = CTRL_PERIOD_MS; }
+
+    /* RPM×10 = ΔN × 600000 / (CPR × **实际周期ms**)   —— 必须 int64，原工程踩过 int32 溢出
+       ★ 2026-11-07（FW=2116）：原来这里写死 CTRL_PERIOD_MS(20)，主循环被拖慢时读数就会跳。*/
     g_enc_rpm_x10 = (int16_t)(((int64_t)d * 600000LL) /
-                              ((int64_t)CTRL_ENC_CPR * (int64_t)CTRL_PERIOD_MS));
+                              ((int64_t)CTRL_ENC_CPR * (int64_t)dt_ms));
 }
 
 /* stm32f4xx_it.c 的 EXTI0_IRQHandler 转发到这里 */
@@ -1706,10 +1709,23 @@ void board_ctrl_tick (void)
     uint32_t now = HAL_GetTick();
 
     if ((now - t_last) < CTRL_PERIOD_MS) { return; }
-    t_last = now;
 
-    /* 1) 编码器：取增量 + 算转速 */
-    encoder_tick();
+    /* ★★★ 2026-11-07（FW=2116）：**用实际经过的时间算转速** ★★★
+       现场数据（上位机记录文件）：占空比稳在 2700 左右，但转速读数 405~519 乱跳，
+       平均值只有 430 —— 不是控制环在振荡，是**测速本身不准**：
+       原来 RPM 固定按 20ms 算，可主循环会被图传发送、舵机同步读（各 1~3ms）拖慢，
+       实际周期常常是 22~30ms ⇒ 同一个增量被当成 20ms 的 ⇒ 读数忽高忽低。
+       ⇒ 这里把真实间隔 dt 传进 encoder_tick()，用它算 RPM。*/
+    {
+        uint32_t dt = now - t_last;
+
+        t_last = now;
+        if (0U == dt)      { dt = CTRL_PERIOD_MS; }
+        if (dt > 200U)     { dt = 200U; }        /* 卡太久就夹住，别算出离谱的值 */
+
+        /* 1) 编码器：取增量 + 用**真实 dt** 算转速 */
+        encoder_tick(dt);
+    }
 
     /* 2) 速度环（只在目标非 0 时才会有输出） */
     speed_tick();

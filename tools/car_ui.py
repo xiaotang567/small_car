@@ -26,6 +26,7 @@ small_car 控制台  ——  图像 + 仪表 + 按钮控制
 import socket
 import sys
 import time
+import os
 
 import tkinter as tk
 from tkinter import ttk
@@ -138,6 +139,11 @@ class App(object):
         self.fault_seen = None
         self.t_keep = 0.0           # 上次发保活的时刻
         self.t_rx = time.time()     # 上次收到任何字节的时刻
+        # ★ 2026-11-07：**把收到的每一行都写进文件**（遥测/S/ACK…），
+        #   这样出问题时直接看文件就行，不用去抢连接。
+        self.logf = None
+        self.log_path = None
+        self.log_n = 0
 
         # ---- 窗口 ----
         self.root = tk.Tk()
@@ -839,10 +845,13 @@ class App(object):
                 ln = ln[cut:]
 
             if ln.startswith('T '):
+                self.log_line(ln)
                 self.on_tele(ln[2:])
             elif ln.startswith('S '):
+                self.log_line(ln)
                 self.on_stat(ln[2:])
             elif ln.startswith('ACK') or ln.startswith('CFG') or ln.startswith('CAM'):
+                self.log_line(ln)
                 self.log(ln)
                 self._ack_seen(ln)          # ★ 收到回执 ⇒ 这条命令不用再重发
 
@@ -948,6 +957,46 @@ class App(object):
         if 'm' in d:
             self.mode_gray = (int(d['m']) == 0)
             self.refresh_buttons()
+
+    def log_open(self):
+        """★ 记录文件：每次连上都新建一个 tools/log_年月日_时分秒.txt
+           里面的每行 = `时间戳 原始文本行`（T 遥测 / S 心跳 / ACK 回执都在），
+           出问题时直接把文件给助手看，不用抢连接。"""
+        try:
+            d = os.path.join(os.path.dirname(os.path.abspath(__file__)))
+            os.makedirs(d, exist_ok=True)
+            self.log_path = os.path.join(d, 'log_%s.txt' % time.strftime('%Y%m%d_%H%M%S'))
+            self.logf = open(self.log_path, 'w', encoding='utf-8', buffering=1)
+            self.log_n = 0
+            self.log('记录中 → %s' % os.path.basename(self.log_path))
+            print('[记录] %s' % self.log_path)
+        except Exception as e:
+            self.logf = None
+            print('[记录] 打开失败: %s' % e)
+
+    def log_close(self):
+        try:
+            if self.logf is not None:
+                self.logf.close()
+        except Exception:
+            pass
+        self.logf = None
+
+    def log_line(self, ln):
+        """把一行原始文本追加进记录文件（>8MB 就换新文件，别把盘写爆）"""
+        if self.logf is None:
+            return
+        try:
+            self.logf.write('%.3f %s\n' % (time.time(), ln))
+            self.log_n += 1
+            if self.log_n >= 200:              # 每 200 行 flush 一次，尽量不拖慢 UI
+                self.log_n = 0
+                self.logf.flush()
+                if self.logf.tell() > 8 * 1024 * 1024:
+                    self.log_close()
+                    self.log_open()
+        except Exception:
+            self.logf = None
 
     # ================================================================ 画图
     def schedule_draw(self, force=False):
@@ -1058,6 +1107,7 @@ def run():
         app.buf = bytearray()
         conn.settimeout(0.1)
         app.log('--- 板子已连接 ---')
+        app.log_open()                    # ★ 开始记录到 tools/log_*.txt
 
         try:
             conn.sendall(b's\n')          # 问一下状态（顺便确认下行通）
@@ -1107,6 +1157,7 @@ def run():
         except Exception:
             pass
         app.log('--- 连接断开 ---')
+        app.log_close()                   # ★ 收尾，保证记录文件落盘
 
     app.close()
 
