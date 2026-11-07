@@ -72,7 +72,7 @@ C_WAIT    = '#b8860b'      # ★ 命令"已发出、等板子回执"时按钮变
 PWM_PRESETS = (10, 20, 30, 50)          # 占空比 %
 RPM_PRESETS = (300, 600, 1000, 1500)
 SERVO_MID = 2748                       # ★ 2026-11-07 用户实测：默认中位
-SERVO_MIN, SERVO_MAX = 1700, 4000      # ★ 安全行程（左/右快捷档就取这两个端点）
+SERVO_MIN, SERVO_MAX = 1700, 3024      # ★ 安全行程（左/右快捷档就取这两个端点）
 SERVO_LEFT, SERVO_RIGHT = SERVO_MIN, SERVO_MAX
 
 

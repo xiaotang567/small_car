@@ -149,7 +149,7 @@ static void cam_cmd_status (void)
        DRP = 发送看门狗**主动放弃**的帧数（一直飙 ⇒ 链路/模块发不动）✓
        DST = DMA 停摆看门狗重启采集的次数（>0 ⇒ 采集链卡过，但已经自己救回来了）✓
        SELF= 连续 2 秒没有完整帧 ⇒ 重启采集的次数（和 DST 一起看）✓ */
-    sprintf(b, "CFG f=%u g=%u x=%u y=%u (%ux%u) d=%u CST=%u RV=%06lX LINE=%u FW=2110 EDG=%lu EL=%u ER=%u DRP=%lu DST=%lu SELF=%lu\r\n",
+    sprintf(b, "CFG f=%u g=%u x=%u y=%u (%ux%u) d=%u CST=%u RV=%06lX LINE=%u FW=2111 EDG=%lu EL=%u ER=%u DRP=%lu DST=%lu SELF=%lu\r\n",
             (unsigned)cam_cmd_fps, (unsigned)cam_cmd_gap_ms,
             (unsigned)cam_cmd_dx, (unsigned)cam_cmd_dy,
             (unsigned)(CAM_TXW / cam_cmd_dx), (unsigned)(CAM_H / cam_cmd_dy),
@@ -468,7 +468,7 @@ static void cam_cmd_line (char *s)
         /* ==================== ★★ 车模控制（2026-11-05 从 MSPM0 工程移植）★★ ====================
            q <rpm>          速度环目标（0 = 停；速度环驱动电机 1）
            w <d1> <d2>      开环直接给两个电机占空比（-10000..+10000，0 0 = 停）
-           r <pos>          舵机位置 0..4095（**中位 2748；安全限位 1700..4000**，超出会被夹住）
+           r <pos>          舵机位置 0..4095（**中位 2748；安全限位 1700..3024**，超出会被夹住）
            l                编码器累计清零
            h                一行汇总：编码器 / 转速 / 速度环 / 姿态 / 舵机 / IMU
         =============================================================================== */
@@ -620,7 +620,7 @@ void cam_cmd_poll (void)
                 cam_cmd_len = 0U;
             }
         }
-        /* ★★★ 2026-11-07（FW=2110）：**只收可打印字符，别把模块的 0x00 填充塞进命令行** ★★★
+        /* ★★★ 2026-11-07（FW=2111）：**只收可打印字符，别把模块的 0x00 填充塞进命令行** ★★★
            现场：上位机点按钮一直重发，板子却回的是 `CFG`（default 分支），不是 `ACK r`。
            真凶：模块把下行数据放在 32 字节块里，**前面补了一堆 0x00**；
            这些 0 被当成命令字符塞进 `cam_cmd_buf`，于是 `cam_cmd_line()` 看到的第一个字节是
