@@ -7,6 +7,7 @@
 ********************************************************************************************************************/
 
 #include "ctrl_f4.h"
+#include "board_f4.h"   /* ★ 2174：要用 cam_err_near / cam_curved / cam_track_ok */
 
 
 //===================================================★ 幻尔总线舵机（UART4，1Mbps，同步轮询）===================================================
@@ -607,4 +608,49 @@ void ctrl_servo_tick (void)
         srv_div ++;
         if (srv_div >= 10U) { srv_div = 0U; servo_read_pos(); }
     }
+}
+
+//-------------------------------------------------------------------------------------------------------------------
+// ★★★ FW=2174：**摄像头巡线 → 舵机** ★★★
+//   输入（cam_f4.c 里 cam_track_eval() 算好）：
+//     cam_err_near  近处中线相对画面中心的偏差（像素，右为正）
+//     cam_err_dir   远处中线相对近处的偏移（右为正）= 赛道拐向，直道上≈0
+//     cam_curved    1 = 弯道（中线拟合残差大）；0 = 直道
+//   输出：舵机目标 = 中位 + SIGN × (KP×err_near + KD×err_dir)
+//     · 直道 KD_STR（小）：主要跟近处偏差，不乱提前打舵
+//     · 弯道 KD_CUR（大）：用"拐向"提前打舵 —— 过弯靠的就是这一项
+//   ⚠️ STEER_SIGN：手推时先看方向，反了就改成 (-1.0f) 重烧一次
+//-------------------------------------------------------------------------------------------------------------------
+#define STEER_KP        4.0f     /* 近处偏差 → 舵机步数/像素 */
+#define STEER_KD_STR    5.0f     /* 直道：拐向前馈 */
+#define STEER_KD_CUR    9.0f     /* 弯道：拐向前馈（更大 = 更早打舵）*/
+#define STEER_SIGN      (+1.0f)  /* ★ 方向反了改成 (-1.0f) */
+#define STEER_SLEW      80       /* 每个控制周期(20ms)最多变多少步，防止舵机被打 */
+
+volatile uint8_t  g_steer_enable       = 1U;   /* 1 = 视觉打舵开 */
+volatile uint32_t g_steer_manual_until = 0U;   /* 手动打舵优先到这个时刻(ms) */
+static   int32_t  s_steer_last         = CTRL_SERVO_POS_CENTER;
+
+void ctrl_steer_from_cam (void)
+{
+    int32_t target;
+    float   kd;
+
+    if (0U == g_steer_enable) { return; }                    /* 已关掉 */
+    if (HAL_GetTick() < g_steer_manual_until) { return; }     /* 手动优先 3 秒 */
+    if (0U == cam_track_ok) { return; }                      /* 这一帧没线 ⇒ 保持 */
+
+    kd = (0U != cam_curved) ? STEER_KD_CUR : STEER_KD_STR;
+
+    target = (int32_t)CTRL_SERVO_POS_CENTER
+           + (int32_t)(STEER_SIGN * (STEER_KP * (float)cam_err_near + kd * (float)cam_err_dir));
+
+    if (target < (int32_t)CTRL_SERVO_POS_MIN) { target = (int32_t)CTRL_SERVO_POS_MIN; }
+    if (target > (int32_t)CTRL_SERVO_POS_MAX) { target = (int32_t)CTRL_SERVO_POS_MAX; }
+
+    if (target > s_steer_last + STEER_SLEW) { target = s_steer_last + STEER_SLEW; }
+    if (target < s_steer_last - STEER_SLEW) { target = s_steer_last - STEER_SLEW; }
+
+    s_steer_last = target;
+    (void)ctrl_servo_set_pos((uint16_t)target);
 }

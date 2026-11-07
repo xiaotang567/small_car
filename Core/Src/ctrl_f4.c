@@ -78,5 +78,6 @@ void board_ctrl_tick (void)
     ctrl_protect_tick();         /* 3) 堵转保护 + 按键重启 */
     ctrl_imu_tick();             /* 4) IMU + yaw */
     ctrl_servo_tick();           /* 5) 舵机（同步轮询） */
+    ctrl_steer_from_cam();       /* 5.5) ★ 2174 摄像头巡线 → 舵机目标位置 */
     ctrl_oled_status();          /* 6) OLED 状态页 */
 }

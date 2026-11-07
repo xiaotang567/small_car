@@ -153,6 +153,11 @@ void     board_cam_analyze (void);           // ★ Otsu 二值化 + 每行亮/�
 extern volatile uint8_t  cam_bound[120];      /* 左边界 */
 extern volatile uint8_t  cam_bound_r[120];    /* 右边界 */
 extern volatile uint8_t  cam_center[120];     /* 中线 = (左+右)/2 */
+extern volatile int32_t  cam_err_near;         /* ★ 2174 近处中线偏差（像素，右正）*/
+extern volatile int32_t  cam_err_dir;          /* ★ 2174 远处相对近处的横向偏移（右正）*/
+extern volatile uint8_t  cam_curved;           /* ★ 2174 1 = 弯道（残差大）*/
+extern volatile uint8_t  cam_track_ok;         /* ★ 2174 1 = 本帧有赛道 */
+void cam_track_eval (void);                    /* ★ 2174 算直道/弯道 + 舵机偏差 */
 extern volatile uint8_t  cam_now;
 extern volatile uint8_t  cam_ahead;
 extern volatile uint16_t cam_fps10;

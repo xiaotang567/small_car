@@ -2819,6 +2819,73 @@ static void lf_temporal (void)
    由上位机用**红线**画出来 ⇒ 板子保持"纯二值图"，红线不会和白色赛道混在一起 ✓
    （那两个"竖直长方形"也就彻底没有了 —— 那是补行涂白造成的）*/
 
+//-------------------------------------------------------------------------------------------------------------------
+// ★★★ FW=2174：**给舵机用的赛道几何量**（判据和上位机的红/蓝线完全一致）★★★
+//   中线 = (左边界 + 右边界)/2，对整条中线做最小二乘直线拟合：
+//     残差小 ⇒ 直道（上位机画红）      残差大 ⇒ 弯道（上位机画蓝）
+//   同时给舵机两个量：
+//     cam_err_near = 近处（最下面那条有效行）中线相对画面中心的偏差，像素，**右为正**
+//     cam_err_dir  = 远处中线相对近处的横向偏移 = 赛道往哪边拐，**右为正**
+//                   （直道上它≈0，弯道上它正比于弯的急缓 ⇒ 天然的"提前打舵"项）
+//-------------------------------------------------------------------------------------------------------------------
+volatile int32_t cam_err_near = 0;
+volatile int32_t cam_err_dir  = 0;
+volatile uint8_t cam_curved   = 0U;      /* 1 = 本帧判为弯道 */
+volatile uint8_t cam_track_ok = 0U;      /* 1 = 本帧有可用赛道 */
+
+void cam_track_eval (void)
+{
+    int32_t r, n = 0, r_lo = -1, r_hi = -1;
+    float   sx = 0.0f, sy = 0.0f, sxx = 0.0f, sxy = 0.0f, den, k, b, res = 0.0f;
+
+    cam_track_ok = 0U;
+    cam_err_near = 0;
+    cam_err_dir  = 0;
+
+    for (r = 0; r < (int32_t)CAM_H; r++)
+    {
+        if ((cam_bound[r] != 0xFFU) && (cam_bound_r[r] != 0xFFU) &&
+            (cam_bound_r[r] > cam_bound[r]))
+        {
+            float c = ((float)cam_bound[r] + (float)cam_bound_r[r]) * 0.5f;
+
+            sx  += (float)r;
+            sy  += c;
+            sxx += (float)r * (float)r;
+            sxy += (float)r * c;
+            n ++;
+            if (r_lo < 0) { r_lo = r; }
+            r_hi = r;
+        }
+    }
+    if ((n < 8) || (r_lo == r_hi)) { return; }
+
+    den = (float)n * sxx - sx * sx;
+    if (den > -0.5f && den < 0.5f) { return; }
+
+    k = ((float)n * sxy - sx * sy) / den;
+    b = (sy - k * sx) / (float)n;
+
+    for (r = r_lo; r <= r_hi; r++)
+    {
+        if ((cam_bound[r] != 0xFFU) && (cam_bound_r[r] != 0xFFU) &&
+            (cam_bound_r[r] > cam_bound[r]))
+        {
+            float c  = ((float)cam_bound[r] + (float)cam_bound_r[r]) * 0.5f;
+            float d  = k * (float)r + b - c;
+
+            if (d < 0.0f) { d = -d; }
+            if (d > res)  { res = d; }
+        }
+    }
+
+    /* 行号越大 = 画面越靠下 = 离车越近 ⇒ "近处"用 r_hi */
+    cam_err_near = (int32_t)(k * (float)r_hi + b - (float)(CAM_TXW / 2));
+    cam_err_dir  = (int32_t)(k * (float)(r_lo - r_hi));
+    cam_curved   = (res > 1.6f) ? 1U : 0U;
+    cam_track_ok = 1U;
+}
+
 void board_cam_analyze (void)
 {
     static uint32_t hist[256];
@@ -2880,6 +2947,8 @@ void board_cam_analyze (void)
             cam_center[r] = 0xFFU;
         }
     }
+
+    cam_track_eval();        /* ★ FW=2174：算直道/弯道 + 给舵机的偏差量 */
 
     /* ★ 左右边界留在 cam_bound[] / cam_bound_r[] 里，由 app.c 打包发给上位机画红线 */
 #else

@@ -149,7 +149,7 @@ static void cam_cmd_status (void)
        DRP = 发送看门狗**主动放弃**的帧数（一直飙 ⇒ 链路/模块发不动）✓
        DST = DMA 停摆看门狗重启采集的次数（>0 ⇒ 采集链卡过，但已经自己救回来了）✓
        SELF= 连续 2 秒没有完整帧 ⇒ 重启采集的次数（和 DST 一起看）✓ */
-    sprintf(b, "CFG f=%u g=%u x=%u y=%u (%ux%u) d=%u CST=%u RV=%06lX LINE=%u FW=2173 EDG=%lu EL=%u ER=%u DRP=%lu DST=%lu SELF=%lu TH=%u\r\n",
+    sprintf(b, "CFG f=%u g=%u x=%u y=%u (%ux%u) d=%u CST=%u RV=%06lX LINE=%u FW=2174 EDG=%lu EL=%u ER=%u DRP=%lu DST=%lu SELF=%lu TH=%u\r\n",
             (unsigned)cam_cmd_fps, (unsigned)cam_cmd_gap_ms,
             (unsigned)cam_cmd_dx, (unsigned)cam_cmd_dy,
             (unsigned)(CAM_TXW / cam_cmd_dx), (unsigned)(CAM_H / cam_cmd_dy),
@@ -283,6 +283,22 @@ static void cam_cmd_line (char *s)
             return;
 
         case 'v':
+            /* ★ FW=2174：`vs 0` / `vs 1` = 视觉打舵 关 / 开（默认开）
+               用法：手推测试时 `vs 1`；想自己用按钮打舵就 `vs 0`。*/
+            if ((s[1] == 's') || (s[1] == 'S'))
+            {
+                int32_t on = cam_cmd_snum(s + 2);
+
+                g_steer_enable       = (0 == on) ? 0U : 1U;
+                g_steer_manual_until = 0U;
+                sprintf(b, "ACK vs: vision-steer=%s (err_near=%ld dir=%ld curved=%u ok=%u)\r\n",
+                        (0U != g_steer_enable) ? "ON" : "OFF",
+                        (long)cam_err_near, (long)cam_err_dir,
+                        (unsigned)cam_curved, (unsigned)cam_track_ok);
+                cmd_txt(b);
+                return;
+            }
+
             v = cam_cfg_read_ver();
             sprintf(b, "ACK v: got %lu bytes RV=%06lX LINE=%u\r\n",
                     (unsigned long)v, (unsigned long)(cam_cfg_ver & 0xFFFFFFUL),
@@ -587,8 +603,10 @@ static void cam_cmd_line (char *s)
                 }
                 if (p < 0)      { p = 0; }
                 if (p > 4095)   { p = 4095; }
+                /* ★ FW=2174：手动打舵优先 3 秒（不然视觉打舵会立刻把它顶回去）*/
+                g_steer_manual_until = HAL_GetTick() + 3000U;
                 (void)ctrl_servo_set_pos((uint16_t)p);
-                sprintf(b, "ACK r: servo -> %u (now %u)\r\n",
+                sprintf(b, "ACK r: servo -> %u (now %u, vision paused 3s)\r\n",
                         (unsigned)p, (unsigned)ctrl_servo_get_pos());
                 cmd_txt(b);
             }

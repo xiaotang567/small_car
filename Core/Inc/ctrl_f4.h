@@ -138,6 +138,9 @@ void     ctrl_speed_tick (void);               /* pid_f4.c：速度环一次迭�
 void     ctrl_protect_tick (void);             /* protect_f4.c：堵转保护 + 按键重启 */
 void     ctrl_imu_tick (void);                 /* imu_f4.c：读 IMU + 喂 yaw */
 void     ctrl_servo_tick (void);               /* servo_f4.c：舵机状态机 */
+void     ctrl_steer_from_cam (void);           /* ★ 2174 摄像头巡线 → 舵机 */
+extern volatile uint8_t  g_steer_enable;       /* ★ 1 = 视觉打舵开（默认开）*/
+extern volatile uint32_t g_steer_manual_until; /* ★ 手动打舵优先到这一刻（ms）*/
 uint8_t  ctrl_imu_ok (void);                   /* 1 = MPU9250 在线 */
 uint8_t  ctrl_motor_stalled (void);            /* 1 = 堵转停机中（OLED 用）*/
 uint8_t  ctrl_motor_started (void);            /* 1 = 已经起过转（OLED 用）*/
