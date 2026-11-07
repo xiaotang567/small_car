@@ -129,7 +129,7 @@ class App(object):
         # ---- 目标值（界面状态）----
         self.req_rpm = 0            # 想跑多少（带方向）
         self.req_servo = SERVO_MID
-        self.thresh_val = THRESH_INIT   # ★ 100（和固件默认的 cam_thresh_manual 一致）
+        self.thresh_val = 0            # ★ 0 = 自动 Otsu（和固件默认一致）；第一次按 ± 从 100 起步
         self.expo_val = EXPO_INIT       # ★ 100（和固件默认的 cam_shutter 一致）
         self.running = False        # ★ 电机1 是否"启动"状态：上电默认停
         self.dir = +1               # 方向：+1 前进 / -1 后退
@@ -246,7 +246,7 @@ class App(object):
         #   每点一下发 `th <n>`，板子回 ACK th；同前缀命令会自动顶掉上一条，连点不会堆积。
         self.btn_th_dn = self._btn(f, '阈值 −1', lambda: self.do_thresh(-1), w=7, h=1)
         self.btn_th_dn.grid(row=2, column=0, padx=6, pady=(0, 6), sticky='w')
-        self.lbl_th = self._lbl(f, '阈值 %d' % THRESH_INIT, fg=C_ACCENT,
+        self.lbl_th = self._lbl(f, '阈值 自动', fg=C_ACCENT,
                                 font=('Consolas', 12, 'bold'))
         self.lbl_th.grid(row=2, column=1, columnspan=2, sticky='ew')
         self.btn_th_up = self._btn(f, '阈值 +1', lambda: self.do_thresh(+1), w=7, h=1)

@@ -1966,10 +1966,23 @@ uint8_t cam_sccb_set_bin4 (void)
     //         （SR=0000 / RIS=0000）** ✗✗ —— DCMI 这边怎么重启都没用，因为根本没帧可同步 ✓
     //   ⇒ 必须把快门压到帧内（120 行以内，取 100 行 ≈ 3.7ms 曝光）✓
     //   （想更亮/更暗：后续可以做成命令，动态改 R0x0B ✓）
-    /* ★★★ 2026-11-07（FW=2130）：**这里彻底不碰 R0xAF 了** ★★★
-       2128 写它 ⇒ 图像消失；2129 只读它 ⇒ 图像也没回来。
-       ⇒ 这颗传感器上 0xAF 很可能不是普通配置寄存器（读/写都可能影响时钟或状态），
-         为稳妥起见**读写都不做**，初始化流程恢复成"已知能出图"的 2126 版本。*/
+    /* ★★★ 2026-11-07（FW=2132）：**按 MT9V034 数据手册关掉 AEC/AGC，曝光才归我们管** ★★★
+       依据：《MT9V034-数据手册》Table 8 / 第 39 页 / 第 61 页
+         · R0xAF = "AEC/AGC Enable"（bit0=AEC, bit1=AGC），**上电默认 0x0003（两个都开）**
+         · 手册原文："When AEC is disabled (R0xAF[0] = 0), the sensor uses the manual
+           exposure value in coarse and fine shutter width registers."
+       ⇒ 这就是"写 R0x0B 没反应"的根本原因：AEC 开着，每帧都会把曝光改回去。
+       ⇒ 必须先 R0xAF = 0（AEC + AGC 都关），再写 R0x0B，才真正是手动曝光。
+       ⚠️ 上次 2128 关掉 AEC 后"看不到图"，其实是**画面变暗 + 手动阈值 100 把二值图刷黑**，
+          不是传感器坏了（这次同时把默认阈值改成"自动 Otsu"，就不会再全黑）。*/
+    if (0U == cam_sccb_read_reg(0xAFU, &v))
+    {
+        (void)cam_sccb_write_reg(0xAFU, 0x0000U);        /* AEC=0, AGC=0 ⇒ 纯手动 */
+        if (0U != cam_sccb_read_reg(0xAFU, &v)) { v = 0xFFFFU; }
+        cam_ae = v;                                      /* 正常应回读 0 */
+    }
+    else { cam_ae = 0xFFFFU; }
+
     if (0U == cam_sccb_read_reg(0x0BU, &v))
     {
         {   /* ★ 硬上限：行 bin4 后一帧只有 120 行，快门一旦 ≥ 它，帧永远结束不了 */
@@ -2001,6 +2014,7 @@ uint8_t cam_sccb_set_bin4 (void)
     return cam_bin_ok;
 }
 
+volatile uint16_t cam_ae = 0xFFFFU;     /* ★ R0xAF 回读：0 = AEC/AGC 已关闭（正常）*/
 volatile uint8_t cam_shutter = 100U;  // ★★ 曝光 R0x0B（行数）：范围 1..110，1 = 最暗，110 = 最亮
                                       //   ⚠️ 原来写 150：150 > 120 ⇒ 传感器**永远完不成一帧**
                                       //      ⇒ PCLK 一直在跑（PF 有值）但 VSYNC/HREF 一个边沿都没有
@@ -2043,7 +2057,7 @@ volatile uint8_t  cam_thresh = 0;     // 本帧实际用的二值化阈值（诊
    0        = 自动（Otsu，原来的行为）
    1..255   = 固定阈值，直接用这个值二值化
    命令：`th <n>`（见 cmd_f4.c），上位机【阈值】按钮循环切换。*/
-volatile uint8_t  cam_thresh_manual = 100U;   /* ★ 默认就用**手动阈值 100**（用户要求不用自动）*/
+volatile uint8_t  cam_thresh_manual = 0U;     /* ★ 默认 = **自动 Otsu**（不会全黑）；按【阈值±】才切手动 */
 
 //-------------------------------------------------------------------------------------------------------------------
 // ★★★ 帧率画进图像（**单片机自己画**，电脑只负责收）★★★
