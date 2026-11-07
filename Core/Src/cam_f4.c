@@ -1936,6 +1936,22 @@ uint8_t cam_sccb_set_bin4 (void)
     uint16_t v   = 0U;
     uint8_t  err = 0U;
 
+    /* ★★★ 2026-11-07（FW=2136）：**先给传感器一次软复位** ★★★
+       现场抓包（FW=2135）：
+           BIN=0            -> cam_bin_ok=0，初始化失败
+           SH=778(=0x030A)  -> 读 0x0B 却读回 0x0D 的值，**读数据错位**
+           EDG=0            -> 一帧都没有
+       说明传感器被前面那几次寄存器实验写进了异常状态
+       （手册开头就警告：改保留寄存器会让器件进入 unknown state）。
+       手册 Table 8：**R0x0C = Reset**（写 bit0=1）⇒ 让传感器重新初始化一遍。
+       复位后等 30ms 再按正常流程配置。*/
+    (void)cam_sccb_write_reg(0x0CU, 0x0001U);        /* 软复位 */
+    HAL_Delay(30);
+
+    /* 复位后回读 R0x00（芯片版本，MT9V034 应为 0x13xx）确认 SCCB 恢复正常 */
+    if (0U == cam_sccb_read_reg(0x00U, &v)) { cam_id_rd = v; }
+    else                                    { cam_id_rd = 0xFFFFU; }
+
     // 🔥🔥🔥 2026-10-20 重大更正：**R0x0D 是 Context A 的 Read Mode，R0x0E 是 Context B 的！**
     //   （手册 P29 原文：`0x0E (14)  Read Mode Context B`）
     //   传感器默认跑在 **Context A** ⇒ **行 bin 也必须写在 R0x0D 里**！
@@ -2009,6 +2025,7 @@ uint8_t cam_sccb_set_bin4 (void)
     return cam_bin_ok;
 }
 
+volatile uint16_t cam_id_rd = 0xFFFFU;   /* ★ 软复位后回读的 R0x00（应 0x13xx）*/
 volatile uint8_t cam_shutter = 100U;  // ★★ 曝光 R0x0B（行数）：范围 1..110，1 = 最暗，110 = 最亮
                                       //   ⚠️ 原来写 150：150 > 120 ⇒ 传感器**永远完不成一帧**
                                       //      ⇒ PCLK 一直在跑（PF 有值）但 VSYNC/HREF 一个边沿都没有

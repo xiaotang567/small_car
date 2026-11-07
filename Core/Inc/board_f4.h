@@ -158,6 +158,7 @@ extern volatile uint8_t  cam_ahead;
 extern volatile uint16_t cam_fps10;
 extern volatile float    lf_dbg_a, lf_dbg_b, lf_dbg_c, lf_dbg_dev;     // 每行交界列（0xFF=无）
 extern volatile uint8_t  cam_thresh;         // 本帧实际用的二值化阈值
+extern volatile uint16_t cam_id_rd;           // ★ 软复位后回读的 R0x00（应 0x13xx）
 extern volatile uint8_t  cam_thresh_manual;  // ★ 0 = 自动(Otsu)；1..255 = 手动固定阈值
 extern volatile uint8_t  cam_shutter;        // 曝光 R0x0B（行数，`e <n>` 可调）
 void     cam_sccb_apply_flip (void);         // ★ 按 cam_flip 重写 R0x0D 的翻转位（bit5=左右镜像 bit4=上下）
