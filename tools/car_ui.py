@@ -9,7 +9,7 @@ small_car 控制台  ——  图像 + 仪表 + 按钮控制
   ③ 控制：
        电机1：**[启动] [停止]**（上电默认停，必须点"启动"才转）、[前进]/[后退] 选方向、
               快捷档 300 600 1000 1500、滑条（松手才发）
-       舵机：左 / 中 / 右 / −20 / +20 / 滑条
+       舵机：左 / 中 / 右 / −50 / −20 / +20 / +50 / 滑条
        其它：编码器清零 / 紧急停止
   ④ 事件：右上角一行提示"最后做了什么"，底部日志显示板子的回执
 
@@ -325,10 +325,17 @@ class App(object):
         self.btn_sr = self._btn(f, '右', lambda: self.do_servo(SERVO_RIGHT, self.btn_sr), w=4, h=2)
         self.btn_sr.grid(row=1, column=4, padx=3, pady=3, sticky='ew')
 
-        self.btn_sd = self._btn(f, '−20', lambda: self.do_servo_nudge(-20), w=4, h=1)
-        self.btn_sd.grid(row=2, column=0, padx=3, pady=(0, 4), sticky='ew')
-        self.btn_su = self._btn(f, '+20', lambda: self.do_servo_nudge(+20), w=4, h=1)
-        self.btn_su.grid(row=2, column=4, padx=3, pady=(0, 4), sticky='ew')
+        # ★★ 2026-11-07：**步进加减**：−50 / −20 … +20 / +50（一次点一下 = 目标位置 ±50 步）★★
+        #   舵机 4096 步 = 360° ⇒ 50 步 ≈ 4.4°；按住不放/连点就连续加。
+        #   每一步都会夹在 SERVO_MIN..SERVO_MAX 里，不会顶到机械限位。
+        self.btn_sd50 = self._btn(f, '−50', lambda: self.do_servo_nudge(-50, self.btn_sd50), w=4, h=1)
+        self.btn_sd50.grid(row=2, column=0, padx=3, pady=(0, 4), sticky='ew')
+        self.btn_sd = self._btn(f, '−20', lambda: self.do_servo_nudge(-20, self.btn_sd), w=4, h=1)
+        self.btn_sd.grid(row=2, column=1, padx=3, pady=(0, 4), sticky='ew')
+        self.btn_su = self._btn(f, '+20', lambda: self.do_servo_nudge(+20, self.btn_su), w=4, h=1)
+        self.btn_su.grid(row=2, column=3, padx=3, pady=(0, 4), sticky='ew')
+        self.btn_su50 = self._btn(f, '+50', lambda: self.do_servo_nudge(+50, self.btn_su50), w=4, h=1)
+        self.btn_su50.grid(row=2, column=4, padx=3, pady=(0, 4), sticky='ew')
 
         self.sld_servo = tk.Scale(f, from_=SERVO_MIN, to=SERVO_MAX, orient='horizontal',
                                   bg=C_PANEL, fg=C_FG, troughcolor='#3c3c4c',
@@ -614,8 +621,9 @@ class App(object):
         self.lbl_srv.configure(text='目标  %d' % pos)
         self.send_ack('r %d' % pos, 'ACK r', '舵机 → %d' % pos, btn)
 
-    def do_servo_nudge(self, d):
-        self.do_servo(self.req_servo + d, self.btn_su if d > 0 else self.btn_sd)
+    def do_servo_nudge(self, d, btn=None):
+        """在当前目标上加减 d 步（−50 / −20 / +20 / +50），夹在安全限位内再下发"""
+        self.do_servo(self.req_servo + d, btn)
 
     def do_duplex(self, half):
         """切换舵机物理层：0=全双工(PC10=TX/PC11=RX)，1=单线半双工(只接PC10)"""
