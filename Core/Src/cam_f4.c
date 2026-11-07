@@ -1966,6 +1966,21 @@ uint8_t cam_sccb_set_bin4 (void)
     //         （SR=0000 / RIS=0000）** ✗✗ —— DCMI 这边怎么重启都没用，因为根本没帧可同步 ✓
     //   ⇒ 必须把快门压到帧内（120 行以内，取 100 行 ≈ 3.7ms 曝光）✓
     //   （想更亮/更暗：后续可以做成命令，动态改 R0x0B ✓）
+    /* ★★★ 2026-11-07（FW=2128）：**必须先关自动曝光（AEC），否则 R0x0B 写了也没用** ★★★
+       依据：逐飞 TC264 库 zf_device_mt9v03x.h
+             MT9V03X_AUTO_EXP_DEF = 0   // 自动曝光，**默认不开启**，范围 [0-63]，0 = 关闭
+       这句话说明：自动曝光是**板上那颗 51 默认开、由它关掉**的。
+       用户把 51 芯片拆了 ⇒ 上电走传感器默认值 ⇒ **AEC 开着** ⇒ 它会自己调亮度，
+       我们写 R0x0B（快门）当然看不出变化。
+       MT9V03x 的 AEC/AGC 控制寄存器是 R0xAF：写 0 = 关闭自动曝光（纯手动）。*/
+    if (0U == cam_sccb_read_reg(0xAFU, &v))
+    {
+        (void)cam_sccb_write_reg(0xAFU, 0U);          /* AEC/AGC = 关 */
+        if (0U != cam_sccb_read_reg(0xAFU, &v)) { v = 0xFFFFU; }
+        cam_ae = v;
+    }
+    else { cam_ae = 0xFFFFU; }
+
     if (0U == cam_sccb_read_reg(0x0BU, &v))
     {
         {   /* ★ 硬上限：行 bin4 后一帧只有 120 行，快门一旦 ≥ 它，帧永远结束不了 */
@@ -1997,6 +2012,7 @@ uint8_t cam_sccb_set_bin4 (void)
     return cam_bin_ok;
 }
 
+volatile uint16_t cam_ae = 0xFFFFU;     /* ★ R0xAF 回读：0 = 自动曝光已关闭（正常）*/
 volatile uint8_t cam_shutter = 50U;    /* ★ 2026-11-07 用户实测对照：默认 50（原来 100）*/  // ★★ 曝光 R0x0B（行数）：范围 1..110，1 = 最暗，110 = 最亮
                                       //   ⚠️ 原来写 150：150 > 120 ⇒ 传感器**永远完不成一帧**
                                       //      ⇒ PCLK 一直在跑（PF 有值）但 VSYNC/HREF 一个边沿都没有
