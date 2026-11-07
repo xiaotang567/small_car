@@ -1958,6 +1958,30 @@ uint8_t cam_sccb_set_bin4 (void)
     (void)cam_sccb_write_reg(0xAFU, 0x0003U);      /* ★ 恢复出厂：AEC=1, AGC=1 */
     HAL_Delay(5);
 
+    /* ★★★ 2026-11-07（FW=2144）：**整机恢复出厂寄存器**（最后手段）★★★
+       现场：所有关键寄存器读回都是正确值（0B=0064 0C=0000 0D=030A 03=01E0 04=02F0
+             07=0388 0F=0100 AF=0003），却完全没有 VSYNC / W=0 / RISR=0。
+       手册 p63 还提到：**STANDBY 拉高时传感器会关闭数字逻辑/内部时钟/模拟电源，
+       但那两条线之外 SCCB 仍然可读** —— 症状完全吻合。
+       ⇒ 把 Table 8 里**所有有默认值的主寄存器**逐个写回出厂值，
+         再重新配 bin4 + 快门，尽量把芯片从任何未知状态拉回。*/
+    {
+        static const uint8_t  regs[14] = {0x01,0x02,0x03,0x04,0x05,0x06,0x07,
+                                          0x08,0x09,0x0A,0x0B,0x0F,0x20,0x24};
+        static const uint16_t vals[14] = {0x0001,0x0004,0x01E0,0x02F0,0x005E,0x002D,0x0388,
+                                          0x01BB,0x01D9,0x0164,0x01E0,0x0100,0x0007,0x0002};
+        uint8_t k;
+
+        for (k = 0U; k < 14U; k++)
+        {
+            (void)cam_sccb_write_reg(regs[k], vals[k]);
+            HAL_Delay(1);
+        }
+
+        (void)cam_sccb_write_reg(0x0DU, 0x0300U);      /* 先回默认读模式 */
+        HAL_Delay(1);
+    }
+
     // 🔥🔥🔥 2026-10-20 重大更正：**R0x0D 是 Context A 的 Read Mode，R0x0E 是 Context B 的！**
     //   （手册 P29 原文：`0x0E (14)  Read Mode Context B`）
     //   传感器默认跑在 **Context A** ⇒ **行 bin 也必须写在 R0x0D 里**！
