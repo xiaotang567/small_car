@@ -718,29 +718,34 @@ void ctrl_servo_init (void)
     ctrl_servo_scan();
 }
 
-/* ★★★ 2026-11-07（FW=2104）：**不再扫描** ★★★
-   用户明确：总线舵机 **ID = 1、波特率 = 1000000**，固定值，不用找。
-   ⇒ 原来的"0~20 号挨个 PING"整个去掉，只：
-     ① 把 ID / 波特率设成固定值；② PING 一次，只为把"通没通/报没报错"填进诊断量。
-   好处：开机不再为了找 ID 反复发帧（那条路径在收发短接时会一直空转），
-        现在固定一次 PING 就完事（约 1~2ms）。*/
+/* ★★★ 2026-11-07（FW=2107）：**ID 固定 1，波特率自动试两档** ★★★
+   舵机型号 HX-10HM。它的手册前后不一致（第 1 页写 115200、规格表和协议文档写 1Mbps）——
+   其实 115200 是**调试板到电脑**那一路，**舵机总线那一路是 1000000**。
+   为了不再靠猜：开机把 1M → 115200 各 PING 一次（每次最多 1~2ms，总共几毫秒），
+   谁应答就用谁；两个都不应答就停在 1M，运行中还会继续换档重试（见 board_ctrl_tick）。*/
 void ctrl_servo_scan (void)
 {
-    uint8_t err = 0xFFU;
+    static const uint32_t bauds[] = { CTRL_SERVO_BAUD, CTRL_SERVO_BAUD_ALT };
+    uint8_t  bi;
+    uint8_t  err = 0xFFU;
 
     ctrl_oled_boot(9U);
 
     g_servo_id = CTRL_SERVO_ID;                 /* ★ 固定 = 1 */
-    servo_set_baud(CTRL_SERVO_BAUD);            /* ★ 固定 = 1000000 */
 
-    if (0U == servo_ping(g_servo_id, &err))     /* 0 = 应答正常；2 = 应答但报故障 */
+    for (bi = 0U; bi < (uint8_t)(sizeof(bauds) / sizeof(bauds[0])); bi ++)
     {
-        g_servo_err = err;
+        servo_set_baud(bauds[bi]);
+
+        if (0U == servo_ping(g_servo_id, &err))     /* 0 = 应答正常；2 = 应答但报故障 */
+        {
+            g_servo_err = err;
+            return;                                 /* 这一档能通 ⇒ 定下来 */
+        }
     }
-    else
-    {
-        g_servo_err = 0xFFU;                    /* 没应答：留着给上位机显示 */
-    }
+
+    servo_set_baud(CTRL_SERVO_BAUD);            /* 都不应答：回默认档 */
+    g_servo_err = 0xFFU;                        /* 留着给上位机显示 */
 }
 
 /* 走到目标位置（写 0x2A 两个字节，同步等应答）*/
@@ -1618,6 +1623,27 @@ void board_ctrl_tick (void)
           · 然后写一次目标速度（0x2E 是保持型寄存器），再摆到目标位置
           · 之后：目标变了才发（发完立刻等应答，约 1~2ms）；空闲时每 10 拍（200ms）读一次位置
           ⚠️ 一处失败（没应答）不会重试 —— 与原来的行为一致；下一次目标变化还会再发。*/
+    /* ★★★ 2026-11-07（FW=2107）：一次合法应答都没收到过 ⇒ 每 3 秒换一档波特率再 PING ★★★
+       HX-10HM 的波特率在手册里有两种说法（1M / 115200），与其猜，不如两档都试。
+       一旦收到应答（g_srv_rx_cnt > 0）就停，不再打扰总线。
+       每次 PING 最多 ~2ms，靠同步轮询，不用中断，不会卡。*/
+    if ((0U == g_srv_rx_cnt) && (g_servo_boot >= 50U))
+    {
+        static uint32_t t_baud = 0U;
+        static uint8_t  alt    = 0U;
+
+        if ((HAL_GetTick() - t_baud) > 3000U)
+        {
+            uint8_t err = 0xFFU;
+
+            t_baud = HAL_GetTick();
+            alt    = (uint8_t)(alt ^ 1U);
+            servo_set_baud((0U != alt) ? CTRL_SERVO_BAUD_ALT : CTRL_SERVO_BAUD);
+            (void)servo_ping(g_servo_id, &err);
+            g_servo_err = err;
+        }
+    }
+
     if (g_servo_boot < 50U)
     {
         g_servo_boot ++;

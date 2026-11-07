@@ -75,11 +75,15 @@
    ⚠️ 顺带修的一个坑：低速时 USARTDIV 会超过 4095（BRR 装不下）
       ⇒ `servo_set_baud()` 会自动切 OVER8=1（8 倍过采样），10000bps 以下才需要。*/
 #define CTRL_SERVO_BAUD         1000000UL
+/* ★ 备用档：HX-10HM 手册第 1 页写的 115200（其实那是"调试板→电脑"那一路）。
+   开机自动在 1M / 115200 之间试一次；运行中一次应答都没收到时也会每 3 秒换档重试。*/
+#define CTRL_SERVO_BAUD_ALT     115200UL
 /* ★ 2026-11-06：**开机默认走单线半双工**（用户要求）
    1 = 默认单线：数据只走 **PC10** 一根线（UART4 HDSEL + PC10 开漏+上拉）
    0 = 默认全双工：PC10=TX / PC11=RX
    运行时仍可用 `r -1`（单线）/ `r -2`（全双工）切换，不用重烧。*/
-#define CTRL_SERVO_HALF_DUPLEX_DEFAULT  1
+#define CTRL_SERVO_HALF_DUPLEX_DEFAULT  0   /* ★ 有幻尔调试板 ⇒ 全双工：PC10=TX/PC11=RX 分开走，
+                                               绝对不要把这两根线并在一起（并了就是两个输出对拉）*/
 #define CTRL_SERVO_ID           1            /* 总线上那颗舵机的 ID */
 #define CTRL_SERVO_POS_MIN      1048         /* 安全限位（原工程 2048 ± 1000） */
 #define CTRL_SERVO_POS_MAX      3048
