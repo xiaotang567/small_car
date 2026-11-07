@@ -1948,6 +1948,16 @@ uint8_t cam_sccb_set_bin4 (void)
     (void)cam_sccb_write_reg(0x0CU, 0x0000U);       /* ★ 释放复位 */
     HAL_Delay(50);
 
+    /* ★★★ 2026-11-07（FW=2143）：**把 R0xAF 恢复成出厂值 0x0003** ★★★
+       `dr` 抓到的寄存器快照：
+           0B:0064 0C:0000 0D:030A 03:01E0 04:02F0 07:0388 0F:0100 **AF:0000**
+       除了 AF 之外**全部正确**（快门/bin4/窗口/控制位/HDR 都好，复位也释放了），
+       唯独 R0xAF（AEC/AGC Enable）被我 2132 那次写成了 0，之后就一直是 0
+       ⇒ 手册 Table 8 的出厂值是 **0x0003**（AEC 开、AGC 开）。
+       这就是"配置全对却完全没有 VSYNC"的唯一异常项 ⇒ 这里显式写回 0x0003。*/
+    (void)cam_sccb_write_reg(0xAFU, 0x0003U);      /* ★ 恢复出厂：AEC=1, AGC=1 */
+    HAL_Delay(5);
+
     // 🔥🔥🔥 2026-10-20 重大更正：**R0x0D 是 Context A 的 Read Mode，R0x0E 是 Context B 的！**
     //   （手册 P29 原文：`0x0E (14)  Read Mode Context B`）
     //   传感器默认跑在 **Context A** ⇒ **行 bin 也必须写在 R0x0D 里**！
