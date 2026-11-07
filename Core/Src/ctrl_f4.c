@@ -1351,7 +1351,9 @@ static void oled_pad (char *b)
 /* 重新生成 4 行文字（内容变了才标 dirty） */
 static void oled_text_update (void)
 {
-    char b[20];
+    static const char spin[4] = { '-', '\\', '|', '/' };
+    char     b[20];
+    uint32_t now = HAL_GetTick();
 
     if (0U != wifi_f4_is_ready()) { sprintf(b, "WiFi OK"); }
     else if (0U == wifi_f4_last_err()) { sprintf(b, "WiFi --"); }   /* 还在初始化（模块没报错）*/
@@ -1365,7 +1367,11 @@ static void oled_text_update (void)
     sprintf(b, "ENC %05ld", (long)(g_enc_total % 100000L));
     oled_pad(b); oled_line_set(2U, b);
 
-    sprintf(b, "RPM %4d", (int)(g_enc_rpm_x10 / 10));
+    /* ★★ 2026-11-07（FW=2100）：行尾这个会**转的小符号** = "主循环还活着"的铁证 ★★
+       以前 RPM 一直是 0、ENC 不动的时候，屏幕看着就像"卡死"，根本分不清是
+       "主循环停了"还是"只是数值没变所以没重画"。现在它每 250ms 变一次
+       （一行重画 ≈4ms ⇒ 约 1.6% CPU），**停了就是真停了**。*/
+    sprintf(b, "RPM %4d %c", (int)(g_enc_rpm_x10 / 10), spin[(now / 250U) & 3U]);
     oled_pad(b); oled_line_set(3U, b);
 }
 

@@ -41,7 +41,18 @@
 
 /* Private variables ---------------------------------------------------------*/
 /* USER CODE BEGIN PV */
-
+/* ★★★ 2026-11-07（FW=2100）：**主循环看门狗**（软件）★★★
+   现场：并上 PC10/PC11 后 OLED 直接定格 ⇒ 主循环停了，但模块还揣着 TCP
+   ⇒ 上位机永远"已连接 + 0 B/s"，只能断电。
+   这里在 SysTick（优先级 0，谁也抢不走）里盯着 app_loop 的脚印：
+     · g_wdt_on    = 1 之后才开始看（开机那段几十秒的初始化不算）
+     · g_wdt_pause = 1 时暂停（只包住必然长时间阻塞的 wifi_f4_init）
+     · 6 秒没踩脚印 ⇒ NVIC_SystemReset()（软件复位，心跳里 RST=04）
+   效果：卡死最多 6 秒后自己重启、自己重连，不用再断电。*/
+extern volatile uint32_t g_loop_tick;
+extern volatile uint8_t  g_wdt_on;
+extern volatile uint8_t  g_wdt_pause;
+extern volatile uint8_t  g_loop_mark;      /* 主循环走到第几步（面包屑）*/
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -110,7 +121,17 @@ void HardFault_Handler(void)
 void MemManage_Handler(void)
 {
   /* USER CODE BEGIN MemoryManagement_IRQn 0 */
-
+  /* ★ 2026-11-07（FW=2100）：**故障里绝不能 while(1)**。
+     故障处理器的优先级是负数（比任何中断都高）⇒ 一旦在这里死等，
+     连 SysTick 都被挡住、主循环看门狗也救不回来 ⇒ 只能断电。
+     改成"记现场 + 软复位"，和 HardFault_Handler 一致。*/
+  RCC->APB1ENR |= (1UL << 28);
+  PWR->CR      |= (1UL << 8);
+  RTC->BKP0R = 0xA5A5A5A5UL;
+  RTC->BKP3R = SCB->CFSR;
+  RTC->BKP4R = SCB->HFSR;
+  RTC->BKP5R = SCB->BFAR;
+  NVIC_SystemReset();
   /* USER CODE END MemoryManagement_IRQn 0 */
   while (1)
   {
@@ -125,7 +146,14 @@ void MemManage_Handler(void)
 void BusFault_Handler(void)
 {
   /* USER CODE BEGIN BusFault_IRQn 0 */
-
+  /* ★ 同理：这里 while(1) 会把整个系统钉死（故障优先级最高）⇒ 改成记现场 + 软复位 */
+  RCC->APB1ENR |= (1UL << 28);
+  PWR->CR      |= (1UL << 8);
+  RTC->BKP0R = 0xA5A5A5A5UL;
+  RTC->BKP3R = SCB->CFSR;
+  RTC->BKP4R = SCB->HFSR;
+  RTC->BKP5R = SCB->BFAR;
+  NVIC_SystemReset();
   /* USER CODE END BusFault_IRQn 0 */
   while (1)
   {
@@ -140,7 +168,14 @@ void BusFault_Handler(void)
 void UsageFault_Handler(void)
 {
   /* USER CODE BEGIN UsageFault_IRQn 0 */
-
+  /* ★ 同理：记现场 + 软复位，绝不死等 */
+  RCC->APB1ENR |= (1UL << 28);
+  PWR->CR      |= (1UL << 8);
+  RTC->BKP0R = 0xA5A5A5A5UL;
+  RTC->BKP3R = SCB->CFSR;
+  RTC->BKP4R = SCB->HFSR;
+  RTC->BKP5R = SCB->BFAR;
+  NVIC_SystemReset();
   /* USER CODE END UsageFault_IRQn 0 */
   while (1)
   {
@@ -198,7 +233,16 @@ void SysTick_Handler(void)
   /* USER CODE END SysTick_IRQn 0 */
   HAL_IncTick();
   /* USER CODE BEGIN SysTick_IRQn 1 */
-
+  /* ★ 主循环看门狗（见文件头 PV 段说明）：SysTick 优先级已提到 0，这个判断一定跑得到 */
+  if ((0U != g_wdt_on) && (0U == g_wdt_pause) &&
+      ((HAL_GetTick() - g_loop_tick) > 6000U))
+  {
+    /* ★ 先把"卡在第几步"记进 RTC 备份寄存器（掉电不丢），开机心跳里会显示成 LM= */
+    RCC->APB1ENR |= (1UL << 28);
+    PWR->CR      |= (1UL << 8);
+    RTC->BKP6R    = (uint32_t)g_loop_mark;
+    NVIC_SystemReset();                 /* 主循环停了 6 秒 ⇒ 立刻重启（RST=04 可查）*/
+  }
   /* USER CODE END SysTick_IRQn 1 */
 }
 

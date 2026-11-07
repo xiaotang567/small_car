@@ -68,6 +68,9 @@ volatile uint32_t flt_lr   = 0U;
 volatile uint32_t flt_cfsr = 0U;      /* 可配置故障状态 */
 volatile uint32_t flt_hfsr = 0U;
 volatile uint32_t flt_bfar = 0U;      /* BusFault 出错地址 */
+/* ★ 2026-11-07（FW=2100）：**主循环看门狗复位时，卡在哪一步**（"面包屑"）
+   由 SysTick 看门狗写进 RTC->BKP6R，开机读回来，心跳里显示成 LM= */
+volatile uint32_t flt_mark = 0U;
 
 int main(void)
 {
@@ -124,6 +127,9 @@ int main(void)
   {
     RCC->APB1ENR |= (1UL << 28);
     PWR->CR      |= (1UL << 8);
+    /* ★ 主循环看门狗复位时记下的"卡在第几步"（RTC 备份寄存器，掉电不丢）*/
+    flt_mark   = RTC->BKP6R;
+    RTC->BKP6R = 0U;
     if (0xA5A5A5A5UL == RTC->BKP0R)
     {
       flt_pc   = RTC->BKP1R;

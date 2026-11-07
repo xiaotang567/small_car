@@ -46,6 +46,14 @@ static uint32_t cam_t_p2      = 0;       // ★ 进相 2（开始发这一帧）
 uint32_t        cam_tx_drop   = 0U;      // ★ 因为发不出去而**主动放弃**的帧数（CFG 里的 DRP）
 uint32_t        cam_self_heal = 0U;      // ★ 连续 2 秒没有完整帧 ⇒ 重启采集的次数（CFG 里的 SELF）
 
+/* ★★★ 2026-11-07（FW=2100）：**主循环看门狗**（在 SysTick 里判，见 stm32f4xx_it.c）★★★
+   现场：PC10/PC11 并上以后 OLED 直接定格 ⇒ 主循环停了（模块还揣着 TCP）
+   ⇒ 上位机永远"已连接 + 0 B/s"，只能断电。这里让板子自己发现、自己重启。*/
+volatile uint32_t g_loop_tick  = 0U;     /* 主循环每圈踩一下 */
+volatile uint8_t  g_wdt_on     = 0U;     /* 1 = 开始看门（app_loop 启动后才置，避开开机初始化）*/
+volatile uint8_t  g_wdt_pause  = 0U;     /* 1 = 暂停（只包住必然长时间阻塞的 wifi_f4_init）*/
+volatile uint8_t  g_loop_mark  = 0U;     /* 这一圈走到第几步（卡死时由看门狗写进 RTC，开机显示 LM=）*/
+
 /* ★★★ 2026-11-06：上位机"原图/二值图"开关 ★★★
    0 = 发 **8bit 灰度缩略图**（94×60，`0xFC` 包，8 块）
    1 = 发 **位打包二值整帧**（188×120，`0xFF` 包）—— 默认，就是原来的行为
@@ -514,8 +522,13 @@ static void cam_tx_row_done (void)
 //===================================================主循环===================================================
 void app_loop (void)
 {
+  g_loop_tick = HAL_GetTick();
+  g_wdt_on    = 1U;                    /* ★ 从这一圈起，主循环 6 秒不动就自动复位 */
+
   while (1)
   {
+    g_loop_tick = HAL_GetTick();       /* ★ 踩脚印（主循环看门狗，见 stm32f4xx_it.c）*/
+
     // 几个跨轮次保持的状态（static：只初始化一次）
     static uint8_t  cam_min = 255;      // 最近一帧的最暗值
     static uint8_t  cam_max = 0;        // 最近一帧的最亮值
@@ -568,7 +581,10 @@ void app_loop (void)
         if (relink_n >= 2U)
         {
           relink_n = 0;
+          g_wdt_pause = 1U;                     /* ★ 整模块复位最长要几十秒，先暂停看门狗 */
           (void)wifi_f4_init();                 /* 拉 RST + 重新连热点/上位机（阻塞几秒）*/
+          g_wdt_pause = 0U;
+          g_loop_tick = HAL_GetTick();
           board_led_show(wifi_f4_last_err());
         }
         else
@@ -627,21 +643,25 @@ void app_loop (void)
     board_led_task();
 
     // ---- 轮询 DCMI 状态标志（排"f=0"用；只读寄存器，很快）----
+    g_loop_mark = 2U;
     board_cam_poll();
 
     // ---- ★ 全画面：把 DMA 刚写完的行收割进 disp_img（每 4 行取 1 行、每 4 列取 1 列）----
     //   ⚠️ 必须在**主循环每轮都跑**：一条行在 90KB 环形缓冲里只活 **4.2ms**，
     //      一旦被覆盖就收割不到了 ⇒ 绝不能放进有节流（6ms/500ms）的块里。
+    g_loop_mark = 3U;
     board_cam_harvest();
 
     // ---- ★ 实时命令：把上位机发来的字节攒成行并**立刻执行**（改帧率/抽点/配摄像头）----
     //   ⚠️ 和收割一样必须**每轮都跑**：塞进带节流的块里会让命令延迟几百毫秒才生效，
     //      调参时就会"发了半天没反应"，很难判断是命令没到还是参数没作用。
+    g_loop_mark = 4U;
     cam_cmd_poll();
 
     // ---- ★★ 车模控制节拍（20ms 自己节流）：编码器 / 速度环 / 舵机 / IMU / yaw ★★
     //   🔑 必须放在主循环里、且**绝不阻塞**：内部所有等待都有上界，
     //      舵机走中断发送、IMU 一次约 0.3ms、其余都是几次整数运算。
+    g_loop_mark = 5U;
     board_ctrl_tick();
 
     // ---- ★ 引脚"悬浮/断线"检测（**已关闭**，2026-10-15）----
@@ -658,6 +678,7 @@ void app_loop (void)
     //      而"位发生变化"本身会**强制 DCMI 重新同步**。
     //      我后来写的"每 200ms 重写同样的值"——值没变 ⇒ 等于什么都没做 ⇒ 所以没用。
     //   ⇒ 恢复轮换，但**只在"不花"的几组之间轮换**（0/1/2 会花，已排除）。
+    g_loop_mark = 6U;
     board_cam_pol_search();
 
     // ==================== 摄像头：统计（**默认不算**！）====================
@@ -709,6 +730,7 @@ void app_loop (void)
     //      移到主循环层级（用自己的 6ms 节流）后 ⇒ 约 166 行/秒 ⇒ 整帧约 0.36s。
     //
     //   包格式： 0xAA 0x55 0xA5 0x5A | 行号 | W | 极性组号 | H | 像素[W] | 校验和高8 低8
+    g_loop_mark = 8U;
     if (wifi_f4_is_ready())
     {
       // ⚠️ 这里原来有 t_tx / t_img / tx_row 三个 static（节流 + 行号）。
@@ -879,6 +901,7 @@ void app_loop (void)
     //      但换来"完全不用人工敲命令"，值得 ✓（找到之后就不再探了）
     //   ⚠️ 现在是"**开机立刻探第一次**"，之后**每 1 秒**重试 ——
     //      快间隔是**故意的**：用它来做"**边碰线边找脚**"（改完硬件不用重烧、不用复位）✓
+    g_loop_mark = 9U;
     if ((0U == cam_if_ok) && ((0U == cam_if_tries) || ((HAL_GetTick() - t_camprobe) >= 1000UL)))
     {
         uint8_t rr;
@@ -922,6 +945,7 @@ void app_loop (void)
     //   格式（故意短，别超过 130 字符 —— 上位机的文本行有长度上限）：
     //     T r=<转速RPM> ax ay az gx gy gz <原始LSB> y=<偏航角, 单位 0.1°> s=<舵机位置> m=<图像模式>
     //   上位机只按 = 取数，顺序/字段名可以随意加（加新字段要同步改 car_ui.py）
+    g_loop_mark = 10U;
     if (wifi_f4_is_ready() && ((HAL_GetTick() - t_tel) >= 200U))
     {
       static char tb[192];
@@ -960,6 +984,7 @@ void app_loop (void)
     //   🔥 上一版这里是"只在收到摄像头帧时才发"——结果摄像头一出问题，
     //      **一个字节都发不出去**，看起来像"WiFi 挂了"，极难排查。
     //      ⇒ 输出绝不能挂在另一个可能坏掉的外设上。心跳永远发，摄像头状态放在内容里。
+    g_loop_mark = 11U;
     if (wifi_f4_is_ready() && ((HAL_GetTick() - t_hb) >= 500))
     {
       static char buf[320];   /* ★ static：进 .bss，不吃栈（最长的一行 S 约 203B，最坏 271B）*/
@@ -979,7 +1004,7 @@ void app_loop (void)
         //     MD  = 当前采集模式（0 = 752 宽 / 1 = 188 宽）
         //     BIN = 188×120 配置是否成功（1 = 已写并回读一致）
         //     R0D/R0E = 两个 Read Mode 寄存器的**回读值**（列 bin 在 R0D[3:2]、行 bin 在 R0E[1:0]）
-        sprintf(buf, "S f=%lu V=%lu VS=%lu LG=%lu TO=%lu F=%u FL=%u P=%u RX=%lu CAM=%u ID=%04X N=%u MD=%u BIN=%u R0D=%04X W=%u E=%u K=%lu R=%04lX IE=%04lX MI=%04lX LW=%lu GP=%lu FW=2099 RST=%02lX PC=%08lX CF=%04lX BA=%08lX\r\n",
+        sprintf(buf, "S f=%lu V=%lu VS=%lu LG=%lu TO=%lu F=%u FL=%u P=%u RX=%lu CAM=%u ID=%04X N=%u MD=%u BIN=%u R0D=%04X W=%u E=%u K=%lu R=%04lX IE=%04lX MI=%04lX LW=%lu GP=%lu FW=2100 LM=%lu RST=%02lX PC=%08lX CF=%04lX BA=%08lX\r\n",
                 (unsigned long)cam_frame_cnt, (unsigned long)cam_vsync_isr_cnt,
                 (unsigned long)cam_vs_cap_cnt,
                 (unsigned long)disp_lag_max,
@@ -994,6 +1019,7 @@ void app_loop (void)
                 (unsigned long)t_pclk, (unsigned long)dcmi_ris,
                 (unsigned long)dbg_dcmi_ier, (unsigned long)dbg_dcmi_misr,
                 (unsigned long)cam_line_isr_cnt, (unsigned long)cam_ln_gap_cnt,
+                (unsigned long)flt_mark,
                 (unsigned long)cam_rst_flags,
                 (unsigned long)flt_pc, (unsigned long)flt_cfsr, (unsigned long)flt_bfar);
         dbg_txt(buf);

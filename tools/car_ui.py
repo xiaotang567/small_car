@@ -853,8 +853,14 @@ class App(object):
         pc  = d.get('PC', '00000000')
         cf  = d.get('CF', '0000')
         ba  = d.get('BA', '00000000')
-        if pc not in ('00000000', '') or cf not in ('0000', ''):
-            key = (rst, pc, cf)
+        lm  = d.get('LM', '0')
+        # LM = 主循环看门狗复位前"卡在第几步"（FW=2100 起）
+        LM_NAME = {'0': '开机/未记录', '1': 'LED', '2': 'cam_poll', '3': 'cam_harvest',
+                   '4': 'cmd_poll(SPI读)', '5': 'board_ctrl_tick(舵机/IMU/OLED)',
+                   '6': 'cam_pol_search', '7': '统计', '8': '图像发送(SPI)',
+                   '9': '摄像头探测', '10': '遥测', '11': '心跳'}
+        if lm not in ('0', '') or pc not in ('00000000', '') or cf not in ('0000', ''):
+            key = (rst, pc, cf, lm)
             if key != self.fault_seen:
                 self.fault_seen = key
                 # RST 位：bit0=欠压 BOR / bit1=引脚复位 / bit2=上电 / bit3=软件 / bit4=IWDG
@@ -867,8 +873,9 @@ class App(object):
                                   (4, '看门狗'), (5, '窗口看门狗'), (6, '低功耗')):
                     if r >= 0 and (r >> bit) & 1:
                         why.append(name)
-                self.log('⚠ 板子上次运行异常：RST=%s(%s) PC=%s CF=%s BA=%s'
-                         % (rst, '/'.join(why) or '?', pc, cf, ba))
+                self.log('⚠ 板子上次运行异常：RST=%s(%s) PC=%s CF=%s BA=%s  卡在 LM=%s(%s)'
+                         % (rst, '/'.join(why) or '?', pc, cf, ba,
+                            lm, LM_NAME.get(lm, '?')))
 
     def on_tele(self, s):
         d = {}
