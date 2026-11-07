@@ -439,6 +439,46 @@
               <FileType>1</FileType>
               <FilePath>../Core/Src/ctrl_f4.c</FilePath>
             </File>
+            <File>
+              <FileName>motor_f4.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>../Core/Src/motor_f4.c</FilePath>
+            </File>
+            <File>
+              <FileName>encoder_f4.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>../Core/Src/encoder_f4.c</FilePath>
+            </File>
+            <File>
+              <FileName>servo_f4.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>../Core/Src/servo_f4.c</FilePath>
+            </File>
+            <File>
+              <FileName>pid_f4.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>../Core/Src/pid_f4.c</FilePath>
+            </File>
+            <File>
+              <FileName>protect_f4.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>../Core/Src/protect_f4.c</FilePath>
+            </File>
+            <File>
+              <FileName>oled_f4.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>../Core/Src/oled_f4.c</FilePath>
+            </File>
+            <File>
+              <FileName>io_f4.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>../Core/Src/io_f4.c</FilePath>
+            </File>
+            <File>
+              <FileName>imu_f4.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>../Core/Src/imu_f4.c</FilePath>
+            </File>
           </Files>
         </Group>
         <Group>

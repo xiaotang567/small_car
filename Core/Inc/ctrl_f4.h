@@ -40,6 +40,10 @@
 
 //===================================================参数（按实车标定）===================================================
 
+/* ---- 时钟（和 board_f4.c 的时钟树一致：APB1 = 42MHz，APB1 上的定时器 = 84MHz）---- */
+#define CTRL_APB1_HZ_LOCAL      42000000UL
+#define CTRL_TIM_APB1_HZ        84000000UL
+
 /* ---- 电机（原工程：17kHz、占空比 ±10000、DIR 高=正转）---- */
 #define CTRL_PWM_FREQ_HZ        17000U
 #define CTRL_PWM_ARR            ((uint16_t)(84000000UL / CTRL_PWM_FREQ_HZ - 1UL))   /* = 4940 → 17.0kHz */
@@ -122,6 +126,20 @@
 #define CTRL_YAW_SCALE          1.0f
 
 //===================================================对外接口===================================================
+
+/* ---------- 底层工具（DWT 微秒延时，ctrl_f4.c）---------- */
+void     ctrl_dwt_init (void);
+void     ctrl_delay_us (uint32_t us);
+
+/* ---------- 各模块的"节拍"（由 board_ctrl_tick 统一调用）---------- */
+void     ctrl_encoder_tick (uint32_t dt_us);   /* encoder_f4.c：取增量 + 用真实间隔算转速 */
+void     ctrl_speed_tick (void);               /* pid_f4.c：速度环一次迭代 */
+void     ctrl_protect_tick (void);             /* protect_f4.c：堵转保护 + 按键重启 */
+void     ctrl_imu_tick (void);                 /* imu_f4.c：读 IMU + 喂 yaw */
+void     ctrl_servo_tick (void);               /* servo_f4.c：舵机状态机 */
+uint8_t  ctrl_imu_ok (void);                   /* 1 = MPU9250 在线 */
+uint8_t  ctrl_motor_stalled (void);            /* 1 = 堵转停机中（OLED 用）*/
+uint8_t  ctrl_motor_started (void);            /* 1 = 已经起过转（OLED 用）*/
 
 /* ---------- 初始化（全部很快，不阻塞；在 board_cam_init() 之后调）---------- */
 void     ctrl_all_init (void);
