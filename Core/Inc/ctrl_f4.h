@@ -71,7 +71,8 @@
      · OLED 第 2 行显示 RUN 500 / STALL PC2 / STOP。
    把 CTRL_RUN_AUTO_START 改成 0 就回到"上电不转、等上位机命令"。*/
 #define CTRL_RUN_RPM            500          /* 巡航目标转速（RPM）*/
-#define CTRL_RUN_AUTO_START     1            /* 1 = 主循环一开始就自动起转 */
+#define CTRL_RUN_AUTO_START     0            /* ★ 2026-11-07：**默认不转**（用户要求）——上电只初始化，
+                                                等上位机发 `q <rpm>`（PID 闭环）或 `w <duty>`（开环）才动 */
 #define CTRL_STALL_ENABLE       1            /* ★ 1 = 打开堵转保护；0 = 关闭 */
 #define CTRL_STALL_RPM          400          /* ★★ 全局判据：实测转速 < 400 RPM 持续 2 秒 ⇒ 关电机 ★★ */
 #define CTRL_STALL_MS           2000         /* 低于 400 持续多久判堵转 */

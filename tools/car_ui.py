@@ -72,6 +72,9 @@ C_WAIT    = '#b8860b'      # ★ 命令"已发出、等板子回执"时按钮变
 #   'rpm' —— 走速度环闭环（需要编码器读数正确）
 PWM_PRESETS = (10, 20, 30, 50)          # 占空比 %
 RPM_PRESETS = (500, 800, 1200, 1500)
+
+# ★ 2026-11-07：二值化阈值档位（0 = 自动 Otsu；其余为手动固定阈值）
+THRESH_STEPS = (80, 100, 120, 140, 160, 200, 0)   # 默认 100（和固件一致），最后一档 0 = 自动
 SERVO_MID = 2748                       # ★ 2026-11-07 用户实测：默认中位
 SERVO_MIN, SERVO_MAX = 1700, 3024      # ★ 安全行程（左/右快捷档就取这两个端点）
 SERVO_LEFT, SERVO_RIGHT = SERVO_MIN, SERVO_MAX
@@ -124,6 +127,7 @@ class App(object):
         # ---- 目标值（界面状态）----
         self.req_rpm = 0            # 想跑多少（带方向）
         self.req_servo = SERVO_MID
+        self.thresh_idx = 1          # ★ 1 = 100（和固件默认的 cam_thresh_manual 一致）
         self.running = False        # ★ 电机1 是否"启动"状态：上电默认停
         self.dir = +1               # 方向：+1 前进 / -1 后退
         self.ctrl_mode = 'rpm'      # ★ 默认"转速闭环"（固件巡航目标 500 RPM）；可切回占空比
@@ -234,8 +238,12 @@ class App(object):
         self.btn_img_off.grid(row=1, column=0, columnspan=2, padx=6, pady=(0, 6), sticky='ew')
         self.btn_img_on = self._btn(f, '恢复图传', lambda: self.do_img(1), w=10)
         self.btn_img_on.grid(row=1, column=2, columnspan=2, padx=6, pady=(0, 6), sticky='ew')
+        # ★★ 2026-11-07：**二值化阈值**（固件已改成手动阈值，这条按钮循环切换）★★
+        #   0 = 自动(Otsu)；其它 = 固定阈值。点一下 → 下一档，发 `th <n>`，板子回 ACK th。
+        self.btn_thresh = self._btn(f, self.thresh_text(), lambda: self.do_thresh(), w=10)
+        self.btn_thresh.grid(row=2, column=0, columnspan=4, padx=6, pady=(0, 6), sticky='ew')
         self.lbl_mode = self._lbl(f, '当前：二值图 188×120', fg=C_DIM, font=('Microsoft YaHei', 9))
-        self.lbl_mode.grid(row=2, column=0, columnspan=4, sticky='w', padx=6, pady=(0, 6))
+        self.lbl_mode.grid(row=3, column=0, columnspan=4, sticky='w', padx=6, pady=(0, 6))
 
         # ---- 仪表 ----
         f = tk.LabelFrame(right, text=' 实时数据 ', bg=C_PANEL, fg=C_ACCENT,
@@ -620,6 +628,19 @@ class App(object):
                 self.btn_mode_rpm.configure(bg=C_ON if self.ctrl_mode == 'rpm' else C_BTN)
         except Exception:
             pass
+
+    def thresh_text(self):
+        v = THRESH_STEPS[self.thresh_idx % len(THRESH_STEPS)]
+        return ('阈值 自动' if 0 == v else '阈值 %d' % v)
+
+    def do_thresh(self):
+        """循环切换二值化阈值：自动 → 40 → 60 → 80 → 100 → 120 → 140 → 160 → 200 → 自动"""
+        self.thresh_idx = (self.thresh_idx + 1) % len(THRESH_STEPS)
+        v = THRESH_STEPS[self.thresh_idx]
+        self.btn_thresh.configure(text=self.thresh_text())
+        self.send_ack('th %d' % v, 'ACK th',
+                      '二值化阈值 → %s' % ('自动(Otsu)' if 0 == v else str(v)),
+                      self.btn_thresh)
 
     def do_servo(self, pos, btn=None):
         pos = max(SERVO_MIN, min(SERVO_MAX, int(pos)))

@@ -2033,7 +2033,13 @@ void cam_sccb_apply_flip (void)
 volatile uint8_t  cam_bound[120];
 volatile uint8_t  cam_bound_r[120];
 volatile uint8_t  cam_center[120];     // 每行的亮/暗交界列（0xFF = 无）
-volatile uint8_t  cam_thresh = 0;     // 本帧 Otsu 阈值（诊断用）
+volatile uint8_t  cam_thresh = 0;     // 本帧实际用的二值化阈值（诊断用）
+
+/* ★★★ 2026-11-07（FW=2124）：**手动阈值**（用户要求二值化不再用自动 Otsu）★★★
+   0        = 自动（Otsu，原来的行为）
+   1..255   = 固定阈值，直接用这个值二值化
+   命令：`th <n>`（见 cmd_f4.c），上位机【阈值】按钮循环切换。*/
+volatile uint8_t  cam_thresh_manual = 100U;   /* ★ 默认就用**手动阈值 100**（用户要求不用自动）*/
 
 //-------------------------------------------------------------------------------------------------------------------
 // ★★★ 帧率画进图像（**单片机自己画**，电脑只负责收）★★★
@@ -2634,25 +2640,38 @@ void board_cam_analyze (void)
     float    best = -1.0f;
     uint8_t  T = 128;
 
-    for (i = 0; i < 256U; i++) { hist[i] = 0U; }
-    for (i = 0; i < total; i++)      { hist[base[i]] ++; }
-    for (i = 0; i < 256U; i++)       { sum_all += i * hist[i]; }
-
-    for (k = 0; k < 256U; k++)       // ★ Otsu：类间方差最大者胜
+    /* ★★★ 2026-11-07（FW=2124）：**手动阈值优先，不再用自动 Otsu** ★★★
+       用户要求二值化改成手动阈值（现场光照固定，自动阈值反而会跟着地面反光乱跳）。
+         cam_thresh_manual == 0   ⇒ 仍走 Otsu（保留原来的自动方式，便于对比）
+         cam_thresh_manual != 0   ⇒ 直接用这个固定值，**连直方图都不算**（省 ~2ms/帧）
+       命令：`th 0` 回自动；`th 80` 固定 80。上位机【阈值】按钮循环切换。*/
+    if (0U != cam_thresh_manual)
     {
-        uint32_t w_f;
-        float mu_b, mu_f, d;
-        w_b += hist[k];
-        if (0U == w_b)   { continue; }
-        w_f = total - w_b;
-        if (0U == w_f)   { break; }
-        sum_b += k * hist[k];
-        mu_b = (float)sum_b / (float)w_b;
-        mu_f = (float)(sum_all - sum_b) / (float)w_f;
-        d    = (float)w_b * (float)w_f * (mu_b - mu_f) * (mu_b - mu_f);
-        if (d > best) { best = d; T = (uint8_t)k; }
+        T = cam_thresh_manual;
+        cam_thresh = T;
     }
-    cam_thresh = T;
+    else
+    {
+        for (i = 0; i < 256U; i++) { hist[i] = 0U; }
+        for (i = 0; i < total; i++)      { hist[base[i]] ++; }
+        for (i = 0; i < 256U; i++)       { sum_all += i * hist[i]; }
+
+        for (k = 0; k < 256U; k++)       // ★ Otsu：类间方差最大者胜
+        {
+            uint32_t w_f;
+            float mu_b, mu_f, d;
+            w_b += hist[k];
+            if (0U == w_b)   { continue; }
+            w_f = total - w_b;
+            if (0U == w_f)   { break; }
+            sum_b += k * hist[k];
+            mu_b = (float)sum_b / (float)w_b;
+            mu_f = (float)(sum_all - sum_b) / (float)w_f;
+            d    = (float)w_b * (float)w_f * (mu_b - mu_f) * (mu_b - mu_f);
+            if (d > best) { best = d; T = (uint8_t)k; }
+        }
+        cam_thresh = T;
+    }
 
     /* ② 先整帧二值化（与行序无关，单独一遍） */
     for (r = 0U; r < (uint32_t)CAM_H; r++)
