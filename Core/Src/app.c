@@ -998,13 +998,13 @@ void app_loop (void)
       yf  = (y10 < 0) ? -(y10 % 10) : (y10 % 10);
 
       /* n = 序号：上位机用它算丢包率 —— "板子没发"和"链路丢了"一下子就分开了 */
-      sprintf(tb, "T n=%u r=%d ax=%d ay=%d az=%d gx=%d gy=%d gz=%d y=%ld.%ld s=%u m=%u e=%ld cv=%u d1=%d d2=%d si=%u sr=%u sb=%u st=%u sba=%lu sl=%u k1=%u k2=%u ol=%u\r\n",
+      sprintf(tb, "T n=%u r=%d ax=%d ay=%d az=%d gx=%d gy=%d gz=%d y=%ld.%ld s=%u m=%u e=%ld cv=%u iv=%ld d1=%d d2=%d si=%u sr=%u sb=%u st=%u sba=%lu sl=%u k1=%u k2=%u ol=%u\r\n",
               (unsigned)tel_seq,
               (int)ctrl_speed_get_rpm(),
               (int)ax, (int)ay, (int)az, (int)gx, (int)gy, (int)gz,
               (long)yi, (long)yf,
               (unsigned)ctrl_servo_get_pos(), (unsigned)cam_view_mode,
-              (long)g_steer_err, (unsigned)cam_curved,
+              (long)g_steer_err, (unsigned)cam_curved, (long)(g_steer_ierr * g_steer_ki),
               (int)ctrl_motor_get(1U), (int)ctrl_motor_get(2U),
               (unsigned)ctrl_servo_id(),
               (unsigned)(ctrl_servo_rx_bytes() & 0xFFFFU), (unsigned)(ctrl_servo_rx_bad() & 0xFFFFU),
@@ -1041,7 +1041,7 @@ void app_loop (void)
         //     MD  = 当前采集模式（0 = 752 宽 / 1 = 188 宽）
         //     BIN = 188×120 配置是否成功（1 = 已写并回读一致）
         //     R0D/R0E = 两个 Read Mode 寄存器的**回读值**（列 bin 在 R0D[3:2]、行 bin 在 R0E[1:0]）
-        sprintf(buf, "S f=%lu V=%lu VS=%lu LG=%lu TO=%lu F=%u FL=%u P=%u RX=%lu CAM=%u ID=%04X N=%u MD=%u BIN=%u R0D=%04X W=%u E=%u K=%lu R=%04lX IE=%04lX MI=%04lX CR=%08lX ND=%lu DC=%08lX HE=%lu VE=%lu LW=%lu GP=%lu FW=2175 LM=%lu RST=%02lX PC=%08lX CF=%04lX BA=%08lX\r\n",
+        sprintf(buf, "S f=%lu V=%lu VS=%lu LG=%lu TO=%lu F=%u FL=%u P=%u RX=%lu CAM=%u ID=%04X N=%u MD=%u BIN=%u R0D=%04X W=%u E=%u K=%lu R=%04lX IE=%04lX MI=%04lX CR=%08lX ND=%lu DC=%08lX HE=%lu VE=%lu LW=%lu GP=%lu FW=2176 LM=%lu RST=%02lX PC=%08lX CF=%04lX BA=%08lX\r\n",
                 (unsigned long)cam_frame_cnt, (unsigned long)cam_vsync_isr_cnt,
                 (unsigned long)cam_vs_cap_cnt,
                 (unsigned long)disp_lag_max,

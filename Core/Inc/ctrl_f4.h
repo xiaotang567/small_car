@@ -148,6 +148,7 @@ extern volatile float    g_steer_kd;           /* ★ 2175 直道 D */
 extern volatile float    g_steer_kp_cur;       /* ★ 2175 弯道 P */
 extern volatile float    g_steer_kd_cur;       /* ★ 2175 弯道 D */
 extern volatile float    g_steer_err;          /* ★ 2175 诊断：当前误差(px) */
+extern volatile float    g_steer_ierr;         /* ★ 2176 诊断：积分项 */
 uint8_t  ctrl_imu_ok (void);                   /* 1 = MPU9250 在线 */
 uint8_t  ctrl_motor_stalled (void);            /* 1 = 堵转停机中（OLED 用）*/
 uint8_t  ctrl_motor_started (void);            /* 1 = 已经起过转（OLED 用）*/

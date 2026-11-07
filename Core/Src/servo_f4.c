@@ -627,8 +627,11 @@ void ctrl_servo_tick (void)
 //        `sc <kp×10> <kd×10>`           弯道增益
 //        `vs 0/1`          关/开视觉打舵
 //-------------------------------------------------------------------------------------------------------------------
-#define STEER_R_AHEAD    100      /* 前瞻行号（0=最远，119=最近）*/
-#define STEER_I_LIMIT    400.0f   /* 积分限幅（像素·次）：只用来抹掉很小的静态偏差 */
+#define STEER_R_AHEAD    95       /* 前瞻行号（0=最远，119=最近）*/
+#define STEER_R_NEAR     112      /* 近处行号：决定回不回中线 */
+#define STEER_W_STR      0.20f    /* 直道：近处权重 0.8 ⇒ 一定回到中线 */
+#define STEER_W_CUR      0.60f    /* 弯道：远处权重 0.6 ⇒ 提前打舵 */
+#define STEER_I_LIMIT    600.0f   /* 积分限幅（像素·次）：抹掉安装/机械中位偏差 */
 #define STEER_I_LEAK     0.985f   /* 没线时积分泄放系数 */
 #define STEER_E_LIMIT    90.0f    /* 误差限幅（像素），防跑飞 */
 #define STEER_SLEW       100      /* 每 20ms 最多变多少步 */
@@ -637,12 +640,13 @@ volatile uint8_t  g_steer_enable       = 1U;   /* 1 = 视觉打舵开 */
 volatile uint32_t g_steer_manual_until = 0U;   /* 手动打舵优先到这个时刻(ms) */
 volatile float    g_steer_sign         = 1.0f; /* ★ 方向：+1 / -1 */
 volatile float    g_steer_kp           = 5.0f; /* 直道 P */
-volatile float    g_steer_ki           = 0.10f;/* 直道 I */
+volatile float    g_steer_ki           = 0.50f;/* 直道 I（2176：0.1 → 0.5）*/
 volatile float    g_steer_kd           = 10.0f;/* 直道 D */
 volatile float    g_steer_kp_cur       = 4.5f; /* 弯道 P */
 volatile float    g_steer_kd_cur       = 16.0f;/* 弯道 D（更大 = 更早打舵）*/
 volatile float    g_steer_err          = 0.0f; /* 诊断：当前误差 */
 volatile float    g_steer_i            = 0.0f; /* 诊断：积分项 */
+volatile float    g_steer_ierr         = 0.0f; /* 诊断：积分项（对外）*/
 
 static   int32_t  s_steer_last         = CTRL_SERVO_POS_CENTER;
 static   float    s_e_prev             = 0.0f;
@@ -662,8 +666,21 @@ void ctrl_steer_from_cam (void)
         return;
     }
 
-    /* ── 误差：前瞻点的中线列 - 画面中心列 ── */
-    e = (cam_line_k * (float)STEER_R_AHEAD + cam_line_b) - (float)(CAM_TXW / 2);
+    /* ── 误差：**近处为主 + 一点前瞻**（FW=2176）
+       你反馈"过完弯道脱轨、回不到中线"，根因是之前只用了前瞻点(第100行)：
+       前瞻点是"车将会到的地方"，不是"车现在偏了多少" ⇒ 直道上会稳定在一个偏置上。
+       现在：
+         近处 e_near = 第 112 行（车头前方一点点）的中线偏差  ← 决定"回不回中线"
+         远近 e_far  = 第  95 行的中线偏差                     ← 决定"要不要提前打舵"
+         直道权重 w=0.20（几乎全靠近处 ⇒ 一定回到中线）
+         弯道权重 w=0.60（多用远处  ⇒ 提前打舵）                             */
+    {
+        float e_near = (cam_line_k * (float)STEER_R_NEAR + cam_line_b) - (float)(CAM_TXW / 2);
+        float e_far  = (cam_line_k * (float)STEER_R_AHEAD + cam_line_b) - (float)(CAM_TXW / 2);
+        float w      = (0U != cam_curved) ? STEER_W_CUR : STEER_W_STR;
+
+        e = e_near * (1.0f - w) + e_far * w;
+    }
     if (e >  STEER_E_LIMIT) { e =  STEER_E_LIMIT; }
     if (e < -STEER_E_LIMIT) { e = -STEER_E_LIMIT; }
 
@@ -684,14 +701,17 @@ void ctrl_steer_from_cam (void)
     }
 
     /* ★ 2175：**只在"接近中心"时积分**（|e|<20px），并且在偏离时缓慢泄放
-       —— 不然过弯时误差很大，积分会一路顶到限幅，出弯后舵机半天回不来（实测就是这个）*/
+       —— 不然过弯时误差很大，积分会一路顶到限幅，出弯后舵机半天回不来（实测就是这个）
+       ★ 2176：积分力度放大（KI 0.1→0.5、限幅 400→600）——
+         之前那点积分根本抹不掉"安装/机械中位偏差"，车就一直歪着跑 */
     if ((e < 20.0f) && (e > -20.0f)) { g_steer_i += e; }
-    else                             { g_steer_i *= 0.90f; }
+    else                             { g_steer_i *= 0.92f; }
     if (g_steer_i >  STEER_I_LIMIT) { g_steer_i =  STEER_I_LIMIT; }
     if (g_steer_i < -STEER_I_LIMIT) { g_steer_i = -STEER_I_LIMIT; }
 
     u = kp * e + g_steer_ki * g_steer_i + kd * de;
     g_steer_err = e;
+    g_steer_ierr = g_steer_i;
 
     target = (int32_t)CTRL_SERVO_POS_CENTER + (int32_t)(g_steer_sign * u);
 
