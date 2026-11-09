@@ -180,7 +180,9 @@ extern volatile uint8_t  cam_shutter;        // 曝光 R0x0B（行数，`e <n>` 
         ⇒ 阈值 255 下二值图整幅全白 ✗ （而且 AEC 开着时 R0x0B 无效 ⇒ 老"亮度"按钮是空操作）
    现在：R0xAD 限到 110 行；`e <n>` 改成写 R0xA5（AEC 目标亮度），它才是 AEC 开着时有效的 */
 extern volatile uint8_t  cam_bin_target;     // AEC/AGC 目标亮度 R0xA5（0..63，默认 0x3A=58）
-extern volatile uint16_t cam_r_ad;           // R0xAD 回读（AEC 最大曝光行数，正常 110）
+extern volatile uint16_t cam_r_ad;           // R0xAD 回读（已不再写，保留字段）
+extern volatile uint32_t cam_gray_mean;      // ★ 2204：本帧平均灰度（≈255 ⇒ 真过曝，二值图全白就是它）
+extern volatile uint32_t cam_sat_pcnt;       // ★ 2204：本帧饱和（>=250）像素百分比
 void     cam_sccb_apply_flip (void);         // ★ 按 cam_flip 重写 R0x0D 的翻转位（bit5=左右镜像 bit4=上下）
 extern volatile uint8_t  cam_flip;           // 0=不翻 1=镜像 2=上下 3=180°
 extern volatile uint8_t  cam_bin_ok;                // 1 = 配置成功且回读一致

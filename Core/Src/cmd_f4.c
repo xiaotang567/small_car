@@ -149,7 +149,7 @@ static void cam_cmd_status (void)
        DRP = 发送看门狗**主动放弃**的帧数（一直飙 ⇒ 链路/模块发不动）✓
        DST = DMA 停摆看门狗重启采集的次数（>0 ⇒ 采集链卡过，但已经自己救回来了）✓
        SELF= 连续 2 秒没有完整帧 ⇒ 重启采集的次数（和 DST 一起看）✓ */
-    sprintf(b, "CFG f=%u g=%u x=%u y=%u (%ux%u) d=%u CST=%u RV=%06lX LINE=%u FW=2202 EDG=%lu EL=%u ER=%u DRP=%lu DST=%lu SELF=%lu TH=%u AD=%u\r\n",
+    sprintf(b, "CFG f=%u g=%u x=%u y=%u (%ux%u) d=%u CST=%u RV=%06lX LINE=%u FW=2205 EDG=%lu EL=%u ER=%u DRP=%lu DST=%lu SELF=%lu TH=%u\r\n",
             (unsigned)cam_cmd_fps, (unsigned)cam_cmd_gap_ms,
             (unsigned)cam_cmd_dx, (unsigned)cam_cmd_dy,
             (unsigned)(CAM_TXW / cam_cmd_dx), (unsigned)(CAM_H / cam_cmd_dy),
@@ -161,8 +161,7 @@ static void cam_cmd_status (void)
             (unsigned long)cam_tx_drop,
             (unsigned long)cam_dma_stall,
             (unsigned long)cam_self_heal,
-            (unsigned)((0U != cam_thresh_manual) ? (unsigned)cam_thresh_manual : (unsigned)cam_thresh),
-            (unsigned)cam_r_ad);      /* ★ 2202：AEC 最大曝光回读（正常 110；若 480 ⇒ 此行没写进去）*/
+            (unsigned)((0U != cam_thresh_manual) ? (unsigned)cam_thresh_manual : (unsigned)cam_thresh));
     cmd_txt(b);
 }
 
@@ -435,19 +434,16 @@ static void cam_cmd_line (char *s)
         //   行 bin4 后帧只有 120 行 ⇒ 行数必须 < 120（出厂 443 会卡死不成帧 ✓）
         case 'e':
             v = cam_cmd_num(s + 1);
-            /* ★★ 2026-11-09（FW=2202）：**亮度改成写 R0xA5（AEC/AGC 目标亮度）** ★★
-               原来这里写 R0x0B（曝光行数），但手册 P29 写明：**R0x0B 只在 AEC 关闭时才有效**，
-               而 MT9V034 出厂 R0xAF=0x0003 ⇒ AEC/AGC 是**开着**的
-               ⇒ 之前按"亮度 ±"其实是**空操作**（图一点没变，这就是按了没反应的原因）。
-               现在写 R0xA5（0..63，默认 0x3A=58）：数字越小画面越暗，AEC 会自动跟着调 ✓
-               同时仍写一遍 R0x0B（10..110，AEC 关掉时它会生效）。*/
+            /* ★★ 2026-11-09（FW=2205）：这台摄像头**拆掉了 51 单片机** ⇒ 没有串口配置、没有 EEPROM，
+               参数只能靠 SCCB 直接写；AEC 也必须开着（关掉就退回 R0x0B=443 行 > 一帧 120 行 ⇒ 不出图）
+               ⇒ **调亮度就写 R0xA5（AEC/AGC 目标亮度 0..63）**：数值越小画面越暗，这是 AEC 开启时正确的旋钮。
+               顺手也写一遍 R0x0B（10..110）：万一以后关了 AEC，它才是曝光行数。*/
             cam_bin_target = (uint8_t)cam_cmd_clamp(v, 1U, 63U);
             (void)cam_sccb_write_reg(0xA5U, (uint16_t)cam_bin_target);
             cam_shutter = (uint8_t)cam_cmd_clamp(v, 10U, 110U);
             (void)cam_sccb_write_reg(0x0BU, cam_shutter);
-            sprintf(b, "ACK e: bin_target=%u (R0xA5) shutter=%u rows\r\n",
+            sprintf(b, "ACK e: AEC target=%u (R0xA5 1..63) shutter=%u rows\r\n",
                     (unsigned)cam_bin_target, (unsigned)cam_shutter);
-            cmd_txt(b);
             return;
 
         // ★ 翻转/镜像：`n` 每按一次换一种（0 不翻 → 1 左右镜像 → 2 上下 → 3 180° → 0…）
