@@ -174,6 +174,13 @@ void     cam_pin_probe (uint32_t *href_edges, uint32_t *vsync_edges);
 void     cam_dump_regs_line (uint8_t base);   // ★ 开机自动 dump 相机寄存器的一行   // ★ 直接数 PB7(VSYNC) 边沿（绕开 DCMI）
 extern volatile uint8_t  cam_thresh_manual;  // ★ 0=自动Otsu；1..255=手动
 extern volatile uint8_t  cam_shutter;        // 曝光 R0x0B（行数，`e <n>` 可调）
+/* ★ 2202：曝光/AEC（修"有时候整幅图全白"）
+   根因：MT9V034 出厂 **AEC/AGC 是开着的**（R0xAF=0x0003），默认最大曝光 R0xAD=480 行，
+        而 188×120（行 bin4）一帧只有 120 行 ⇒ AEC 把积分顶到超过一帧 ⇒ 整幅饱和
+        ⇒ 阈值 255 下二值图整幅全白 ✗ （而且 AEC 开着时 R0x0B 无效 ⇒ 老"亮度"按钮是空操作）
+   现在：R0xAD 限到 110 行；`e <n>` 改成写 R0xA5（AEC 目标亮度），它才是 AEC 开着时有效的 */
+extern volatile uint8_t  cam_bin_target;     // AEC/AGC 目标亮度 R0xA5（0..63，默认 0x3A=58）
+extern volatile uint16_t cam_r_ad;           // R0xAD 回读（AEC 最大曝光行数，正常 110）
 void     cam_sccb_apply_flip (void);         // ★ 按 cam_flip 重写 R0x0D 的翻转位（bit5=左右镜像 bit4=上下）
 extern volatile uint8_t  cam_flip;           // 0=不翻 1=镜像 2=上下 3=180°
 extern volatile uint8_t  cam_bin_ok;                // 1 = 配置成功且回读一致

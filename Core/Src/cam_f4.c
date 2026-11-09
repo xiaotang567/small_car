@@ -1977,6 +1977,8 @@ void cam_pin_tristate_all (void)
 volatile uint8_t  cam_bin_ok = 0U;        // 1 = 配置成功且回读一致
 volatile uint16_t cam_r0d    = 0U;        // R0x0D 回读值（含列 bin 位）
 volatile uint16_t cam_r0e    = 0U;        // R0x0E 回读值（含行 bin 位）
+volatile uint8_t  cam_bin_target = 0x3AU; // ★ 2202：AEC/AGC 目标亮度 R0xA5（e <n> 调它，0..63）
+volatile uint16_t cam_r_ad     = 0U;      // ★ 2202：R0xAD 回读（AEC 最大曝光行数，必须 < 一帧 120）
 
 uint8_t cam_sccb_set_bin4 (void)
 {
@@ -2023,6 +2025,29 @@ uint8_t cam_sccb_set_bin4 (void)
     }
     else { err = 1U; }
 
+    //-----------------------------------------------------------------------------------------------------------
+    // ★★★ FW=2202（2026-11-09）：**"有时候整幅图变成全白"的真凶找到了** ★★★
+    //   现象：二值图偶尔整幅全白（阈值手动 255 时特别明显），过一会儿又自己好了。
+    //   手册 Table 8 的默认值（tools/docs_txt/MT9V034-数据手册.txt）：
+    //     · R0xAF = 0x0003  ⇒ **AEC（自动曝光）+ AGC（自动增益）出厂就是开着的**
+    //     · R0xAD = 0x01E0  ⇒ **AEC 最大曝光 480 行**
+    //     · R0xA5 = 0x003A  ⇒ AEC/AGC 目标亮度 58
+    //   而 188×120 模式行 bin4 之后 **一帧只有 120 行**：
+    //     AEC 想把画面调亮时会把积分时间一路顶到 480 行（**远超一帧**）
+    //     ⇒ 整帧都在积分 ⇒ **每个像素都饱和 = 255** ⇒ 阈值 255 下二值图整幅全白 ✗
+    //   而且 AEC 开着的时候 **R0x0B 是不起作用的**（手册 P29：R0x0B 只在 AEC 关闭时有效）
+    //     ⇒ 之前那个"亮度"按钮（写 R0x0B）在 AEC 开启时**根本没有效果** ✗ —— 这就是按了没反应的原因。
+    //   处理：
+    //     ① 把 **AEC 最大曝光限到 110 行**（< 一帧 120 行）⇒ 物理上不可能再整幅饱和 ✓
+    //     ② AEC/AGC 最小曝光给 2 行，目标亮度用 R0xA5（`e <n>` 现在改它，见 cmd_f4.c）✓
+    //     ③ AEC/AGC 保持出厂开启（自动适应明暗，比写死曝光稳）✓
+    //   想彻底固定亮度（不要 AEC 自动调）：把下面 R0xAF 改成 0x0000，再用 `e <n>` 调 R0x0B。
+    //-----------------------------------------------------------------------------------------------------------
+    (void)cam_sccb_write_reg(0xAFU, 0x0003U);          /* AEC + AGC 开（显式写一遍，读回可查）*/
+    (void)cam_sccb_write_reg(0xACU, 0x0002U);          /* AEC 最小曝光 = 2 行 */
+    (void)cam_sccb_write_reg(0xADU, 0x006EU);          /* ★ AEC 最大曝光 = 110 行（一帧 120 行）*/
+    (void)cam_sccb_write_reg(0xA5U, (uint16_t)(cam_bin_target & 0x003FU));   /* AEC/AGC 目标亮度 */
+
     HAL_Delay(10);
 
     // ★ 回读验证（只看 R0x0D：[3:2] 必须是 2，[1:0] 必须是 2）
@@ -2031,6 +2056,8 @@ uint8_t cam_sccb_set_bin4 (void)
     cam_r0e = 0U;                       // （R0x0E 是 Context B，不再使用）
     if (0U != cam_sccb_read_reg(0x0BU, &v)) { err = 1U; }
     cam_r0e = v;                        // ★ 复用 R0E 字段报"快门回读值"（正常应为 100=0x64）
+    if (0U != cam_sccb_read_reg(0xADU, &v)) { err = 1U; }
+    cam_r_ad = v;                       // ★ 2202：R0xAD 回读（AEC 最大曝光，正常 110=0x6E）
 
     if ((0U == err) && ((cam_r0d & 0x000CU) == 0x0008U) && ((cam_r0d & 0x0003U) == 0x0002U))
     {

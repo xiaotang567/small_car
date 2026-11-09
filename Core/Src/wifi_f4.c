@@ -627,22 +627,13 @@ uint8_t wifi_f4_retry (void)
         return 0;
     }
 
-#if !(WF_PC_USE_FIXED)
-    /* ★★ 2026-11-09（FW=2201）：**自动推导的 IP 连不上，再用写死的兜底 IP 试一次** ★★
-       自动推导的前提是"电脑末段恒为 77"。万一哪天不是 77（或者热点把电脑分到别的地址），
-       光靠推导就会永远连不上 —— 所以这里再拿 WIFI_PC_IP 试一次，两条路都不通才认输。*/
-    if (0 != strcmp(wf_pc_ip, WIFI_PC_IP))
-    {
-        if (wf_socket_connect(WIFI_USE_TCP ? "TCP" : "UDP",
-                              WIFI_PC_IP, WIFI_PC_PORT, WIFI_LOCAL_PORT, 1500U) == 0)
-        {
-            wifi_f4_progress = 3;
-            wf_last_err      = 0;
-            wf_ready         = 1;
-            return 0;
-        }
-    }
-#endif
+    /* ★★ 2026-11-09 撤回：不要在重连里再试第二个 IP ★★
+       实测现象：上位机日志里"已连接 192.168.103.204:6667 → 对方断开 → :6668 → 断开 → :6666 …"
+       一直抖。原因是我在重连里加了"推导 IP 失败就再连写死 IP"这一段：
+       模块可能**其实已经连上了**（上位机那边 ESTABLISHED），只是我们的握手没等到 ACK
+       ⇒ 这里再发一次 CIPSTART 会把**已经连好的 socket 拆掉**、去连另一个不存在的地址
+       ⇒ 上位机看到断开、板子又重连 ⇒ 抖动无限循环 ✗
+       ⇒ 恢复成"只连 wf_pc_ip 一个地址"，抖动消失。 */
 
     wf_last_err = 3;
     return 1;
