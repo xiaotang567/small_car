@@ -627,6 +627,23 @@ uint8_t wifi_f4_retry (void)
         return 0;
     }
 
+#if !(WF_PC_USE_FIXED)
+    /* ★★ 2026-11-09（FW=2201）：**自动推导的 IP 连不上，再用写死的兜底 IP 试一次** ★★
+       自动推导的前提是"电脑末段恒为 77"。万一哪天不是 77（或者热点把电脑分到别的地址），
+       光靠推导就会永远连不上 —— 所以这里再拿 WIFI_PC_IP 试一次，两条路都不通才认输。*/
+    if (0 != strcmp(wf_pc_ip, WIFI_PC_IP))
+    {
+        if (wf_socket_connect(WIFI_USE_TCP ? "TCP" : "UDP",
+                              WIFI_PC_IP, WIFI_PC_PORT, WIFI_LOCAL_PORT, 1500U) == 0)
+        {
+            wifi_f4_progress = 3;
+            wf_last_err      = 0;
+            wf_ready         = 1;
+            return 0;
+        }
+    }
+#endif
+
     wf_last_err = 3;
     return 1;
 }
