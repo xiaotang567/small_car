@@ -93,7 +93,8 @@
 #define CTRL_SPEED_KP_X1000     2500         /* ★ 2197：1.5 -> 2.5（100RPM 时 P 只有 150，太弱）*/
 #define CTRL_SPEED_KI_X1000     450          /* ★ 2197：0.15 -> 0.45（积分太弱，爬到 100RPM 要好几百 ms）*/
 #define CTRL_SPEED_I_LIMIT      3500         /* ★ 2197：2500 -> 3500（配合更大的 Ki）*/
-#define CTRL_SPEED_DUTY_MAX     5000         /* ★ 2195：**上限 50%**（用户改，原来 80%）*/
+#define CTRL_SPEED_DUTY_MAX     5000         /* 直道占空比上限 50%（用户改，原来 80%）*/
+#define CTRL_SPEED_DUTY_MAX_CUR 8000         /* ★ 2211：**弯道占空比上限 80%** —— 弯里阻力大，50% 顶不住就掉速（实测 d1 顶死 5000、转速掉到 26~65）*/
 #define CTRL_SPEED_SIGN_AUTO    1            /* 1 = 反馈极性自动识别 */
 
 /* ---- 舵机（幻尔 HX 总线舵机）----

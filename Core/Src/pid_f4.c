@@ -8,6 +8,7 @@
 
 #include "ctrl_f4.h"
 #include "wifi_f4.h"          /* 断链强制停车要用 wifi_f4_is_ready() */
+#include "board_f4.h"         /* ★ 2211：弯道占空比上限要用 cam_curved */
 
 
 //===================================================★ 速度环（PI + 比例前馈 + 斜坡，参数照抄原工程）===================================================
@@ -161,10 +162,17 @@ void ctrl_speed_tick (void)
     if (g_sc_ramp_x10 > 0)      { ff_term += CTRL_SPEED_FF_OFFSET; }
     else if (g_sc_ramp_x10 < 0) { ff_term -= CTRL_SPEED_FF_OFFSET; }
 
-    out = ff_term + p_term + g_sc_i_acc;
-    if (out > CTRL_SPEED_DUTY_MAX) { out = CTRL_SPEED_DUTY_MAX; }
-    if (out < 0)                   { out = 0; }
+    out = ff_term + p_term + g_sc_i_acc;   /* ← 2211 我一度把这一行漏掉了（编译警告 p_term 未使用），已补回 */
 
+    /* ★★ 2211：**弯道把占空比上限放开到 80%**（直道仍 50%）
+       实测（11-09 17:5x）：直道 d1≈2000~2500（20~25%），弯道里 d1=5000 顶死、转速掉到 26~65（目标 100）
+       ⇒ 弯里阻力大，50% 的上限卡住了速度环 ⇒ 这就是"转弯减速"的原因。*/
+    {
+        int32_t dmax = (0U != cam_curved) ? (int32_t)CTRL_SPEED_DUTY_MAX_CUR : (int32_t)CTRL_SPEED_DUTY_MAX;
+
+        if (out > dmax) { out = dmax; }
+        if (out < 0)    { out = 0; }
+    }
     /* ★★ 2195：**起转踹一脚 —— 只在开始那一下**
        用户要求："踹只能开始的时候踹"。
        所以不再按"转速低就踹"，而是：
