@@ -1977,9 +1977,12 @@ void cam_pin_tristate_all (void)
 volatile uint8_t  cam_bin_ok = 0U;        // 1 = 配置成功且回读一致
 volatile uint16_t cam_r0d    = 0U;        // R0x0D 回读值（含列 bin 位）
 volatile uint16_t cam_r0e    = 0U;        // R0x0E 回读值（含行 bin 位）
+volatile uint16_t cam_dbg_a5   = 0U;   // ★ 2205：R0xA5 回读（AEC 目标亮度）
+volatile uint16_t cam_dbg_sh   = 0U;   // ★ 2205：R0x0B 回读（快门行数）
 volatile uint32_t cam_gray_mean = 0U;   // ★ 2204：本帧平均灰度（≈255 ⇒ 真过曝）/ 诊断'全白'用
 volatile uint32_t cam_sat_pcnt  = 0U;   // ★ 2204：本帧饱和像素百分比
-volatile uint8_t  cam_bin_target = 0x3AU; // ★ 2202：AEC/AGC 目标亮度 R0xA5（e <n> 调它，0..63）
+volatile uint8_t  cam_bin_target = 0x3AU; // ★ 2202：AEC/AGC 目标亮度 R0xA5（AEC 关掉后不再用）
+volatile uint8_t  cam_gain       = 16U;   // ★ 2206：模拟增益 R0x35（16=1X、32=2X、64=4X，越大越亮）
 volatile uint16_t cam_r_ad     = 0U;      // ★ 2202：R0xAD 回读（AEC 最大曝光行数，必须 < 一帧 120）
 
 uint8_t cam_sccb_set_bin4 (void)
@@ -2006,10 +2009,25 @@ uint8_t cam_sccb_set_bin4 (void)
     //-----------------------------------------------------------------------------------------------------------
     (void)cam_sccb_write_reg(0x0CU, 0x0003U);      /* ★ 软复位：数字逻辑 + AEC/AGC 状态机 */
     HAL_Delay(5);
-    (void)cam_sccb_write_reg(0xAFU, 0x0003U);      /* AEC + AGC 使能（手册默认）*/
-    (void)cam_sccb_write_reg(0xACU, 0x0001U);      /* AEC 最小曝光（手册默认）*/
-    (void)cam_sccb_write_reg(0xADU, 0x01E0U);      /* AEC 最大曝光 480（手册默认）*/
-    (void)cam_sccb_write_reg(0xA5U, 0x003AU);      /* AEC/AGC 目标亮度 58（手册默认）*/
+    /* 🚨🚨 FW=2207 我又试了一次"固定曝光"（先写 0x0B=100、0x35=16，再关 AEC/AGC=0）
+       ⇒ **还是立刻没图**（F=0、K=4.2MHz，DST 开始涨）。这已经是第二次实测确认：
+         **这颗 MT9V034 只要关掉 AEC/AGC 就出不了帧**，不管 0x0B 写多少。
+       ⇒ 结论（写死在这里，别再试了）：**AEC/AGC 必须保持开启**，R0xAF 只能写 0x0003。
+       附带实测：AEC 开着的时候
+         · 把 R0x0B 从 100 改到 30 ⇒ 回读确实变了，但 MG（平均灰度）112 → 109 **几乎不变**
+         · 把 R0xA5 从 58 改到 30 ⇒ MG 也不变
+       原因就是 AGC/AEC 在闭环：你把曝光调小，它就把增益顶上来，**画面亮度被它锁在自己的目标上**。
+       ⇒ 所以"亮度按钮改了什么"在这个模式下**不可能有明显效果**，能动的只剩：
+           ① 二值化阈值（cam_thresh_manual / 自动 Otsu）
+           ② 现场光线 / 补光
+           ③ R0xAB（AGC 最大增益，默认 64）—— 只影响暗处，不影响过曝
+       文档 1.4/6.1 说的"关自动曝光再调曝光时间"是针对**普通版（带 51 的）**的流程，
+       拆掉 51 之后这颗传感器的 AEC 不能关 ⇒ 那条路在这块板子上走不通。*/
+    (void)cam_sccb_write_reg(0xAFU, 0x0003U);      /* ★ AEC + AGC 开（手册默认，关了就出不了图）*/
+    (void)cam_sccb_write_reg(0xACU, 0x0001U);      /* AEC 最小曝光（默认）*/
+    (void)cam_sccb_write_reg(0xADU, 0x01E0U);      /* AEC 最大曝光 480（默认）*/
+    (void)cam_sccb_write_reg(0xA5U, 0x003AU);      /* AEC/AGC 目标亮度 58（默认）*/
+    HAL_Delay(2);
     HAL_Delay(2);
 
     // 🔥🔥🔥 2026-10-20 重大更正：**R0x0D 是 Context A 的 Read Mode，R0x0E 是 Context B 的！**

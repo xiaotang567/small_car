@@ -149,7 +149,7 @@ static void cam_cmd_status (void)
        DRP = 发送看门狗**主动放弃**的帧数（一直飙 ⇒ 链路/模块发不动）✓
        DST = DMA 停摆看门狗重启采集的次数（>0 ⇒ 采集链卡过，但已经自己救回来了）✓
        SELF= 连续 2 秒没有完整帧 ⇒ 重启采集的次数（和 DST 一起看）✓ */
-    sprintf(b, "CFG f=%u g=%u x=%u y=%u (%ux%u) d=%u CST=%u RV=%06lX LINE=%u FW=2205 EDG=%lu EL=%u ER=%u DRP=%lu DST=%lu SELF=%lu TH=%u\r\n",
+    sprintf(b, "CFG f=%u g=%u x=%u y=%u (%ux%u) d=%u CST=%u RV=%06lX LINE=%u FW=2208 EDG=%lu EL=%u ER=%u DRP=%lu DST=%lu SELF=%lu TH=%u\r\n",
             (unsigned)cam_cmd_fps, (unsigned)cam_cmd_gap_ms,
             (unsigned)cam_cmd_dx, (unsigned)cam_cmd_dy,
             (unsigned)(CAM_TXW / cam_cmd_dx), (unsigned)(CAM_H / cam_cmd_dy),
@@ -434,16 +434,16 @@ static void cam_cmd_line (char *s)
         //   行 bin4 后帧只有 120 行 ⇒ 行数必须 < 120（出厂 443 会卡死不成帧 ✓）
         case 'e':
             v = cam_cmd_num(s + 1);
-            /* ★★ 2026-11-09（FW=2205）：这台摄像头**拆掉了 51 单片机** ⇒ 没有串口配置、没有 EEPROM，
-               参数只能靠 SCCB 直接写；AEC 也必须开着（关掉就退回 R0x0B=443 行 > 一帧 120 行 ⇒ 不出图）
-               ⇒ **调亮度就写 R0xA5（AEC/AGC 目标亮度 0..63）**：数值越小画面越暗，这是 AEC 开启时正确的旋钮。
-               顺手也写一遍 R0x0B（10..110）：万一以后关了 AEC，它才是曝光行数。*/
-            cam_bin_target = (uint8_t)cam_cmd_clamp(v, 1U, 63U);
-            (void)cam_sccb_write_reg(0xA5U, (uint16_t)cam_bin_target);
+            /* ★★ FW=2208：**亮度就是曝光行数（R0x0B）** ★★
+               因为我们已经把 AEC/AGC 关掉了（见 cam_f4.c 里的说明：AEC 开着时 R0x0B/R0xA5 都不听话，
+               亮度按钮按了没反应就是这么来的）。现在：
+                 · R0x0B 曝光行数 10..110（必须 < 一帧 120 行）← 这个命令调它，越大越亮
+                 · R0x35 模拟增益 16..64（16=1X），要更亮就改 cam_gain
+               上位机"亮度 ±"发的是 `e <n>`，n 直接就是行数（会被夹到 10..110）。*/
             cam_shutter = (uint8_t)cam_cmd_clamp(v, 10U, 110U);
-            (void)cam_sccb_write_reg(0x0BU, cam_shutter);
-            sprintf(b, "ACK e: AEC target=%u (R0xA5 1..63) shutter=%u rows\r\n",
-                    (unsigned)cam_bin_target, (unsigned)cam_shutter);
+            (void)cam_sccb_write_reg(0x0BU, (uint16_t)cam_shutter);
+            sprintf(b, "ACK e: exposure=%u rows (10..110, AEC off) gain=%u\r\n",
+                    (unsigned)cam_shutter, (unsigned)cam_gain);
             return;
 
         // ★ 翻转/镜像：`n` 每按一次换一种（0 不翻 → 1 左右镜像 → 2 上下 → 3 180° → 0…）

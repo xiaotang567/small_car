@@ -1027,6 +1027,11 @@ void app_loop (void)
       static char buf[320];   /* ★ static：进 .bss，不吃栈（最长的一行 S 约 203B，最坏 271B）*/
       t_hb = HAL_GetTick();
       board_cam_dbg();                            // 抓一份 DCMI/DMA 寄存器快照
+        {   /* ★ 2205：每 500ms 回读一次 AEC 目标亮度(R0xA5) 和 快门(R0x0B) —— 验证"改亮度到底写进去没有" */
+            uint16_t r5 = 0U, rs = 0U;
+            if (0U == cam_sccb_read_reg(0xA5U, &r5)) { cam_dbg_a5 = r5; }
+            if (0U == cam_sccb_read_reg(0x0BU, &rs)) { cam_dbg_sh = rs; }
+        }
 
       // ==================== ★★ 心跳分档（上位机命令 `d 0/1/2`）★★ ====================
       //   这一段是**控制台噪声的总开关**：默认只发上面这**一行**，
@@ -1041,7 +1046,7 @@ void app_loop (void)
         //     MD  = 当前采集模式（0 = 752 宽 / 1 = 188 宽）
         //     BIN = 188×120 配置是否成功（1 = 已写并回读一致）
         //     R0D/R0E = 两个 Read Mode 寄存器的**回读值**（列 bin 在 R0D[3:2]、行 bin 在 R0E[1:0]）
-        sprintf(buf, "S f=%lu V=%lu VS=%lu LG=%lu TO=%lu F=%u FL=%u P=%u RX=%lu CAM=%u ID=%04X N=%u MD=%u BIN=%u R0D=%04X W=%u E=%u K=%lu R=%04lX IE=%04lX MI=%04lX CR=%08lX ND=%lu DC=%08lX HE=%lu VE=%lu LW=%lu GP=%lu FW=2205 LM=%lu RST=%02lX PC=%08lX CF=%04lX BA=%08lX MG=%lu SAT=%lu\r\n",
+        sprintf(buf, "S f=%lu V=%lu VS=%lu LG=%lu TO=%lu F=%u FL=%u P=%u RX=%lu CAM=%u ID=%04X N=%u MD=%u BIN=%u R0D=%04X W=%u E=%u K=%lu R=%04lX IE=%04lX MI=%04lX CR=%08lX ND=%lu DC=%08lX HE=%lu VE=%lu LW=%lu GP=%lu FW=2208 LM=%lu RST=%02lX PC=%08lX CF=%04lX BA=%08lX MG=%lu SAT=%lu A5=%04lX SH=%04lX\r\n",
                 (unsigned long)cam_frame_cnt, (unsigned long)cam_vsync_isr_cnt,
                 (unsigned long)cam_vs_cap_cnt,
                 (unsigned long)disp_lag_max,
@@ -1061,7 +1066,8 @@ void app_loop (void)
                 (unsigned long)flt_mark,
                 (unsigned long)cam_rst_flags,
                 (unsigned long)flt_pc, (unsigned long)flt_cfsr, (unsigned long)flt_bfar,
-                (unsigned long)cam_gray_mean, (unsigned long)cam_sat_pcnt);   /* ★ 2204：诊断"全白" */
+                (unsigned long)cam_gray_mean, (unsigned long)cam_sat_pcnt,
+                (unsigned long)cam_dbg_a5, (unsigned long)cam_dbg_sh);   /* ★ 2205：A5/快门回读 */
         dbg_txt(buf);
       }
 
