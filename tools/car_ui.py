@@ -449,12 +449,16 @@ class App(object):
                                 font=('Microsoft YaHei', 9))
         self.btn_sc.grid(row=1, column=7, padx=4, pady=2)
 
-        tk.Label(f, text='★ 弯道 ki', bg=C_PANEL, fg='#ffcc66',
-                 font=('Microsoft YaHei', 9)).grid(row=2, column=0, columnspan=2, sticky='e')
-        self.e_kic = _ent(f, 2, 2, '0.5')
         tk.Label(f, text='（单独调"转弯的积分"；以前跟直道共用一个 ki）',
                  bg=C_PANEL, fg=C_DIM, font=('Microsoft YaHei', 8)
                  ).grid(row=2, column=3, columnspan=5, sticky='w', padx=2)
+
+        self.btn_psave = self._btn(f, '存到板子（掉电保存 ss）', self.do_pid_save, bg=C_ON, w=16, h=1,
+                                   font=('Microsoft YaHei', 9))
+        self.btn_psave.grid(row=3, column=0, columnspan=4, padx=4, pady=(2, 4), sticky='ew')
+        self.btn_pload = self._btn(f, '读回板子里的 (sl)', self.do_pid_load, bg=C_BTN, w=12, h=1,
+                                   font=('Microsoft YaHei', 9))
+        self.btn_pload.grid(row=3, column=4, columnspan=4, padx=4, pady=(2, 4), sticky='ew')
         # ---- 其它 ----
         f = tk.LabelFrame(right, text=' 其它 ', bg=C_PANEL, fg=C_ACCENT,
                           font=('Microsoft YaHei', 10, 'bold'), bd=1, relief='groove')
@@ -781,6 +785,14 @@ class App(object):
         self.send_ack('sp %d %d %d' % (round(kp * 10), round(ki * 10), round(kd * 10)),
                       'ACK sp', '直道 PID  kp=%.1f ki=%.1f kd=%.1f' % (kp, ki, kd),
                       self.btn_sp)
+
+    def do_pid_save(self):
+        """把当前 7 个 PID 参数存进板子内部 Flash（命令 ss）—— 断电不丢，开机自动读回"""
+        self.send_ack('ss', 'ACK ss', 'PID 存进板子（掉电保存）', self.btn_psave)
+
+    def do_pid_load(self):
+        """从板子 Flash 读回 PID（命令 sl）"""
+        self.send_ack('sl', 'ACK sl', '从板子读回 PID', self.btn_pload)
 
     def do_apply_sc(self):
         """弯道 PID：sc <kp×10> <kd×10> <kff> <ki×10>

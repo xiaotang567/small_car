@@ -161,6 +161,12 @@ extern volatile float    g_steer_kff;          /* ★ 2187 走向前馈系数 */
 extern volatile float    g_steer_err;          /* ★ 2175 诊断：当前误差(px) */
 extern volatile float    g_steer_ierr;         /* ★ 2176 诊断：积分项 */
 extern volatile int32_t  g_steer_target;       /* ★ 2178 诊断：PID 目标位置 */
+
+/* ★ 2210：PID 掉电保存（内部 Flash 扇区 11）*/
+extern volatile uint8_t  pid_store_ok;
+uint8_t pid_store_save  (void);   /* 0 = 存成功 */
+uint8_t pid_store_load  (void);   /* 1 = 读到并已生效 */
+uint8_t pid_store_clear (void);   /* 抹掉保存的数据 */
 uint8_t  ctrl_imu_ok (void);                   /* 1 = MPU9250 在线 */
 uint8_t  ctrl_motor_stalled (void);            /* 1 = 堵转停机中（OLED 用）*/
 uint8_t  ctrl_motor_started (void);            /* 1 = 已经起过转（OLED 用）*/

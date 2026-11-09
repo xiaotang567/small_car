@@ -149,7 +149,7 @@ static void cam_cmd_status (void)
        DRP = 发送看门狗**主动放弃**的帧数（一直飙 ⇒ 链路/模块发不动）✓
        DST = DMA 停摆看门狗重启采集的次数（>0 ⇒ 采集链卡过，但已经自己救回来了）✓
        SELF= 连续 2 秒没有完整帧 ⇒ 重启采集的次数（和 DST 一起看）✓ */
-    sprintf(b, "CFG f=%u g=%u x=%u y=%u (%ux%u) d=%u CST=%u RV=%06lX LINE=%u FW=2209 EDG=%lu EL=%u ER=%u DRP=%lu DST=%lu SELF=%lu TH=%u\r\n",
+    sprintf(b, "CFG f=%u g=%u x=%u y=%u (%ux%u) d=%u CST=%u RV=%06lX LINE=%u FW=2210 EDG=%lu EL=%u ER=%u DRP=%lu DST=%lu SELF=%lu TH=%u\r\n",
             (unsigned)cam_cmd_fps, (unsigned)cam_cmd_gap_ms,
             (unsigned)cam_cmd_dx, (unsigned)cam_cmd_dy,
             (unsigned)(CAM_TXW / cam_cmd_dx), (unsigned)(CAM_H / cam_cmd_dy),
@@ -434,7 +434,7 @@ static void cam_cmd_line (char *s)
         //   行 bin4 后帧只有 120 行 ⇒ 行数必须 < 120（出厂 443 会卡死不成帧 ✓）
         case 'e':
             v = cam_cmd_num(s + 1);
-            /* ★★ FW=2209：**亮度就是曝光行数（R0x0B）** ★★
+            /* ★★ FW=2210：**亮度就是曝光行数（R0x0B）** ★★
                因为我们已经把 AEC/AGC 关掉了（见 cam_f4.c 里的说明：AEC 开着时 R0x0B/R0xA5 都不听话，
                亮度按钮按了没反应就是这么来的）。现在：
                  · R0x0B 曝光行数 10..110（必须 < 一帧 120 行）← 这个命令调它，越大越亮
@@ -684,6 +684,63 @@ static void cam_cmd_line (char *s)
                     cmd_txt(b);
                     return;
                 }
+                /* ★ 2210：PID 掉电保存
+                   `ss` = 把当前 7 个 PID 参数存进 Flash（扇区 11，断电不丢）
+                   `sl` = 从 Flash 读回来并生效
+                   `sq` = 报当前参数（对照用）
+                   `sd` = 抹掉保存的数据（下次开机就用代码默认值）*/
+                if ((*a == 's') || (*a == 'S') || (*a == 'l') || (*a == 'L')
+                    || (*a == 'q') || (*a == 'Q') || (*a == 'd') || (*a == 'D'))
+                {
+                    char sub = (char)((*a >= 'a') ? (*a - 'a' + 'a') : (*a - 'A' + 'a'));
+                    uint8_t r = 0xFFU;
+
+                    if (sub == 's')
+                    {
+                        r = pid_store_save();
+                        sprintf(b, "ACK ss: PID 存盘 %s (kp=%d.%d ki=%d.%d kd=%d.%d | cur kp=%d.%d kd=%d.%d ki=%d.%d kff=%d)\r\n",
+                                (0U == r) ? "OK" : "FAIL",
+                                (int)g_steer_kp, (int)(g_steer_kp * 10) % 10,
+                                (int)g_steer_ki, (int)(g_steer_ki * 10) % 10,
+                                (int)g_steer_kd, (int)(g_steer_kd * 10) % 10,
+                                (int)g_steer_kp_cur, (int)(g_steer_kp_cur * 10) % 10,
+                                (int)g_steer_kd_cur, (int)(g_steer_kd_cur * 10) % 10,
+                                (int)g_steer_ki_cur, (int)(g_steer_ki_cur * 10) % 10,
+                                (int)g_steer_kff);
+                    }
+                    else if (sub == 'l')
+                    {
+                        r = pid_store_load();
+                        sprintf(b, "ACK sl: %s kp=%d.%d ki=%d.%d kd=%d.%d | cur kp=%d.%d kd=%d.%d ki=%d.%d kff=%d\r\n",
+                                (0U != r) ? "loaded" : "empty(use default)",
+                                (int)g_steer_kp, (int)(g_steer_kp * 10) % 10,
+                                (int)g_steer_ki, (int)(g_steer_ki * 10) % 10,
+                                (int)g_steer_kd, (int)(g_steer_kd * 10) % 10,
+                                (int)g_steer_kp_cur, (int)(g_steer_kp_cur * 10) % 10,
+                                (int)g_steer_kd_cur, (int)(g_steer_kd_cur * 10) % 10,
+                                (int)g_steer_ki_cur, (int)(g_steer_ki_cur * 10) % 10,
+                                (int)g_steer_kff);
+                    }
+                    else if (sub == 'q')
+                    {
+                        sprintf(b, "ACK sq: kp=%d.%d ki=%d.%d kd=%d.%d | cur kp=%d.%d kd=%d.%d ki=%d.%d kff=%d\r\n",
+                                (int)g_steer_kp, (int)(g_steer_kp * 10) % 10,
+                                (int)g_steer_ki, (int)(g_steer_ki * 10) % 10,
+                                (int)g_steer_kd, (int)(g_steer_kd * 10) % 10,
+                                (int)g_steer_kp_cur, (int)(g_steer_kp_cur * 10) % 10,
+                                (int)g_steer_kd_cur, (int)(g_steer_kd_cur * 10) % 10,
+                                (int)g_steer_ki_cur, (int)(g_steer_ki_cur * 10) % 10,
+                                (int)g_steer_kff);
+                    }
+                    else
+                    {
+                        (void)pid_store_clear();
+                        sprintf(b, "ACK sd: 已抹掉保存的 PID（下次开机用代码默认值）\r\n");
+                    }
+                    cmd_txt(b);
+                    return;
+                }
+
                 if ((*a == 'c') || (*a == 'C'))
                 {
                     /* ★ 2209：`sc <kp×10> <kd×10> <kff> [ki×10]`

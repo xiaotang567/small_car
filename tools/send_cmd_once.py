@@ -8,8 +8,9 @@ import socket
 import sys
 import time
 
-PORT = int(sys.argv[1]) if len(sys.argv) > 2 else 8086
-CMD = sys.argv[1] if len(sys.argv) > 1 else 'rb 0'
+PORT = int(sys.argv[2]) if len(sys.argv) > 2 else 8086
+CMD = sys.argv[1] if len(sys.argv) > 1 else 'sq'
+WAIT = float(sys.argv[3]) if len(sys.argv) > 3 else 3.0
 
 srv = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 srv.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
@@ -26,7 +27,7 @@ print('sent: %r' % CMD)
 conn.settimeout(0.5)
 t0 = time.time()
 txt = b''
-while time.time() - t0 < 3.0:
+while time.time() - t0 < WAIT:
     try:
         d = conn.recv(8192)
     except socket.timeout:

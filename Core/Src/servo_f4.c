@@ -791,3 +791,112 @@ void ctrl_steer_from_cam (void)
     g_steer_target = target;
     (void)ctrl_servo_set_pos((uint16_t)target);
 }
+
+//===================================================★ 2210：PID 掉电保存（内部 Flash）===================================================
+//   用户："我在上位机调过后，会固化嘛？" —— 原来不会，所有 g_steer_* 都是 RAM 变量，断电就回默认值。
+//   现在给一个真·掉电保存：把当前这 7 个参数写进内部 Flash 的**扇区 11（0x080E0000，128KB）**。
+//     · F407VG 有 1MB Flash，固件只用了前 ~45KB ⇒ 最后那块扇区空着，拿来当"参数区"很安全
+//     · 存：`ps`（或界面按钮）→ 擦扇区 11 → 写 32 字节 → 上锁
+//     · 开机自动读回来（pid_store_load()），没有有效数据（magic 不对）就用代码里的默认值
+//   注意：擦一个 128KB 扇区要 1~2 秒，这一下会卡住主循环（WiFi/图传会短暂停一下），正常。
+//   备份寄存器（RTC->BKPxR）不能用来存 PID：没装 VBAT 电池时断电也会丢。
+//------------------------------------------------------------------------------------------------------------------------------
+#define PID_STORE_ADDR      0x080E0000UL        /* 扇区 11 起始地址（不装代码，安全）*/
+#define PID_STORE_MAGIC     0x50494431UL        /* 'PID1'：用来判断这块地方到底存过没 */
+#define PID_STORE_SECTOR    FLASH_SECTOR_11
+
+typedef struct
+{
+    uint32_t magic;
+    float    v[7];                              /* kp ki kd | kp_cur kd_cur ki_cur kff */
+} pid_store_t;
+
+volatile uint8_t pid_store_ok = 0U;              /* 1 = 上一次操作成功 */
+
+static void pid_pack (float *v)
+{
+    v[0] = g_steer_kp;
+    v[1] = g_steer_ki;
+    v[2] = g_steer_kd;
+    v[3] = g_steer_kp_cur;
+    v[4] = g_steer_kd_cur;
+    v[5] = g_steer_ki_cur;
+    v[6] = g_steer_kff;
+}
+
+static void pid_apply (const float *v)
+{
+    g_steer_kp     = v[0];
+    g_steer_ki     = v[1];
+    g_steer_kd     = v[2];
+    g_steer_kp_cur = v[3];
+    g_steer_kd_cur = v[4];
+    g_steer_ki_cur = v[5];
+    g_steer_kff    = v[6];
+    g_steer_i      = 0.0f;                       /* 参数一变，积分清零重来 */
+}
+
+/* 返回 0 = 存成功 */
+uint8_t pid_store_save (void)
+{
+    pid_store_t buf;
+    FLASH_EraseInitTypeDef er;
+    uint32_t sec_err = 0U, i;
+    uint32_t *w;
+    uint8_t ok = 0U;
+
+    buf.magic = PID_STORE_MAGIC;
+    pid_pack(buf.v);
+
+    HAL_FLASH_Unlock();
+    er.TypeErase    = FLASH_TYPEERASE_SECTORS;
+    er.Sector       = PID_STORE_SECTOR;
+    er.NbSectors    = 1U;
+    er.VoltageRange = FLASH_VOLTAGE_RANGE_3;
+    if (HAL_FLASHEx_Erase(&er, &sec_err) == HAL_OK)
+    {
+        w = (uint32_t *)&buf;
+        ok = 1U;
+        for (i = 0U; i < (sizeof(pid_store_t) / 4U); i++)
+        {
+            if (HAL_FLASH_Program(FLASH_TYPEPROGRAM_WORD, PID_STORE_ADDR + i * 4U, w[i]) != HAL_OK)
+            {
+                ok = 0U;
+                break;
+            }
+        }
+    }
+    HAL_FLASH_Lock();
+
+    pid_store_ok = ok;
+    return (uint8_t)(ok ? 0U : 1U);
+}
+
+/* 返回 1 = 读到了有效数据并已生效；0 = 没有保存过（用默认值）*/
+uint8_t pid_store_load (void)
+{
+    const pid_store_t *p = (const pid_store_t *)PID_STORE_ADDR;
+
+    if (PID_STORE_MAGIC != p->magic) { return 0U; }
+    pid_apply(p->v);
+    return 1U;
+}
+
+/* 清掉保存的数据（把 magic 擦掉）*/
+uint8_t pid_store_clear (void)
+{
+    pid_store_t buf;
+    FLASH_EraseInitTypeDef er;
+    uint32_t sec_err = 0U;
+
+    HAL_FLASH_Unlock();
+    er.TypeErase    = FLASH_TYPEERASE_SECTORS;
+    er.Sector       = PID_STORE_SECTOR;
+    er.NbSectors    = 1U;
+    er.VoltageRange = FLASH_VOLTAGE_RANGE_3;
+    (void)HAL_FLASHEx_Erase(&er, &sec_err);
+    HAL_FLASH_Lock();
+    (void)buf;
+    pid_store_ok = 0U;
+    return 0U;
+}
