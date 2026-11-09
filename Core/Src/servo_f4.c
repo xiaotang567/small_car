@@ -648,6 +648,7 @@ volatile float    g_steer_ki           = 0.50f;/* 直道 I（2176：0.1 → 0.5�
 volatile float    g_steer_kd           = 6.0f; /* ★ 2180：10 -> 6（微分压小）*/
 volatile float    g_steer_kp_cur       = 5.0f; /* ★ 2188：6.0 -> 5.0（配合前馈减小，别切内弯）*/
 volatile float    g_steer_kd_cur       = 10.0f;/* ★ 2180：16 -> 10（微分压小）*/
+volatile float    g_steer_ki_cur       = 0.50f;/* ★ 2209：**弯道专用 I**（原来是和直道共用一个 ki，弯道调积分只能连直道一起动）*/
 volatile float    g_steer_kff          = 200.0f;/* ★ 2188：220 -> 120（弯前打舵过大、压内弯）*/
 volatile float    g_steer_err          = 0.0f; /* 诊断：当前误差 */
 volatile float    g_steer_i            = 0.0f; /* 诊断：积分项 */
@@ -660,7 +661,7 @@ static   uint8_t  s_e_ok               = 0U;
 
 void ctrl_steer_from_cam (void)
 {
-    float   e, de, u, kp, kd;
+    float   e, de, u, kp, kd, ki;
     int32_t target;
 
     /* ★ 2177：**左右扫舵测试**（命令 st 切换）：中位±300，每 200ms 换向
@@ -707,16 +708,18 @@ void ctrl_steer_from_cam (void)
     de = e - s_e_prev;
     s_e_prev = e;
 
-    /* ── 增益调度：直道/弯道用不同的一套 ── */
+    /* ── 增益调度：直道/弯道用不同的一套（★ 2209：I 也分开了） ── */
     if (0U != cam_curved)
     {
         kp = g_steer_kp_cur;
         kd = g_steer_kd_cur;
+        ki = g_steer_ki_cur;      /* ★ 2209：**弯道专用积分** —— 想单独调"转弯的积分"改这里（命令 sc 第 4 个参数）*/
     }
     else
     {
         kp = g_steer_kp;
         kd = g_steer_kd;
+        ki = g_steer_ki;
     }
 
     /* ★ 2175：**只在"接近中心"时积分**（|e|<20px），并且在偏离时缓慢泄放
@@ -743,7 +746,7 @@ void ctrl_steer_from_cam (void)
             if (dterm >  STEER_D_LIMIT) { dterm =  STEER_D_LIMIT; }
             if (dterm < -STEER_D_LIMIT) { dterm = -STEER_D_LIMIT; }
 
-            u = kp * e + g_steer_ki * i_try + dterm;
+            u = kp * e + ki * i_try + dterm;
 
             /* ★★ 2187：**走向前馈**（弯道舵量主要靠它）
                纯靠"偏差"不行：稳态过弯时偏差可能≈0（车正好压在弯的切线上），

@@ -407,6 +407,54 @@ class App(object):
         self.btn_sweep = self._btn(f, '扫舵测试  st', self.do_sweep_toggle, bg=C_BTN, w=10, h=1)
         self.btn_sweep.grid(row=1, column=1, padx=4, pady=(0, 4), sticky='ew')
 
+        # ---- ★ 2209：舵机 PID 在线调参（直道 sp / 弯道 sc）----
+        #   以前只能在代码里改、重新烧录，或者拿串口终端发命令；现在界面直接给输入框。
+        #   弯道的积分是**独立**的（ki_cur），以前和直道共用一个 ki。
+        f = tk.LabelFrame(right, text=' 舵机 PID（在线调，立即生效） ', bg=C_PANEL, fg=C_ACCENT,
+                          font=('Microsoft YaHei', 10, 'bold'), bd=1, relief='groove')
+        f.grid(row=row, column=0, sticky='ew', pady=(0, 8)); row += 1
+
+        def _ent(parent, r, c, val):
+            e = tk.Entry(parent, width=5, bg=C_PANEL, fg=C_FG, insertbackground=C_FG,
+                         font=('Consolas', 10), justify='center', relief='flat',
+                         highlightthickness=1, highlightbackground=C_BTN)
+            e.insert(0, val)
+            e.grid(row=r, column=c, padx=2, pady=2, sticky='ew')
+            return e
+
+        for c in range(6):
+            f.columnconfigure(c, weight=1)
+
+        tk.Label(f, text='直道', bg=C_PANEL, fg=C_DIM, font=('Microsoft YaHei', 9)
+                 ).grid(row=0, column=0, sticky='e')
+        tk.Label(f, text='kp', bg=C_PANEL, fg=C_DIM).grid(row=0, column=1)
+        self.e_kp = _ent(f, 0, 2, '5.0')
+        tk.Label(f, text='ki', bg=C_PANEL, fg=C_DIM).grid(row=0, column=3)
+        self.e_ki = _ent(f, 0, 4, '0.5')
+        tk.Label(f, text='kd', bg=C_PANEL, fg=C_DIM).grid(row=0, column=5)
+        self.e_kd = _ent(f, 0, 6, '6.0')
+        self.btn_sp = self._btn(f, '应用 sp', self.do_apply_sp, bg=C_BTN, w=7, h=1,
+                                font=('Microsoft YaHei', 9))
+        self.btn_sp.grid(row=0, column=7, padx=4, pady=2)
+
+        tk.Label(f, text='弯道', bg=C_PANEL, fg=C_DIM, font=('Microsoft YaHei', 9)
+                 ).grid(row=1, column=0, sticky='e')
+        tk.Label(f, text='kp', bg=C_PANEL, fg=C_DIM).grid(row=1, column=1)
+        self.e_kpc = _ent(f, 1, 2, '5.0')
+        tk.Label(f, text='kd', bg=C_PANEL, fg=C_DIM).grid(row=1, column=3)
+        self.e_kdc = _ent(f, 1, 4, '10.0')
+        tk.Label(f, text='kff', bg=C_PANEL, fg=C_DIM).grid(row=1, column=5)
+        self.e_kff = _ent(f, 1, 6, '200')
+        self.btn_sc = self._btn(f, '应用 sc', self.do_apply_sc, bg=C_BTN, w=7, h=1,
+                                font=('Microsoft YaHei', 9))
+        self.btn_sc.grid(row=1, column=7, padx=4, pady=2)
+
+        tk.Label(f, text='★ 弯道 ki', bg=C_PANEL, fg='#ffcc66',
+                 font=('Microsoft YaHei', 9)).grid(row=2, column=0, columnspan=2, sticky='e')
+        self.e_kic = _ent(f, 2, 2, '0.5')
+        tk.Label(f, text='（单独调"转弯的积分"；以前跟直道共用一个 ki）',
+                 bg=C_PANEL, fg=C_DIM, font=('Microsoft YaHei', 8)
+                 ).grid(row=2, column=3, columnspan=5, sticky='w', padx=2)
         # ---- 其它 ----
         f = tk.LabelFrame(right, text=' 其它 ', bg=C_PANEL, fg=C_ACCENT,
                           font=('Microsoft YaHei', 10, 'bold'), bd=1, relief='groove')
@@ -718,6 +766,33 @@ class App(object):
                                    fg='#66e08a' if self.vision_on else C_DIM)
         except Exception:
             pass
+
+    def _pid_num(self, e):
+        try:
+            return float(e.get().strip())
+        except Exception:
+            return 0.0
+
+    def do_apply_sp(self):
+        """直道 PID：固件命令 sp <kp×10> <ki×10> <kd×10>（立即生效，不用重烧）"""
+        kp = self._pid_num(self.e_kp)
+        ki = self._pid_num(self.e_ki)
+        kd = self._pid_num(self.e_kd)
+        self.send_ack('sp %d %d %d' % (round(kp * 10), round(ki * 10), round(kd * 10)),
+                      'ACK sp', '直道 PID  kp=%.1f ki=%.1f kd=%.1f' % (kp, ki, kd),
+                      self.btn_sp)
+
+    def do_apply_sc(self):
+        """弯道 PID：sc <kp×10> <kd×10> <kff> <ki×10>
+        ★ 第 4 个参数是**弯道专用积分** —— 就是"转弯的积分"那个旋钮。"""
+        kp  = self._pid_num(self.e_kpc)
+        kd  = self._pid_num(self.e_kdc)
+        kff = self._pid_num(self.e_kff)
+        kic = self._pid_num(self.e_kic)
+        self.send_ack('sc %d %d %d %d' % (round(kp * 10), round(kd * 10),
+                                          round(kff), round(kic * 10)),
+                      'ACK sc', '弯道 PID  kp=%.1f kd=%.1f kff=%d ki=%.1f'
+                                % (kp, kd, round(kff), kic), self.btn_sc)
 
     def do_sweep_toggle(self):
         """扫舵测试 开/关（固件 st，中位±300 每 200ms 换向）"""

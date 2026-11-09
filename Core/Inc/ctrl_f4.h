@@ -156,6 +156,7 @@ extern volatile float    g_steer_ki;           /* ★ 2175 直道 I */
 extern volatile float    g_steer_kd;           /* ★ 2175 直道 D */
 extern volatile float    g_steer_kp_cur;       /* ★ 2175 弯道 P */
 extern volatile float    g_steer_kd_cur;       /* ★ 2175 弯道 D */
+extern volatile float    g_steer_ki_cur;       /* ★ 2209 弯道 I（以前弯道和直道共用一个 ki，想单独调弯道积分用这个）*/
 extern volatile float    g_steer_kff;          /* ★ 2187 走向前馈系数 */
 extern volatile float    g_steer_err;          /* ★ 2175 诊断：当前误差(px) */
 extern volatile float    g_steer_ierr;         /* ★ 2176 诊断：积分项 */
