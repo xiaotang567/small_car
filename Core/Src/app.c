@@ -524,8 +524,11 @@ static void cam_tx_row_done (void)
   */
 
 //===================================================主循环===================================================
+#define APP_LINK_KA_TIMEOUT_MS   0U      /* ★ 2215：0 = 关掉"收不到保活就主动重连"（用户要求不要主动断开）*/
+
 void app_loop (void)
 {
+
   g_loop_tick = HAL_GetTick();
   g_wdt_on    = 1U;                    /* ★ 从这一圈起，主循环 6 秒不动就自动复位 */
 
@@ -542,6 +545,13 @@ void app_loop (void)
     static uint32_t t_hb    = 0;
     static uint32_t t_tel   = 0;         // ★ 遥测行节流（10Hz）
     static uint32_t t_camprobe = 0;      // ★ 自动探测摄像头的节流（见下面那段）
+
+    /* ★★ 2215（2026-11-10）：**用户要求"不要主动断开连接"** ⇒ 这个"6 秒没收到保活就强制重连"
+       的看门狗**默认关闭**（APP_LINK_KA_TIMEOUT_MS = 0）。
+       为什么：WiFi 一卡、或主循环忙着发图时，`cam_rx_bytes` 6 秒没涨就判"链路死"，
+       然后每 3 秒重连一次 ⇒ 上位机控制台就刷 [已连接]/[对方断开] 一屏。
+       现在只有**真的发不出去**（`wifi_f4_send()` 失败、`wf_ready` 被清 0）才会重连，绝不主动掐断。
+       想恢复这个看门狗：把下面的 0 改成 6000（毫秒）。*/
 
     // ==================== ★★ 链路见证人：上位机保活 ★★ ====================
     //   2026-11-07（FW=2099）现场故障：上位机突然一直"已连接 + 0 B/s"，只能断电才好。
@@ -561,11 +571,11 @@ void app_loop (void)
         rx_last = cam_rx_bytes;
         t_rx    = HAL_GetTick();
       }
-      else if ((0U != cam_ka_seen) && (0U != wifi_f4_is_ready()) &&
-               ((HAL_GetTick() - t_rx) > 6000U))
+      else if ((APP_LINK_KA_TIMEOUT_MS > 0U) && (0U != cam_ka_seen) && (0U != wifi_f4_is_ready()) &&
+               ((HAL_GetTick() - t_rx) > (uint32_t)APP_LINK_KA_TIMEOUT_MS))
       {
         t_rx = HAL_GetTick();
-        wifi_f4_force_relink();          /* 判链路死 ⇒ 交给下面的重连逻辑 */
+        wifi_f4_force_relink();          /* 只在看门狗启用时才会走到这里 */
       }
     }
 
@@ -1047,7 +1057,7 @@ void app_loop (void)
         //     MD  = 当前采集模式（0 = 752 宽 / 1 = 188 宽）
         //     BIN = 188×120 配置是否成功（1 = 已写并回读一致）
         //     R0D/R0E = 两个 Read Mode 寄存器的**回读值**（列 bin 在 R0D[3:2]、行 bin 在 R0E[1:0]）
-        sprintf(buf, "S f=%lu V=%lu VS=%lu LG=%lu TO=%lu F=%u FL=%u P=%u RX=%lu CAM=%u ID=%04X N=%u MD=%u BIN=%u R0D=%04X W=%u E=%u K=%lu R=%04lX IE=%04lX MI=%04lX CR=%08lX ND=%lu DC=%08lX HE=%lu VE=%lu LW=%lu GP=%lu FW=2214 LM=%lu RST=%02lX PC=%08lX CF=%04lX BA=%08lX MG=%lu SAT=%lu A5=%04lX SH=%04lX\r\n",
+        sprintf(buf, "S f=%lu V=%lu VS=%lu LG=%lu TO=%lu F=%u FL=%u P=%u RX=%lu CAM=%u ID=%04X N=%u MD=%u BIN=%u R0D=%04X W=%u E=%u K=%lu R=%04lX IE=%04lX MI=%04lX CR=%08lX ND=%lu DC=%08lX HE=%lu VE=%lu LW=%lu GP=%lu FW=2215 LM=%lu RST=%02lX PC=%08lX CF=%04lX BA=%08lX MG=%lu SAT=%lu A5=%04lX SH=%04lX\r\n",
                 (unsigned long)cam_frame_cnt, (unsigned long)cam_vsync_isr_cnt,
                 (unsigned long)cam_vs_cap_cnt,
                 (unsigned long)disp_lag_max,
