@@ -19,6 +19,7 @@
    严格按"低于目标"会把正常工作误判成堵转。真堵转时转速基本是 0，用 80% 足够灵敏。*/
 
 static uint8_t  s_motor_started = 0U;      /* 0 = 还没起过转 */
+volatile uint8_t g_protect_enable = 0U;     /* ★ 2212：保护总开关 —— **默认 0（关）**：用户要拿 40% 占空比台架测新 DRV888 */
 static uint8_t  s_motor_stalled = 0U;      /* 1 = 堵转停机，等按键 */
 static uint32_t s_stall_tick    = 0U;      /* ★ 2191：进堵转的时刻（远程重启要冷却 2 秒）*/
 static int16_t  s_tgt_prev      = 0;       /* ★ 2194：上一拍的目转速（判"刚起转"）*/
@@ -81,6 +82,23 @@ void ctrl_protect_tick (void)
           · 唯一例外：电机本来就没驱动（占空比 0 且目标 0）⇒ 那就是"停着的"，不算堵转；
           · 关掉电机后进入 STALL 状态，等 PC2（先松开再按下）重新起转。*/
 #if CTRL_STALL_ENABLE
+    /* ★★ 2212：**保护总开关 + 开环模式自动不判堵转** ★★
+       用户要拿 40% 占空比测新的 DRV888 驱动 —— 那种情况下电机可能转不起来/转速读数不对，
+       堵转保护会立刻把占空比清零，反而妨碍测试。所以：
+         · `g_protect_enable = 0`（命令 `pf 0` / 界面按钮）⇒ 整段跳过，完全不保护；
+         · 开环模式（`w` 命令给的占空比）⇒ 也不判堵转（开环本来就没有"转速闭环"这回事）。
+       ⚠️ 保护关掉以后，堵转时电机会一直给占空比 ⇒ **注意发热/别烧电机**。*/
+    if (0U == g_protect_enable)
+    {
+        s_below_cnt = 0U;
+        return;
+    }
+    if (0U != ctrl_is_open_loop())
+    {
+        s_below_cnt = 0U;
+        return;
+    }
+
     {
         int16_t duty  = ctrl_motor_get((uint8_t)CTRL_SPEED_MOTOR);
         int16_t tgt   = ctrl_speed_get_target();

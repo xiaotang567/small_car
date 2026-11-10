@@ -149,7 +149,7 @@ static void cam_cmd_status (void)
        DRP = 发送看门狗**主动放弃**的帧数（一直飙 ⇒ 链路/模块发不动）✓
        DST = DMA 停摆看门狗重启采集的次数（>0 ⇒ 采集链卡过，但已经自己救回来了）✓
        SELF= 连续 2 秒没有完整帧 ⇒ 重启采集的次数（和 DST 一起看）✓ */
-    sprintf(b, "CFG f=%u g=%u x=%u y=%u (%ux%u) d=%u CST=%u RV=%06lX LINE=%u FW=2211 EDG=%lu EL=%u ER=%u DRP=%lu DST=%lu SELF=%lu TH=%u\r\n",
+    sprintf(b, "CFG f=%u g=%u x=%u y=%u (%ux%u) d=%u CST=%u RV=%06lX LINE=%u FW=2212 EDG=%lu EL=%u ER=%u DRP=%lu DST=%lu SELF=%lu TH=%u\r\n",
             (unsigned)cam_cmd_fps, (unsigned)cam_cmd_gap_ms,
             (unsigned)cam_cmd_dx, (unsigned)cam_cmd_dy,
             (unsigned)(CAM_TXW / cam_cmd_dx), (unsigned)(CAM_H / cam_cmd_dy),
@@ -434,7 +434,7 @@ static void cam_cmd_line (char *s)
         //   行 bin4 后帧只有 120 行 ⇒ 行数必须 < 120（出厂 443 会卡死不成帧 ✓）
         case 'e':
             v = cam_cmd_num(s + 1);
-            /* ★★ FW=2211：**亮度就是曝光行数（R0x0B）** ★★
+            /* ★★ FW=2212：**亮度就是曝光行数（R0x0B）** ★★
                因为我们已经把 AEC/AGC 关掉了（见 cam_f4.c 里的说明：AEC 开着时 R0x0B/R0xA5 都不听话，
                亮度按钮按了没反应就是这么来的）。现在：
                  · R0x0B 曝光行数 10..110（必须 < 一帧 120 行）← 这个命令调它，越大越亮
@@ -552,6 +552,18 @@ static void cam_cmd_line (char *s)
             return;
 
         case 'p':
+            /* ★ 2212：`pf 0` / `pf 1` = **堵转保护总开关** 关 / 开（界面也有按钮）
+               默认是关的（台架测新 DRV888 用 40% 占空比时，保护会把占空比清零）*/
+            if ((s[1] == 'f') || (s[1] == 'F'))
+            {
+                int32_t on = cam_cmd_snum(&s[2]);
+                g_protect_enable = (0 == on) ? 0U : 1U;
+                sprintf(b, "ACK pf: protect=%s (stall=%u open_loop=%u)\r\n",
+                        (0U != g_protect_enable) ? "ON" : "OFF",
+                        (unsigned)ctrl_motor_stalled(), (unsigned)ctrl_is_open_loop());
+                cmd_txt(b);
+                return;
+            }
             sprintf(b, "ACK p: LINE=%u (bit1=PC12/TX bit0=PD2/RX)\r\n",
                     (unsigned)cam_cfg_line_state());
             cmd_txt(b);

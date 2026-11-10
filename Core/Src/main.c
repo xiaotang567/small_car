@@ -156,6 +156,19 @@ int main(void)
   //     被置成"停"（PWM=0 + DIR=0），否则这 60 秒里车可能会乱动。
   ctrl_all_init();
 
+  /* ★★ 2212：**上电默认就开电机**（用户要求：测试新 DRV888 驱动）
+       · 开环占空比 40%（`w 4000 0`，量纲 ±10000 = ±100%）
+       · 保护默认关（g_protect_enable = 0，见 protect_f4.c）
+       · 断链也不强制停车（pid_f4.c 里那一处已经用 g_protect_enable 门控）
+     ⚠️ 上车/上电之前**先把轮子架空**，或者准备好按【停止】/【急停】。
+     想恢复"上电不转"：把下面这 3 行注释掉，或者把 CTRL_BOOT_RUN_DUTY 改成 0。*/
+  #define CTRL_BOOT_RUN_DUTY   4000        /* 40% */
+  if (CTRL_BOOT_RUN_DUTY > 0)
+  {
+      ctrl_open_loop(1U);                   /* 开环：速度环让位 */
+      ctrl_motor_set(1U, (int16_t)CTRL_BOOT_RUN_DUTY);
+      ctrl_motor_set(2U, 0);
+  }
   /* ★ 2210：把上次存进 Flash 的 PID 参数读回来（没有存过就用代码里的默认值）。
      存的动作是命令 ss / 界面上的'存到板子'按钮；存在内部 Flash 扇区 11（0x080E0000）。*/
   (void)pid_store_load();

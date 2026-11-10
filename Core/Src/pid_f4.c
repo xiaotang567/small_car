@@ -86,7 +86,7 @@ void ctrl_speed_tick (void)
        上位机一关（或 WiFi 掉线），板子不知道，会按最后一次目标转速一直跑 —— 很危险。
        `wifi_f4_is_ready()` 在链路断开/发送失败时会被驱动清 0（遥测 100ms 一次，
        所以最多几百 ms 就能发现）⇒ 这里直接把目标清 0，走下面的停机分支。*/
-    if (0U == wifi_f4_is_ready())
+    if ((0U == wifi_f4_is_ready()) && (0U != g_protect_enable))   /* ★ 2212：保护关掉时，断链也不强制停（台架测驱动用）*/
     {
         g_sc_target_x10 = 0;
     }

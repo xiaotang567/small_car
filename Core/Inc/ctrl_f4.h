@@ -148,6 +148,7 @@ void     ctrl_protect_tick (void);             /* protect_f4.c：堵转保护 + 
 void     ctrl_imu_tick (void);                 /* imu_f4.c：读 IMU + 喂 yaw */
 void     ctrl_servo_tick (void);               /* servo_f4.c：舵机状态机 */
 void     ctrl_steer_from_cam (void);           /* ★ 2174 摄像头巡线 → 舵机 */
+extern volatile uint8_t  g_protect_enable;     /* ★ 2212：堵转保护总开关（1=开，0=全关）*/
 extern volatile uint8_t  g_steer_enable;       /* ★ 1 = 视觉打舵开（默认开）*/
 extern volatile uint8_t  g_steer_sweep;        /* ★ 2177 1 = 左右扫舵测试 */
 extern volatile uint32_t g_steer_manual_until; /* ★ 手动打舵优先到这一刻（ms）*/

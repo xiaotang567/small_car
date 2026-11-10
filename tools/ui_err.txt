@@ -1,9 +1,0 @@
-Exception in Tkinter callback
-Traceback (most recent call last):
-  File "C:\Program Files\Python312\Lib\tkinter\__init__.py", line 1968, in __call__
-    return self.func(*args)
-           ^^^^^^^^^^^^^^^^
-  File "C:\Users\SHUIGUI\Documents\small_car\tools\car_ui.py", line 803, in do_apply_sc
-    kic = self._pid_num(self.e_kic)
-                        ^^^^^^^^^^
-AttributeError: 'App' object has no attribute 'e_kic'. Did you mean: 'e_kdc'?
