@@ -162,7 +162,7 @@ int main(void)
        · 断链也不强制停车（pid_f4.c 里那一处已经用 g_protect_enable 门控）
      ⚠️ 上车/上电之前**先把轮子架空**，或者准备好按【停止】/【急停】。
      想恢复"上电不转"：把下面这 3 行注释掉，或者把 CTRL_BOOT_RUN_DUTY 改成 0。*/
-  #define CTRL_BOOT_RUN_DUTY   4000        /* 40% */
+  #define CTRL_BOOT_RUN_DUTY   0           /* ★ 2213：还原成 0（上电不转）。台架测驱动时改成 4000 = 40%，见 tag archive-bench-drv888-2212 */
   if (CTRL_BOOT_RUN_DUTY > 0)
   {
       ctrl_open_loop(1U);                   /* 开环：速度环让位 */
