@@ -15,6 +15,11 @@
 /* 寻线参数 */
 #define LF_SEED_ROW        112                 /* 种子行：车头附近，不被遮挡 */
 #define CAM_MIRROR          1       /* ★ FW=2172：摄像头倒装 ⇒ 左右镜像（0 = 不镜像）*/
+
+/* ★ 2219：**软件翻转**（摄像头姿态不对时运行时可调，命令 `mf <0..3>`）
+     bit0 = 左右翻转   bit1 = 上下翻转
+     默认 3 = 左右+上下（= 原来 CAM_MIRROR 的行为）；上位机/命令改了立即生效，不用重烧。*/
+volatile uint8_t cam_sw_flip = 1U;   /* ★ 2219：默认 **1 = 只左右翻转**（用户反馈"上下颠倒" ⇒ 去掉上下翻转）；命令 `mf <0..3>` 运行时改 */
 #define LF_USE_8NEIGHBOR    1
 
 
@@ -867,27 +872,22 @@ static void cam_copy_whole_frame (uint16_t start_row)
     {
         uint32_t src = ((uint32_t)start_row + r) % (uint32_t)cam_ring_rows;
         const uint8_t *s = &flat[src * (uint32_t)cam_row_bytes];
-        uint8_t       *d = &disp_img[(uint32_t)(CAM_H - 1U) - r][0];
+        uint8_t       *d = &disp_img[(cam_sw_flip & 2U) ? ((uint32_t)CAM_H - 1U - r) : r][0];   /* ★ 2219：上下翻转运行时可调 */
 
-        /* ★ FW=2172：摄像头是**倒装**的 ⇒ 行号要翻（下面 CAM_H-1-r），列也要翻
-           （不然左右就是反的）。整帧 120×188 = 22560 字节，逐字节反向拷贝约 0.2ms，
-           远小于一帧 20ms，可以忽略。不想镜像就把 CAM_MIRROR 改成 0。*/
-#if (CAM_MIRROR != 0)
-        for (c = 0U; c < (uint32_t)CAM_TXW; c++)
+        /* ★ 2219：**软件翻转**，运行时可调（命令 `mf <0..3>`）：bit0=左右 bit1=上下 */
+        if (0U != (cam_sw_flip & 1U))
         {
-            d[c] = s[(uint32_t)CAM_TXW - 1U - c];
+            for (c = 0U; c < (uint32_t)CAM_TXW; c++)
+            {
+                d[c] = s[(uint32_t)CAM_TXW - 1U - c];
+            }
         }
-#else
-        (void)memcpy(d, s, (size_t)CAM_TXW);
-#endif
+        else
+        {
+            (void)memcpy(d, s, (size_t)CAM_TXW);
+        }
     }
 }
-
-// ⚠️ 这个回调**目前永远不会被调用**（VSYNC 中断没使能，见上面的说明）。
-//    留着它纯粹是为了：万一以后有人把 `DCMI_IT_VSYNC` 打开，帧首就是这条更精确的路径。
-// ⚠️ 这个回调**是否真的被调用**，就靠 `cam_vsync_isr_cnt` 说话（心跳里显示成 V=）：
-//    V 在涨 ⇒ VSYNC 中断确实在工作（帧首是硬件精确的）；V 恒 0 ⇒ 它根本没进来，
-//    此时**帧首完全靠下面的"行计数器回绕自检测"兜底**（见 board_cam_harvest 里那一句）。
 volatile uint32_t cam_vsync_isr_cnt = 0;
 
 //-------------------------------------------------------------------------------------------------------------------

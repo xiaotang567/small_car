@@ -407,6 +407,11 @@ class App(object):
         self.btn_sweep = self._btn(f, '扫舵测试  st', self.do_sweep_toggle, bg=C_BTN, w=10, h=1)
         self.btn_sweep.grid(row=1, column=1, padx=4, pady=(0, 4), sticky='ew')
 
+
+        # ★ 2219：图像翻转（上下/左右颠倒时点它循环 0→1→2→3，立即生效）
+        self.sw_flip = 1
+        self.btn_flip = self._btn(f, '图像翻转 mf', self.do_flip_cycle, bg=C_BTN, w=10, h=1)
+        self.btn_flip.grid(row=2, column=0, columnspan=2, padx=4, pady=(0, 6), sticky='ew')
         # ---- ★ 2209：舵机 PID 在线调参（直道 sp / 弯道 sc）----
         #   以前只能在代码里改、重新烧录，或者拿串口终端发命令；现在界面直接给输入框。
         #   弯道的积分是**独立**的（ki_cur），以前和直道共用一个 ki。
@@ -815,6 +820,17 @@ class App(object):
             self.btn_sweep.configure(bg=C_ON if self.sweep_on else C_BTN)
         except Exception:
             pass
+
+    def do_flip_cycle(self):
+        """★ 2219：图像翻转循环 —— 固件 `mf <0..3>`：bit0=左右 bit1=上下
+           0=不翻 1=只左右 2=只上下 3=左右+上下（180°）；立即生效，不用重烧"""
+        self.sw_flip = (self.sw_flip + 1) & 3
+        self.send_ack('mf %d' % self.sw_flip, 'ACK mf',
+                      '图像翻转 → %d（%s）' % (self.sw_flip,
+                                                  ('左右' if self.sw_flip & 1 else '') +
+                                                  ('上下' if self.sw_flip & 2 else '') or '不翻'),
+                      self.btn_flip)
+
 
     def do_img(self, on):
         """图传开关：0 = 停（链路全给文本，调遥测用），1 = 恢复"""

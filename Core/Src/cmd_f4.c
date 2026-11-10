@@ -149,7 +149,7 @@ static void cam_cmd_status (void)
        DRP = 发送看门狗**主动放弃**的帧数（一直飙 ⇒ 链路/模块发不动）✓
        DST = DMA 停摆看门狗重启采集的次数（>0 ⇒ 采集链卡过，但已经自己救回来了）✓
        SELF= 连续 2 秒没有完整帧 ⇒ 重启采集的次数（和 DST 一起看）✓ */
-    sprintf(b, "CFG f=%u g=%u x=%u y=%u (%ux%u) d=%u CST=%u RV=%06lX LINE=%u FW=2218 EDG=%lu EL=%u ER=%u DRP=%lu DST=%lu SELF=%lu TH=%u\r\n",
+    sprintf(b, "CFG f=%u g=%u x=%u y=%u (%ux%u) d=%u CST=%u RV=%06lX LINE=%u FW=2220 EDG=%lu EL=%u ER=%u DRP=%lu DST=%lu SELF=%lu TH=%u\r\n",
             (unsigned)cam_cmd_fps, (unsigned)cam_cmd_gap_ms,
             (unsigned)cam_cmd_dx, (unsigned)cam_cmd_dy,
             (unsigned)(CAM_TXW / cam_cmd_dx), (unsigned)(CAM_H / cam_cmd_dy),
@@ -332,6 +332,21 @@ static void cam_cmd_line (char *s)
 
         // ★ 采集模式：`m 0` = 752 全分辨率（抽行）；`m 1` = 188×120（缓冲即整帧）
         case 'm':
+            /* ★ 2219：`mf <0..3>` —— **软件翻转**（图像上下/左右颠倒时用它，立即生效，不用重烧）
+                 bit0 = 左右翻转    bit1 = 上下翻转
+                 0=不翻  1=只左右  2=只上下(上下颠倒就选这个)  3=左右+上下(180°)
+               另外 `n` 是**硬件**翻转（改传感器寄存器），两个可以叠加。*/
+            if ((s[1] == 'f') || (s[1] == 'F'))
+            {
+                int32_t f = cam_cmd_snum(&s[2]);
+                cam_sw_flip = (uint8_t)(f & 3);
+                sprintf(b, "ACK mf: sw_flip=%u (bit0=LR bit1=UD)  now: LR=%u UD=%u\r\n",
+                        (unsigned)cam_sw_flip,
+                        (unsigned)((cam_sw_flip & 1U) ? 1U : 0U),
+                        (unsigned)((cam_sw_flip & 2U) ? 1U : 0U));
+                cmd_txt(b);
+                return;
+            }
             v = cam_cmd_num(s + 1);
             board_cam_set_mode((uint8_t)((v != 0U) ? 1U : 0U));
             sprintf(b, "ACK m: mode=%u rowbytes=%u span=%u\r\n",
@@ -434,7 +449,7 @@ static void cam_cmd_line (char *s)
         //   行 bin4 后帧只有 120 行 ⇒ 行数必须 < 120（出厂 443 会卡死不成帧 ✓）
         case 'e':
             v = cam_cmd_num(s + 1);
-            /* ★★ FW=2218：**亮度就是曝光行数（R0x0B）** ★★
+            /* ★★ FW=2220：**亮度就是曝光行数（R0x0B）** ★★
                因为我们已经把 AEC/AGC 关掉了（见 cam_f4.c 里的说明：AEC 开着时 R0x0B/R0xA5 都不听话，
                亮度按钮按了没反应就是这么来的）。现在：
                  · R0x0B 曝光行数 10..110（必须 < 一帧 120 行）← 这个命令调它，越大越亮

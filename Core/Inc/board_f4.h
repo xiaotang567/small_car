@@ -188,7 +188,8 @@ extern volatile uint16_t cam_dbg_sh;         // ★ 2205：R0x0B 回读（快门
 extern volatile uint32_t cam_gray_mean;      // ★ 2204：本帧平均灰度（≈255 ⇒ 真过曝，二值图全白就是它）
 extern volatile uint32_t cam_sat_pcnt;       // ★ 2204：本帧饱和（>=250）像素百分比
 void     cam_sccb_apply_flip (void);         // ★ 按 cam_flip 重写 R0x0D 的翻转位（bit5=左右镜像 bit4=上下）
-extern volatile uint8_t  cam_flip;           // 0=不翻 1=镜像 2=上下 3=180°
+extern volatile uint8_t  cam_flip;           // 0=不翻 1=镜像 2=上下 3=180°（硬件寄存器 R0x0D）
+extern volatile uint8_t  cam_sw_flip;        // ★ 2219：软件翻转（bit0=左右 bit1=上下），命令 mf <0..3> 运行时改
 extern volatile uint8_t  cam_bin_ok;                // 1 = 配置成功且回读一致
 extern volatile uint16_t cam_r0d;                   // R0x0D 回读值
 extern volatile uint16_t cam_r0e;                   // R0x0E 回读值
