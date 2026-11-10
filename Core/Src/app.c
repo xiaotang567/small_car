@@ -542,6 +542,7 @@ void app_loop (void)
        放到主循环里延时 2 秒，等舵机/相机/IMU 都初始化完再开，两件事就不打架了。
        不做测试时：把 APP_BOOT_RUN_DUTY 改成 0（或者按界面【停止】/发 `w 0 0`）。*/
     #define APP_BOOT_RUN_DUTY      0U         /* ★ 2218：0 = 上电不转（台架测 DRV 时改 4000U = 40%）*/
+#if (APP_BOOT_RUN_DUTY > 0U)        /* ★ 2218：duty=0 时整块不编译 ⇒ 绝不会把系统切成开环 */
     #define APP_BOOT_RUN_DELAY_MS  2000U      /* 上电多久以后再开 */
     {
         static uint8_t  boot_run_done = 0U;
@@ -549,7 +550,10 @@ void app_loop (void)
 
         if (0U == boot_run_done)
         {
-            if (0U == boot_run_t) { boot_run_t = HAL_GetTick(); }
+            if (0U == boot_run_t)
+            {
+                boot_run_t = HAL_GetTick();
+            }
             else if ((HAL_GetTick() - boot_run_t) >= APP_BOOT_RUN_DELAY_MS)
             {
                 ctrl_open_loop(1U);
@@ -559,6 +563,7 @@ void app_loop (void)
             }
         }
     }
+#endif
 
 
     // 几个跨轮次保持的状态（static：只初始化一次）
