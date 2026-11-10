@@ -8,6 +8,7 @@
 ********************************************************************************************************************/
 
 #include "ctrl_f4.h"
+#include "state_f4.h"     /* ★ 2214：drv_state_update() */
 #include <stdio.h>
 #include <string.h>
 
@@ -78,6 +79,7 @@ void board_ctrl_tick (void)
     ctrl_protect_tick();         /* 3) 堵转保护 + 按键重启 */
     ctrl_imu_tick();             /* 4) IMU + yaw */
     ctrl_servo_tick();           /* 5) 舵机（同步轮询） */
+    drv_state_update();          /* 5.4) ★ 2214 判行驶状态（直道/弯道/没线）+ 选控制量 */
     ctrl_steer_from_cam();       /* 5.5) ★ 2174 摄像头巡线 → 舵机目标位置 */
     ctrl_oled_status();          /* 6) OLED 状态页 */
 }

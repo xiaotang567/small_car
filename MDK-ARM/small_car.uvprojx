@@ -455,6 +455,11 @@
               <FilePath>../Core/Src/servo_f4.c</FilePath>
             </File>
             <File>
+              <FileName>state_f4.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>../Core/Src/state_f4.c</FilePath>
+            </File>
+            <File>
               <FileName>pid_f4.c</FileName>
               <FileType>1</FileType>
               <FilePath>../Core/Src/pid_f4.c</FilePath>

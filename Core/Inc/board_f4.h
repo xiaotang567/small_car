@@ -158,6 +158,7 @@ extern volatile int32_t  cam_err_dir;          /* ★ 2174 远处相对近处的
 extern volatile int32_t  cam_err_far;          /* ★ 2185 诊断：远处偏差 */
 extern volatile int32_t  cam_rows_n;           /* ★ 2185 诊断：有效行数 */
 extern volatile uint8_t  cam_curved;           /* ★ 2174 1 = 弯道（残差大）*/
+extern volatile float    cam_line_res;          /* ★ 2214 中线拟合最大残差（判弯道的原始量）*/
 extern volatile uint8_t  cam_track_ok;         /* ★ 2174 1 = 本帧有赛道 */
 extern volatile float    cam_line_k;           /* ★ 2175 中线拟合斜率 */
 extern volatile float    cam_line_b;           /* ★ 2175 中线拟合截距 */

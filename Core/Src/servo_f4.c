@@ -8,6 +8,7 @@
 
 #include "ctrl_f4.h"
 #include "board_f4.h"   /* ★ 2174：要用 cam_err_near / cam_curved / cam_track_ok */
+#include "state_f4.h"    /* ★ 2214：行驶状态（直道/弯道）与对应控制量 */
 
 
 //===================================================★ 幻尔总线舵机（UART4，1Mbps，同步轮询）===================================================
@@ -697,7 +698,7 @@ void ctrl_steer_from_cam (void)
     {
         float e_near = (cam_line_k * (float)STEER_R_NEAR + cam_line_b) - (float)(CAM_TXW / 2);
         float e_far  = (cam_line_k * (float)STEER_R_AHEAD + cam_line_b) - (float)(CAM_TXW / 2);
-        float w      = (0U != cam_curved) ? STEER_W_CUR : STEER_W_STR;
+        float w      = g_drv_steer_w;        /* ★ 2214：远近权重由 state_f4.c 按状态给 */
 
         e = e_near * (1.0f - w) + e_far * w;
     }
@@ -708,19 +709,12 @@ void ctrl_steer_from_cam (void)
     de = e - s_e_prev;
     s_e_prev = e;
 
-    /* ── 增益调度：直道/弯道用不同的一套（★ 2209：I 也分开了） ── */
-    if (0U != cam_curved)
-    {
-        kp = g_steer_kp_cur;
-        kd = g_steer_kd_cur;
-        ki = g_steer_ki_cur;      /* ★ 2209：**弯道专用积分** —— 想单独调"转弯的积分"改这里（命令 sc 第 4 个参数）*/
-    }
-    else
-    {
-        kp = g_steer_kp;
-        kd = g_steer_kd;
-        ki = g_steer_ki;
-    }
+    /* ── 增益调度：**由 state_f4.c 统一决定**（直道/弯道各一套，含弯道专用积分）──
+       ★ 2214：原来这里自己 if (cam_curved) 选增益，现在直接用状态模块算好的 g_drv_*；
+               想改"弯道/直道各用什么参数"，只改 state_f4.c 一个地方（或命令 sp/sc 改增益，状态模块自动跟着用）。*/
+    kp = g_drv_kp;
+    kd = g_drv_kd;
+    ki = g_drv_ki;
 
     /* ★ 2175：**只在"接近中心"时积分**（|e|<20px），并且在偏离时缓慢泄放
        —— 不然过弯时误差很大，积分会一路顶到限幅，出弯后舵机半天回不来（实测就是这个）

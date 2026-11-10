@@ -2902,6 +2902,7 @@ volatile int32_t cam_err_far  = 0;   /* ★ 2185 诊断：远处(第95行)偏差
 volatile int32_t cam_rows_n   = 0;   /* ★ 2185 诊断：本帧有效行数 */
 volatile int32_t cam_err_dir  = 0;
 volatile uint8_t cam_curved   = 0U;      /* 1 = 本帧判为弯道 */
+volatile float   cam_line_res = 0.0f;    /* ★ 2214：中线拟合的**最大残差**（判弯道的原始量，给 state_f4.c 用）*/
 volatile uint8_t cam_track_ok = 0U;      /* 1 = 本帧有可用赛道 */
 volatile float   cam_line_k   = 0.0f;    /* ★ 2175 中线拟合：c(r) = k*r + b（r=行号）*/
 volatile float   cam_line_b   = 0.0f;
@@ -3030,6 +3031,7 @@ void cam_track_eval (void)
     cam_err_dir  = (int32_t)(k * (float)(r_lo - r_hi));
     cam_line_k   = k;            /* ★ 2175：给舵机 PID 用的直线拟合参数 */
     cam_line_b   = b;
+    cam_line_res = res;                      /* ★ 2214：把残差交出去（state_f4.c 判状态 + 遥测诊断）*/
     cam_curved   = (res > 1.6f) ? 1U : 0U;
     cam_track_ok = 1U;
 
