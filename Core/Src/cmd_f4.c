@@ -149,7 +149,7 @@ static void cam_cmd_status (void)
        DRP = 发送看门狗**主动放弃**的帧数（一直飙 ⇒ 链路/模块发不动）✓
        DST = DMA 停摆看门狗重启采集的次数（>0 ⇒ 采集链卡过，但已经自己救回来了）✓
        SELF= 连续 2 秒没有完整帧 ⇒ 重启采集的次数（和 DST 一起看）✓ */
-    sprintf(b, "CFG f=%u g=%u x=%u y=%u (%ux%u) d=%u CST=%u RV=%06lX LINE=%u FW=2215 EDG=%lu EL=%u ER=%u DRP=%lu DST=%lu SELF=%lu TH=%u\r\n",
+    sprintf(b, "CFG f=%u g=%u x=%u y=%u (%ux%u) d=%u CST=%u RV=%06lX LINE=%u FW=2217 EDG=%lu EL=%u ER=%u DRP=%lu DST=%lu SELF=%lu TH=%u\r\n",
             (unsigned)cam_cmd_fps, (unsigned)cam_cmd_gap_ms,
             (unsigned)cam_cmd_dx, (unsigned)cam_cmd_dy,
             (unsigned)(CAM_TXW / cam_cmd_dx), (unsigned)(CAM_H / cam_cmd_dy),
@@ -434,7 +434,7 @@ static void cam_cmd_line (char *s)
         //   行 bin4 后帧只有 120 行 ⇒ 行数必须 < 120（出厂 443 会卡死不成帧 ✓）
         case 'e':
             v = cam_cmd_num(s + 1);
-            /* ★★ FW=2215：**亮度就是曝光行数（R0x0B）** ★★
+            /* ★★ FW=2217：**亮度就是曝光行数（R0x0B）** ★★
                因为我们已经把 AEC/AGC 关掉了（见 cam_f4.c 里的说明：AEC 开着时 R0x0B/R0xA5 都不听话，
                亮度按钮按了没反应就是这么来的）。现在：
                  · R0x0B 曝光行数 10..110（必须 < 一帧 120 行）← 这个命令调它，越大越亮

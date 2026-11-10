@@ -13,6 +13,16 @@
 #include <string.h>
 #include <stdio.h>
 
+
+/* ★★ 2216（2026-11-10）：用户要求 **"不要主动断开连接"** ★★
+   这两处原来都是"发不动就判链路死 ⇒ 清 wf_ready ⇒ 主循环 3 秒后重连 ⇒ 新 TCP 连接"：
+     · 文本排队 3 秒还发不出去（模块被图像占满就会这样）
+     · 连续 2 秒一个字节都没发出去
+   实测后果就是上位机控制台 "[已连接] / [对方断开]" 反复刷屏（端口 6666→6667→6668…）。
+   现在两个都**默认关掉**：发不动就丢这一条（文本丢一条无所谓，图像下一轮补），
+   **绝不主动拆连接**。真掉线了需要手动重连/重启；想恢复原来的自动重连，把下面改成 1。*/
+#define WF_STALL_RELINK_ENABLE      0U     /* 1 = 2 秒发不出字节就判链路断（老行为）*/
+#define WF_TXT_TIMEOUT_RELINK_EN    0U     /* 1 = 文本排队 3 秒发不出就判链路断（老行为）*/
 //===================================================协议常量===================================================
 #define WF_CMD_RESET            0x01        // 复位（length 固定写 0xA5A5）
 #define WF_CMD_DATA             0x02        // 透传数据
@@ -772,7 +782,7 @@ void wifi_f4_text_pump (void)
         wf_txt_has = 0U;
         wf_txt_pri = 0U;
         wf_txt_fail ++;
-        wf_ready   = 0U;
+        if (WF_TXT_TIMEOUT_RELINK_EN != 0U) { wf_ready = 0U; }   /* ★ 2216：默认不清 ⇒ 不主动断开 */
         return;
     }
 
@@ -856,7 +866,7 @@ uint32_t wifi_f4_send (const uint8_t *buf, uint32_t len)
         else if ((now - wf_stall_t) >= 2000U)
         {
             wf_stall_t = now;
-            wf_ready   = 0U;               /* 2 秒完全发不出去 ⇒ 判链路断，交给主循环重连 */
+            if (WF_STALL_RELINK_ENABLE != 0U) { wf_ready = 0U; }   /* ★ 2216：默认不清 ⇒ 不主动断开 */
         }
     }
     return len;

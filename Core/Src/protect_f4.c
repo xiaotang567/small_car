@@ -19,7 +19,7 @@
    严格按"低于目标"会把正常工作误判成堵转。真堵转时转速基本是 0，用 80% 足够灵敏。*/
 
 static uint8_t  s_motor_started = 0U;      /* 0 = 还没起过转 */
-volatile uint8_t g_protect_enable = 1U;     /* ★ 2213：**还原成默认开**（2212 台架测试时默认关，已存档 tag archive-bench-drv888-2212）*/
+volatile uint8_t g_protect_enable = 0U;     /* ★ 2217：**台架测 DRV 模式 ⇒ 默认关**（正常跑车改成 1U）*/
 static uint8_t  s_motor_stalled = 0U;      /* 1 = 堵转停机，等按键 */
 static uint32_t s_stall_tick    = 0U;      /* ★ 2191：进堵转的时刻（远程重启要冷却 2 秒）*/
 static int16_t  s_tgt_prev      = 0;       /* ★ 2194：上一拍的目转速（判"刚起转"）*/

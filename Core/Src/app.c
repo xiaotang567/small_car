@@ -535,6 +535,31 @@ void app_loop (void)
   while (1)
   {
     g_loop_tick = HAL_GetTick();       /* ★ 踩脚印（主循环看门狗，见 stm32f4xx_it.c）*/
+    /* ★★ 2217（2026-11-10）：**台架测 DRV 模式：上电 2 秒后自动开电机** ★★
+       用户要拿 40% 开环占空比测新的 DRV888。
+       为什么放这里而不是 main.c：main.c 那段在 WiFi 初始化（最长 60 秒）**之前**就开电机，
+       电机一起步抽电流把 3.3V 拉低，实测会把**舵机初始化搞挂**（遥测 s=65535）。
+       放到主循环里延时 2 秒，等舵机/相机/IMU 都初始化完再开，两件事就不打架了。
+       不做测试时：把 APP_BOOT_RUN_DUTY 改成 0（或者按界面【停止】/发 `w 0 0`）。*/
+    #define APP_BOOT_RUN_DUTY      4000U      /* 40% 占空比（±10000 = 100%）*/
+    #define APP_BOOT_RUN_DELAY_MS  2000U      /* 上电多久以后再开 */
+    {
+        static uint8_t  boot_run_done = 0U;
+        static uint32_t boot_run_t    = 0U;
+
+        if (0U == boot_run_done)
+        {
+            if (0U == boot_run_t) { boot_run_t = HAL_GetTick(); }
+            else if ((HAL_GetTick() - boot_run_t) >= APP_BOOT_RUN_DELAY_MS)
+            {
+                ctrl_open_loop(1U);
+                ctrl_motor_set(1U, (int16_t)APP_BOOT_RUN_DUTY);
+                ctrl_motor_set(2U, 0);
+                boot_run_done = 1U;
+            }
+        }
+    }
+
 
     // 几个跨轮次保持的状态（static：只初始化一次）
     static uint8_t  cam_min = 255;      // 最近一帧的最暗值
@@ -1057,7 +1082,7 @@ void app_loop (void)
         //     MD  = 当前采集模式（0 = 752 宽 / 1 = 188 宽）
         //     BIN = 188×120 配置是否成功（1 = 已写并回读一致）
         //     R0D/R0E = 两个 Read Mode 寄存器的**回读值**（列 bin 在 R0D[3:2]、行 bin 在 R0E[1:0]）
-        sprintf(buf, "S f=%lu V=%lu VS=%lu LG=%lu TO=%lu F=%u FL=%u P=%u RX=%lu CAM=%u ID=%04X N=%u MD=%u BIN=%u R0D=%04X W=%u E=%u K=%lu R=%04lX IE=%04lX MI=%04lX CR=%08lX ND=%lu DC=%08lX HE=%lu VE=%lu LW=%lu GP=%lu FW=2215 LM=%lu RST=%02lX PC=%08lX CF=%04lX BA=%08lX MG=%lu SAT=%lu A5=%04lX SH=%04lX\r\n",
+        sprintf(buf, "S f=%lu V=%lu VS=%lu LG=%lu TO=%lu F=%u FL=%u P=%u RX=%lu CAM=%u ID=%04X N=%u MD=%u BIN=%u R0D=%04X W=%u E=%u K=%lu R=%04lX IE=%04lX MI=%04lX CR=%08lX ND=%lu DC=%08lX HE=%lu VE=%lu LW=%lu GP=%lu FW=2217 LM=%lu RST=%02lX PC=%08lX CF=%04lX BA=%08lX MG=%lu SAT=%lu A5=%04lX SH=%04lX\r\n",
                 (unsigned long)cam_frame_cnt, (unsigned long)cam_vsync_isr_cnt,
                 (unsigned long)cam_vs_cap_cnt,
                 (unsigned long)disp_lag_max,
