@@ -77,6 +77,7 @@ void board_ctrl_tick (void)
     ctrl_encoder_tick(dt_us);    /* 1) 编码器：增量 + 用真实 µs 间隔算转速 */
     ctrl_speed_tick();           /* 2) 速度环 */
     ctrl_protect_tick();         /* 3) 堵转保护 + 按键重启 */
+    ctrl_key_tick();             /* 3.5) ★ PC3 = 直接启动/停止（脱机跑，不用连电脑）*/
     ctrl_imu_tick();             /* 4) IMU + yaw */
     ctrl_servo_tick();           /* 5) 舵机（同步轮询） */
     drv_state_update();          /* 5.4) ★ 2214 判行驶状态（直道/弯道/没线）+ 选控制量 */
