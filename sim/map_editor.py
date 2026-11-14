@@ -170,12 +170,20 @@ class Editor(object):
         self.actions.append(('path', {'t': 'line', 'len': L}))
         self.redraw()
 
-    def add_arc(self, deg, sign=1):
+    def add_arc(self, deg, sign=None):
+        """deg 给了（45/90/-45/-90）就**以它的符号定左右**；
+           deg=None（自定义）时用 sign 定左右、输入框里的角度定大小。
+           ⚠️ 原来的 bug：这里写 abs(deg) 且 sign 默认 +1 ⇒ 左右转全变成左转。"""
         r = self._num(self.e_r, 1.3)
-        d = abs(self._num(self.e_deg, 45.0)) if deg is None else abs(deg)
+        if deg is None:
+            d = abs(self._num(self.e_deg, 45.0))
+            s = 1.0 if (sign is None or sign >= 0) else -1.0
+        else:
+            d = abs(float(deg))
+            s = 1.0 if float(deg) >= 0 else -1.0
         if r <= 0 or d <= 0:
             return
-        self.actions.append(('path', {'t': 'arc', 'r': r, 'deg': sign * d}))
+        self.actions.append(('path', {'t': 'arc', 'r': r, 'deg': s * d}))
         self.redraw()
 
     def add_cross(self):
