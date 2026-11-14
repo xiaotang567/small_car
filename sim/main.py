@@ -17,6 +17,7 @@ from PIL import Image, ImageDraw, ImageTk
 
 import control as C
 import steering
+from ipm import IPM
 import view3d
 from sim import Sim
 
@@ -47,6 +48,14 @@ class App(object):
         self.lbl3d.pack()
         self.lblcam = tk.Label(right, bg=BG)
         self.lblcam.pack()
+
+        # ★ 通用逆透视（俯视图）：行=前向距离，列=横向
+        self.ipm = IPM()
+        self.lblbev = tk.Label(right, bg=BG)
+        self.lblbev.pack(pady=4)
+        tk.Label(right, text='↑ 逆透视/BEV（%.2f~%.2fm，%.0fmm/px）' % (
+            self.ipm.bev_x0, self.ipm.bev_x1, self.ipm.res * 1000),
+            fg='#7d8797', bg=BG).pack()
 
         self.txt = tk.Label(right, text='', justify='left', anchor='w', width=34,
                             font=('Consolas', 10), fg=FG, bg=BG)
@@ -216,6 +225,12 @@ class App(object):
                                trail=self.trail).resize((560, 350), Image.NEAREST)
             self._img3d = ImageTk.PhotoImage(im)
             self.lbl3d.configure(image=self._img3d)
+        if self.tick_n % 3 == 2:         # 逆透视每 3 拍刷新（0.7ms）
+            bev = self.ipm.apply(sim.img)
+            imb = Image.fromarray(bev).resize((self.ipm.ny * 2, self.ipm.nx * 2),
+                                              Image.NEAREST)
+            self._imgbev = ImageTk.PhotoImage(imb)
+            self.lblbev.configure(image=self._imgbev)
         if self.tick_n % 3 == 1:         # 相机每 3 拍刷新
             im = Image.fromarray(sim.img).resize((C.CAM_W * 3, C.CAM_H * 3), Image.NEAREST)
             self._imgcam = ImageTk.PhotoImage(im)
@@ -256,6 +271,13 @@ def main():
         print('[sim] TCP 客户端启动（上位机 car_ui.py 在 %d 上监听时自动连上）' % port)
     except Exception as e:
         print('[sim] TCP 未启动：%s' % e)
+    ctrl = 'gyro'
+    for i, a in enumerate(sys.argv):
+        if a == '--ctrl' and i + 1 < len(sys.argv):
+            ctrl = sys.argv[i + 1]
+    if ctrl != 'gyro':
+        app.sim = Sim(controller=ctrl)
+        app.link and setattr(app.link, 'sim', app.sim)
     if sp != 1.0:
         app.speed_x = sp
         app.b_speed.configure(text='加速 ×%d' % int(sp), bg=C_ON)

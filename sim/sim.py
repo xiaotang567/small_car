@@ -15,6 +15,8 @@ from camera import Camera
 import control as C
 import steering
 from imu import IMU
+from ipm import IPM
+from scan_bev import ScanBEV
 
 # ---------------- 车 ----------------
 WHEELBASE = 0.17            # m
@@ -42,9 +44,11 @@ class Sim(object):
         self.fast = fast
         self.cam = Camera(self.track, seed=seed,
                           noise=0.0 if (fast or not noise) else 0.6, fast=fast)
-        self.scan = C.Scan()
+        self.ipm = IPM() if controller == 'bev' else None
+        self.scan = ScanBEV(self.ipm) if controller == 'bev' else C.Scan()
+        self.bev = None
         self.state = C.State()
-        self.steer = C.Steer() if controller == 'vision' else C.SteerGyro()
+        self.steer = C.Steer() if controller in ('vision', 'bev') else C.SteerGyro()
         self.speed = C.Speed()
         self.imu = IMU(seed=seed + 3, bias_dps=imu_bias)
         self.controller = controller
@@ -104,7 +108,11 @@ class Sim(object):
     # ---------------- 20ms 控制拍 ----------------
     def _control(self):
         self.img = self.cam.render(self.x, self.y, self.yaw)
-        self.scan.analyze(self.img, thresh=255)
+        if self.controller == 'bev':
+            self.bev = self.ipm.apply(self.img)      # ★ 通用逆透视
+            self.scan.analyze(self.bev)
+        else:
+            self.scan.analyze(self.img, thresh=255)
 
         # ★ 陀螺也能判弯：残差小但车身真的在转 ⇒ 一定在弯里
         if self.g_gyro_curve(self.p['gz_curve']):
@@ -112,7 +120,7 @@ class Sim(object):
                 self.scan.curved = True
 
         self.state.update(self.scan, self.p)
-        if self.controller == 'vision':
+        if self.controller in ('vision', 'bev'):
             self.servo_cmd = self.steer.tick(self.scan, self.state, self.p)
         else:
             self.servo_cmd = self.steer.tick(self.scan, self.state, self.p,
