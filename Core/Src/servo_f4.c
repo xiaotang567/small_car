@@ -631,7 +631,7 @@ void ctrl_servo_tick (void)
 #define STEER_R_AHEAD    75       /* ★ 2186：95 -> 75（看更远，弯道才会提前、大幅打舵）*/
 #define STEER_R_NEAR     112      /* 近处行号：决定回不回中线 */
 #define STEER_W_STR      0.20f    /* 直道：近处权重 0.8 ⇒ 一定回到中线 */
-#define STEER_W_CUR      0.80f    /* ★ 2186：0.6 -> 0.8（弯道主要看远处 ⇒ 打舵幅度大）*/
+#define STEER_W_CUR      0.45f   /* 同 state_f4.c 的 DRV_W_CUR（仿真标定）*/    /* ★ 2186：0.6 -> 0.8（弯道主要看远处 ⇒ 打舵幅度大）*/
 
 #define STEER_I_LIMIT    200.0f   /* ★ 2180：600 -> 200（积分只做微调，不许把舵机顶到限位）*/
 #define STEER_I_LEAK     0.985f   /* 没线时积分泄放系数 */

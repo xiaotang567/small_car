@@ -16,6 +16,7 @@ import numpy as np
 from PIL import Image, ImageDraw, ImageTk
 
 import control as C
+import steering
 import view3d
 from sim import Sim
 
@@ -63,9 +64,86 @@ class App(object):
         tk.Label(right, text='调参可走 TCP（端口 %d），用 tools/car_ui.py 连' % port,
                  fg='#7d8797', bg=BG).pack(pady=4)
 
+        # ---------- ★ 舵机 / 转弯 参数（改完立即生效，直接看车怎么走）----------
+        panel = tk.LabelFrame(right, text=' 舵机 ↔ 转弯 参数（立即生效） ', fg=FG, bg=BG,
+                              bd=1, labelanchor='nw')
+        panel.pack(fill='x', pady=6)
+        self._knob(panel, 0, '传动比 gain', self.get_gain, self.set_gain, 0.05, '%.2f')
+        self._knob(panel, 1, '舵机满行程', self.get_smax, self.set_smax, 1.0, '%.1f°')
+        self._knob(panel, 2, '连杆死区', self.get_db, self.set_db, 0.2, '%.1f°')
+        self._knob(panel, 3, '弯道权重 w', self.get_wcur, self.set_wcur, 0.05, '%.2f')
+        self._knob(panel, 4, '弯道 kp', self.get_kpc, self.set_kpc, 0.5, '%.2f')
+        self._knob(panel, 5, '弯道 kd', self.get_kdc, self.set_kdc, 1.0, '%.1f')
+        self._knob(panel, 6, '前馈 kff', self.get_kff, self.set_kff, 20.0, '%.0f')
+
         self.tick_n = 0
         self.t_wall0 = time.time()
         self.tick()
+
+    # ---------------- 参数旋钮（−/值/+）----------------
+    def _knob(self, parent, row, label, getter, setter, step, fmt):
+        tk.Label(parent, text=label, fg=FG, bg=BG, width=11, anchor='w').grid(
+            row=row, column=0, padx=(4, 2), pady=1, sticky='w')
+        b1 = tk.Button(parent, text='−', width=2, bg=C_BTN, fg='white', relief='flat',
+                       command=lambda: (setter(getter() - step), self.tick()))
+        b1.grid(row=row, column=1, padx=1, pady=1)
+        lb = tk.Label(parent, text=fmt % getter(), fg='#ffd479', bg=BG, width=7)
+        lb.grid(row=row, column=2, padx=2)
+        b2 = tk.Button(parent, text='+', width=2, bg=C_BTN, fg='white', relief='flat',
+                       command=lambda: (setter(getter() + step), self.tick()))
+        b2.grid(row=row, column=3, padx=1, pady=1)
+        setattr(self, '_lb_%d' % row, (lb, fmt))
+
+    def _show_knobs(self):
+        vals = [self.get_gain(), self.get_smax(), self.get_db(), self.get_wcur(),
+                self.get_kpc(), self.get_kdc(), self.get_kff()]
+        for i, v in enumerate(vals):
+            lb, fmt = getattr(self, '_lb_%d' % i)
+            lb.configure(text=fmt % v)
+
+    # ---- 读写这些参数 ----
+    def get_gain(self):
+        return float(self.sim.servo_gain)
+
+    def set_gain(self, v):
+        self.sim.servo_gain = max(0.20, min(1.20, v))
+        steering.SERVO_WHEEL_GAIN = self.sim.servo_gain
+
+    def get_smax(self):
+        return float(steering.SERVO_MAX_DEG)
+
+    def set_smax(self, v):
+        steering.SERVO_MAX_DEG = max(8.0, min(40.0, v))
+
+    def get_db(self):
+        return float(steering.WHEEL_DEADBAND)
+
+    def set_db(self, v):
+        steering.WHEEL_DEADBAND = max(0.0, min(4.0, v))
+
+    def get_wcur(self):
+        return float(C.STEER_W_CUR)
+
+    def set_wcur(self, v):
+        C.STEER_W_CUR = max(0.0, min(1.0, v))
+
+    def get_kpc(self):
+        return float(self.sim.p['kp_cur'])
+
+    def set_kpc(self, v):
+        self.sim.p['kp_cur'] = max(0.0, min(20.0, v))
+
+    def get_kdc(self):
+        return float(self.sim.p['kd_cur'])
+
+    def set_kdc(self, v):
+        self.sim.p['kd_cur'] = max(0.0, min(40.0, v))
+
+    def get_kff(self):
+        return float(self.sim.p['kff'])
+
+    def set_kff(self, v):
+        self.sim.p['kff'] = max(-600.0, min(600.0, v))
 
     def _btn(self, parent, text, cmd, bg, r, c):
         b = tk.Button(parent, text=text, command=cmd, bg=bg, fg='white',
@@ -110,6 +188,8 @@ class App(object):
                 self.trail.pop(0)
 
         self.tick_n += 1
+        if self.tick_n % 10 == 0:
+            self._show_knobs()
         if self.tick_n % 4 == 0:         # 3D 每 4 拍刷新（低分辨率渲染再放大，省时间）
             im = view3d.render(sim.track, sim.x, sim.y, sim.yaw, W=240, H=150,
                                trail=self.trail).resize((560, 350), Image.NEAREST)
