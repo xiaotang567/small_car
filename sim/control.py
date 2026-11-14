@@ -328,3 +328,108 @@ class Speed(object):
 
         self.duty = out
         return out
+
+
+# ===========================================================================================
+# 视觉 + 陀螺（MPU9050）的巡线
+# ===========================================================================================
+class SteerGyro(object):
+    """在视觉 PID 的基础上加三样**只有陀螺能给的东西**：
+
+    1. **偏航阻尼**（k_yaw）：车在摆的时候 gz 会立刻反向，拿它当微分项比图像 de 干净得多
+       （图像 de 有噪声、还滞后一帧）。  u -= k_yaw * gz
+    2. **丢线保航向**（k_hold）：原来视觉丢线就把舵机冻住 ⇒ 车直冲出去。
+       现在记下最后一次"好线"的航向，丢线后按 (yaw_sp - yaw) 打舵，把车拧回原方向。
+    3. **弯道前馈**（k_curve_ff）：进弯后 gz 立刻上来，用它补一点稳态舵量，
+       减少"弯里误差累积 -> 甩出去"的滞后。
+
+    注意：陀螺会漂（零偏），所以**绝不用它做绝对位置**，只做速率/短时保持。
+    """
+
+    def __init__(self):
+        self.i = 0.0
+        self.e_prev = 0.0
+        self.e_ok = False
+        self.last = SERVO_CENTER
+        self.target = SERVO_CENTER
+        self.e = 0.0
+        self.ierr = 0.0
+        self.yaw_sp = None          # 丢线时要保持的航向
+        self.yaw_sum = 0.0          # 连续航向（不缠绕）
+        self.lost_n = 0
+
+    def tick(self, scan, st, p, imu=None, v=0.0):
+        gz = 0.0 if imu is None else imu.gz
+
+        if imu is not None:
+            y = imu.yaw_wrap()
+            if self.yaw_sp is None:
+                self.yaw_sp = y
+                self.yaw_sum = y
+            d = (y - self.yaw_sum + 540.0) % 360.0 - 180.0
+            self.yaw_sum += d
+
+        # ---------- 丢线：保航向 ----------
+        if not scan.ok:
+            self.i *= STEER_I_LEAK
+            self.ierr = self.i
+            self.lost_n += 1
+            if (imu is not None) and (self.yaw_sp is not None) and (self.lost_n < 60):
+                err = self.yaw_sp - self.yaw_sum
+                u = p['k_hold'] * err - p['k_yaw'] * gz
+                u = max(-400.0, min(400.0, u))     # 保航向也限幅，别一把把舵机打死
+                tgt = int(SERVO_CENTER + u)
+                tgt = max(SERVO_MIN, min(SERVO_MAX, tgt))
+                tgt = max(self.last - STEER_SLEW, min(self.last + STEER_SLEW, tgt))
+                self.last = tgt
+                self.target = tgt
+                self.e = p['k_hold'] * err
+                return tgt
+            self.target = self.last
+            return self.last
+
+        self.lost_n = 0
+        self.yaw_sp = self.yaw_sum
+
+        # ---------- 视觉项（和基线一致）----------
+        e = scan.e_near * (1.0 - st.w) + scan.e_far * st.w
+        e = max(-STEER_E_LIMIT, min(STEER_E_LIMIT, e))
+
+        if not self.e_ok:
+            self.e_prev = e
+            self.e_ok = True
+        de = max(-STEER_DE_LIMIT, min(STEER_DE_LIMIT, e - self.e_prev))
+        self.e_prev = e
+
+        kp, ki, kd = st.kp, st.ki, st.kd
+
+        i_try = self.i
+        if -20.0 < e < 20.0:
+            i_try += e
+        else:
+            i_try *= 0.92
+        i_try = max(-STEER_I_LIMIT, min(STEER_I_LIMIT, i_try))
+
+        dterm = max(-STEER_D_LIMIT, min(STEER_D_LIMIT, kd * de))
+        u = kp * e + ki * i_try + dterm
+
+        ff = -p['kff'] * (scan.kn * 60.0) / 100.0
+        u += max(-500.0, min(500.0, ff))
+
+        u -= p['k_yaw'] * gz                 # 1) 偏航阻尼
+        u += p['k_curve_ff'] * gz            # 3) 弯道前馈
+
+        self.e = e
+        target = int(SERVO_CENTER + u)
+
+        if target < SERVO_MIN or target > SERVO_MAX:
+            self.i *= 0.95
+        else:
+            self.i = i_try
+        self.ierr = self.i
+
+        target = max(SERVO_MIN, min(SERVO_MAX, target))
+        target = max(self.last - STEER_SLEW, min(self.last + STEER_SLEW, target))
+        self.last = target
+        self.target = target
+        return target

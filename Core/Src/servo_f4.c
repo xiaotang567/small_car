@@ -640,6 +640,28 @@ void ctrl_servo_tick (void)
 #define STEER_DE_LIMIT   5.0f     /* ★ 2180：单周期误差变化限幅（像素），压掉噪声 */
 #define STEER_SLEW       400      /* ★ 2177：每 20ms 最多变 400 步（=20000 步/秒，舵机自己会限速）*/
 
+/* ================= ★★ 2229：**陀螺（MPU9050）辅助巡线** =================
+   用户要求："结合 9050 的数据写一个更好的巡线"。
+   在仿真（sim/）里对比过：纯视觉 vs 视觉+陀螺，多组舵机传动比各跑 90~100 秒。
+   三道东西，**都是视觉做不到的**：
+     ① 偏航阻尼  u -= K_YAW × 陀螺角速度(°/s)
+        车在摆的时候陀螺立刻反向。视觉的 de 有噪声、还滞后一帧，压不住这种摆。
+     ② 丢线保航向（见 ctrl_steer_from_cam 的 cam_track_ok==0 分支）
+        原来丢线就冻住舵机 ⇒ 车直冲出去；现在按"最后一次好线的航向"打舵。
+     ③ 判弯道也看陀螺（state_f4.c 里可选用 |gz| 当弯道证据）
+   ⚠️ 陀螺会漂，所以**只用它做速率和短时航向保持**，绝不用来做绝对位置。
+   ⚠️ STEER_GYRO_EN 默认 0：先按原来的方式跑，确认车的机械没问题，
+      想用就在下面改成 1 重新编译（参数照仿真扫出来的那组抄）。
+   ------------------------------------------------------------------------- */
+#define STEER_GYRO_EN    0        /* 1 = 打开"陀螺辅助巡线" */
+#define STEER_K_YAW      1.5f     /* 偏航阻尼（舵机步 / (°/s)）—— 仿真实测：6.0 太强，会跟视觉 P 打架 */
+#define STEER_K_HOLD     12.0f    /* 丢线保航向（舵机步 / 度） */
+
+static float s_yaw_sp = 0.0f;     /* 最后一次"好线"时的航向（度）*/
+#if (STEER_GYRO_EN == 0)
+#define STEER_GYRO_UNUSED()   (void)s_yaw_sp    /* 关掉时别让编译器告警 */
+#endif
+
 volatile uint8_t  g_steer_enable       = 1U;   /* 1 = 视觉打舵开 */
 volatile uint8_t  g_steer_sweep        = 0U;   /* ★ 2177 1 = 左右扫舵测试（st 命令）*/
 volatile uint32_t g_steer_manual_until = 0U;   /* 手动打舵优先到这个时刻(ms) */
@@ -681,9 +703,43 @@ void ctrl_steer_from_cam (void)
     if (0U == g_steer_enable) { return; }                  /* 关掉了 */
     if (HAL_GetTick() < g_steer_manual_until) { return; }   /* 手动优先 3 秒 */
 
+#if (STEER_GYRO_EN == 0)
+    STEER_GYRO_UNUSED();
+#endif
+
     if (0U == cam_track_ok)
     {
         g_steer_i *= STEER_I_LEAK;                 /* 没线：积分慢慢泄掉，保持位置 */
+
+#if (STEER_GYRO_EN != 0)
+        /* ★★ 2229：**丢线保航向**（陀螺）—— 原来这里直接 return，舵机冻在原地，
+           车就照着最后那个舵角直冲出去。现在记着"最后一次好线的航向"，
+           丢线后按 (yaw_sp - yaw) 打舵，把车拧回原来的方向；
+           同时用陀螺速率做阻尼，免得在目标航向附近来回摆。*/
+        {
+            static uint8_t  s_lost_n = 0U;
+            float  err  = s_yaw_sp - ctrl_yaw_deg();      /* 度 */
+
+            while (err >  180.0f) { err -= 360.0f; }
+            while (err < -180.0f) { err += 360.0f; }
+
+            if (s_lost_n < 60U)      /* 1.2 秒内才这么干；再久就说明真跑飞了，别再瞎打 */
+            {
+                float   u2 = STEER_K_HOLD * err - STEER_K_YAW * ctrl_yaw_rate();
+                int32_t t2 = (int32_t)CTRL_SERVO_POS_CENTER + (int32_t)u2;
+
+                if (t2 < (int32_t)CTRL_SERVO_POS_MIN) { t2 = (int32_t)CTRL_SERVO_POS_MIN; }
+                if (t2 > (int32_t)CTRL_SERVO_POS_MAX) { t2 = (int32_t)CTRL_SERVO_POS_MAX; }
+                if (t2 > s_steer_last + STEER_SLEW) { t2 = s_steer_last + STEER_SLEW; }
+                if (t2 < s_steer_last - STEER_SLEW) { t2 = s_steer_last - STEER_SLEW; }
+
+                s_steer_last = t2;
+                g_steer_err  = STEER_K_HOLD * err;
+                (void)ctrl_servo_set_pos((uint16_t)t2);
+            }
+            s_lost_n ++;
+        }
+#endif
         return;
     }
 
@@ -705,6 +761,9 @@ void ctrl_steer_from_cam (void)
     if (e >  STEER_E_LIMIT) { e =  STEER_E_LIMIT; }
     if (e < -STEER_E_LIMIT) { e = -STEER_E_LIMIT; }
 
+#if (STEER_GYRO_EN != 0)
+    s_yaw_sp = ctrl_yaw_deg();        /* ★ 2229：好线时一直刷新"应该保持的航向" */
+#endif
     if (0U == s_e_ok) { s_e_prev = e; s_e_ok = 1U; }
     de = e - s_e_prev;
     s_e_prev = e;
@@ -755,6 +814,11 @@ void ctrl_steer_from_cam (void)
                 if (ff >  500.0f) { ff =  500.0f; }
                 if (ff < -500.0f) { ff = -500.0f; }
                 u += ff;
+
+#if (STEER_GYRO_EN != 0)
+                /* ★ 2229 ①：偏航阻尼 —— 车在摆的时候陀螺立刻反向压住 */
+                u -= STEER_K_YAW * ctrl_yaw_rate();
+#endif
             }
         }
         g_steer_err = e;
