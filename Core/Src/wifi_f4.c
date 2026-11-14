@@ -30,7 +30,15 @@
 // 超时：单位是"100 微秒"（和官方驱动的 wait_idle 口径一致）
 #define WF_TO_OTHER             1000        // 1 秒    普通操作
 #define WF_TO_WIFI              10000       // 10 秒   连热点
-#define WF_TO_SOCKET            50000       // 50 秒   连 TCP 服务器
+#define WF_TO_SOCKET            50000       // 50 秒   连 TCP 服务器（重连里不用，见下）
+
+/* ★★ 2228：**脱机跑**（用户要求"不连接也能跑"）
+   原来开机要死等：连热点 10 秒 + 连 TCP 服务器 50 秒 = 最长 60 秒，
+   上位机没开/热点没开的时候，车在这 60 秒里完全不响应按键，等于开不了机。
+   ⇒ 开机这两步各只等 1.5 秒，连不上就返回失败，主循环照常跑（车能按键启动）；
+     真要连上位机，停下来以后主循环会自己重连（见 app.c）。*/
+#define WF_TO_WIFI_BOOT         1500U       // 开机：设热点信息最多等 1.5 秒
+#define WF_TO_SOCKET_BOOT       1500U       // 开机：连 TCP 服务器最多等 1.5 秒
 //===================================================协议常量===================================================
 
 
@@ -503,7 +511,7 @@ static uint8_t wf_get_ip (void)
 //-------------------------------------------------------------------------------------------------------------------
 // 函数简介     连热点：报文 "SSID\r\n密码\r\n"
 //-------------------------------------------------------------------------------------------------------------------
-static uint8_t wf_wifi_connect (const char *ssid, const char *password)
+static uint8_t wf_wifi_connect_to (const char *ssid, const char *password, uint32_t wait_ms)
 {
     uint8_t buf[64];
     uint16_t len;
@@ -517,7 +525,7 @@ static uint8_t wf_wifi_connect (const char *ssid, const char *password)
         len = (uint16_t)sprintf((char *)buf, "%s\r\n", ssid);
     }
 
-    if (wf_set_parameter(WF_CMD_SET_WIFI, buf, len, WF_TO_WIFI)) return 1;
+    if (wf_set_parameter(WF_CMD_SET_WIFI, buf, len, wait_ms)) return 1;
     wf_get_ip();
     return 0;
 }
@@ -571,7 +579,9 @@ uint8_t wifi_f4_init (void)
     wf_get_mac();
 
     // ---- 连热点 ----
-    if (wf_wifi_connect(WIFI_SSID, WIFI_PASSWORD)) { wf_last_err = 2; return 2; }
+    /* ★ 2228：开机只等 1.5 秒（原来是 10 秒）——连不上就先跑起来 */
+    if (wf_wifi_connect_to(WIFI_SSID, WIFI_PASSWORD, WF_TO_WIFI_BOOT))
+    { wf_last_err = 2; return 2; }
     if (wf_get_ip())                               { wf_last_err = 2; return 2; }
 #if !(WF_PC_USE_FIXED)
     wf_derive_pc_ip();                             /* 自动推导电脑 IP（固定模式下不执行）*/
@@ -586,7 +596,7 @@ uint8_t wifi_f4_init (void)
     //    ⇒ 所以这里**即使握手失败，也把 wf_ready 置 1 让数据能发出去**
     //      （真没连上时模块会把数据丢掉，**无害**）。状态码照旧返回，LED/日志不受影响。
     if (wf_socket_connect(WIFI_USE_TCP ? "TCP" : "UDP",
-                          wf_pc_ip, WIFI_PC_PORT, WIFI_LOCAL_PORT, WF_TO_SOCKET))
+                          wf_pc_ip, WIFI_PC_PORT, WIFI_LOCAL_PORT, WF_TO_SOCKET_BOOT))
     {
         wf_last_err      = 3;
         wifi_f4_progress = 3;

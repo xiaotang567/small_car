@@ -576,9 +576,14 @@ void app_loop (void)
     //      现象是上位机控制台反复刷 `[已连接]/[对方断开]`，TCP 连上了但一个字节都不发
     //      （模块的 INT 一直低 = 一直"忙"，控制命令还能应答，数据通道已经死了）。
     //      ⇒ 连续重连失败 3 次后**整模块硬复位再连**（wifi_f4_init）。
-    if (!wifi_f4_is_ready())
+    /* ★★ 2228：**车在跑的时候完全不碰 WiFi**（脱机跑的关键）
+       重连里最坏要走"整模块硬复位 + 连热点 + 连上位机"，那是几十秒的阻塞；
+       车正在跑的时候被按住几十秒 = 速度环/堵转保护全停 = 车失控。
+       ⇒ 只有在**停机状态**（目标转速 0 且不是开环）才去连上位机；
+         停机时连上以后，按 PC3 启动就能边跑边看图/调参，两不误。*/
+    if ((0U == ctrl_speed_get_target()) && (0U == ctrl_is_open_loop()))
     {
-      if ((HAL_GetTick() - t_retry) > 3000)
+      if (!wifi_f4_is_ready() && ((HAL_GetTick() - t_retry) > 3000))
       {
         t_retry = HAL_GetTick();
 
@@ -597,10 +602,15 @@ void app_loop (void)
           board_led_show(wifi_f4_retry() ? wifi_f4_last_err() : LED_CODE_READY);
         }
       }
+
+      if (wifi_f4_is_ready())
+      {
+        relink_n = 0;                           /* 连上了就清计数 */
+      }
     }
-    else
+    else if (wifi_f4_is_ready())
     {
-      relink_n = 0;                             /* 连上了就清计数 */
+      relink_n = 0;
     }
 
     // ---- ★★ 文本优先时间窗：有文本待发就**让图像让路**，直到发出去（最长 250ms）★★ ----
@@ -1047,7 +1057,7 @@ void app_loop (void)
         //     MD  = 当前采集模式（0 = 752 宽 / 1 = 188 宽）
         //     BIN = 188×120 配置是否成功（1 = 已写并回读一致）
         //     R0D/R0E = 两个 Read Mode 寄存器的**回读值**（列 bin 在 R0D[3:2]、行 bin 在 R0E[1:0]）
-        sprintf(buf, "S f=%lu V=%lu VS=%lu LG=%lu TO=%lu F=%u FL=%u P=%u RX=%lu CAM=%u ID=%04X N=%u MD=%u BIN=%u R0D=%04X W=%u E=%u K=%lu R=%04lX IE=%04lX MI=%04lX CR=%08lX ND=%lu DC=%08lX HE=%lu VE=%lu LW=%lu GP=%lu FW=2227 LM=%lu RST=%02lX PC=%08lX CF=%04lX BA=%08lX MG=%lu SAT=%lu A5=%04lX SH=%04lX\r\n",
+        sprintf(buf, "S f=%lu V=%lu VS=%lu LG=%lu TO=%lu F=%u FL=%u P=%u RX=%lu CAM=%u ID=%04X N=%u MD=%u BIN=%u R0D=%04X W=%u E=%u K=%lu R=%04lX IE=%04lX MI=%04lX CR=%08lX ND=%lu DC=%08lX HE=%lu VE=%lu LW=%lu GP=%lu FW=2228 LM=%lu RST=%02lX PC=%08lX CF=%04lX BA=%08lX MG=%lu SAT=%lu A5=%04lX SH=%04lX\r\n",
                 (unsigned long)cam_frame_cnt, (unsigned long)cam_vsync_isr_cnt,
                 (unsigned long)cam_vs_cap_cnt,
                 (unsigned long)disp_lag_max,
