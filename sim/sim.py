@@ -39,8 +39,8 @@ DEFAULT_PARAMS = {
 
 class Sim(object):
     def __init__(self, params=None, seed=1, noise=True, controller='gyro',
-                 servo_gain=None, imu_bias=0.8, fast=False):
-        self.track = Track()
+                 servo_gain=None, imu_bias=0.8, fast=False, design=None):
+        self.track = Track(design)
         self.fast = fast
         self.cam = Camera(self.track, seed=seed,
                           noise=0.0 if (fast or not noise) else 0.6, fast=fast)

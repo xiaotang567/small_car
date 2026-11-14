@@ -1,64 +1,116 @@
 # -*- coding: utf-8 -*-
-"""赛道几何（3D 场景的"地面贴图"）
+"""赛道几何（可**自己设计**的地图）
 
-坐标系：x 东 / y 北 / z 上，单位 米（实车场地同一量级：赛道宽 0.5m）
-赛道要素（按用户要求）：
-  · 一圈闭环：上下两条长直道 + 左右两条竖道 + 四个 R=1.3m 的 90° 弯
-  · **十字**：底部直道 x=3 处有一条横向支路穿过（路口白色区域是个"+"）
-  · **圆环**：顶部直道中间断开，用一个环形道（内径 0.75 / 外径 1.35）接起来，
-            环心是黑岛 ⇒ 车必须沿环走、不能直穿
+设计文件：sim/track_design.json（没有就用内置默认跑道）
+设计由三部分组成：
 
-实现方式：赛道一次性栅格化成 2cm 分辨率的**占用图**（True=白色路面），
-之后相机/3D 渲染只做查表，22560 个像素也就几毫秒。
+    path    一串**元素**，像开"乌龟"一样一段一段接出来（正是地图编辑器画的那些）
+              {"t":"line","len":2.0}                 直线 2m
+              {"t":"arc","r":1.3,"deg":45}            左转 45° 圆弧（半径 1.3m，deg 负数 = 右转）
+              {"t":"arc","r":0.8,"deg":-90}           右转 90°
+              {"t":"pts","p":[[x,y],...]}             直接给一串折线点（编辑器内部用）
+    crosses 十字：{"x":3,"y":0,"yaw":1.5708,"half":1.3}  （yaw=支路方向，half=支路半长）
+    rings   圆环：{"x":3,"y":6,"r_in":0.75,"r_out":1.35}
+
+坐标系：x 东 / y 北 / z 上，单位米；赛道宽 = 2 × half_w。
 """
+import json
+import math
+import os
+
 import numpy as np
 
-# ---------------- 场地参数 ----------------
-TRACK_HALF_W = 0.25         # 赛道半宽（0.5m 宽 ≈ 真实智能车赛道）
-CORNER_R     = 1.3          # 四个角的半径（R=1.0 太紧，实车会切内弯）
-RING_INNER   = 0.75         # 圆环内径（黑洞半径）
-RING_OUTER   = 1.35         # 圆环外径
-RING_CENTER  = (3.0, 6.0)   # 圆环中心（在顶部直道上）
-CROSS_CENTER = (3.0, 0.0)   # 十字路口中心（在底部直道上）
-CROSS_HALF_L = 1.3          # 十字支路半长
-LOOP_W       = 6.0          # 底部直道长度（x 从 0 到 6）
-LOOP_H       = 6.0          # 左右竖道高度（y 从 0 到 6）
+HERE = os.path.dirname(os.path.abspath(__file__))
+DESIGN_FILE = os.path.join(HERE, 'track_design.json')
 
-GRID_RES = 0.02             # 占用图分辨率 2cm
-GRID_PAD = 0.8              # 场地外扩（米）
+GRID_RES = 0.02
+GRID_PAD = 0.8
+
+# ---------------- 内置默认跑道（和之前那圈一样）----------------
+DEFAULT_DESIGN = {
+    'half_w': 0.25,
+    'start': [0.15, 0.0, 0.0],
+    'path': [
+        {'t': 'line', 'len': 6.0},
+        {'t': 'arc', 'r': 1.3, 'deg': 90},
+        {'t': 'line', 'len': 3.4},
+        {'t': 'arc', 'r': 1.3, 'deg': 90},
+        {'t': 'line', 'len': 6.0},
+        {'t': 'arc', 'r': 1.3, 'deg': 90},
+        {'t': 'line', 'len': 3.4},
+        {'t': 'arc', 'r': 1.3, 'deg': 90},
+    ],
+    'crosses': [{'x': 3.0, 'y': 0.0, 'yaw': math.pi / 2, 'half': 1.3}],
+    'rings': [{'x': 3.0, 'y': 6.0, 'r_in': 0.75, 'r_out': 1.35}],
+}
 
 
-def _arc(cx, cy, r, a0, a1, n=48):
+def _arc_points(cx, cy, r, a0, a1, n=48):
     a = np.linspace(a0, a1, n)
     return np.stack([cx + r * np.cos(a), cy + r * np.sin(a)], axis=1)
 
 
-def build_centerline():
-    """闭环中心线。
-       底部直道 y=0（x 0..6）；右下角圆心 (6,R)；右侧 x=6+R；右上角圆心 (6,6-R)；
-       顶部直道 y=6（x 6..0）；左上角圆心 (0,6-R)；左侧 x=-R；左下角圆心 (0,R)。"""
-    R, W, H = CORNER_R, LOOP_W, LOOP_H
-    return np.vstack([
-        np.array([[0.0, 0.0], [W, 0.0]]),
-        _arc(W, R, R, -np.pi / 2, 0.0),
-        np.array([[W + R, R], [W + R, H - R]]),
-        _arc(W, H - R, R, 0.0, np.pi / 2),
-        np.array([[W, H], [0.0, H]]),
-        _arc(0.0, H - R, R, np.pi / 2, np.pi),
-        np.array([[-R, H - R], [-R, R]]),
-        _arc(0.0, R, R, np.pi, 1.5 * np.pi),
-    ])
+def path_from_elements(elements, start_xy=(0.0, 0.0), start_yaw=0.0, arc_step_deg=5.0):
+    """把元素序列走成一条折线（编辑器/设计文件共用）"""
+    x, y = float(start_xy[0]), float(start_xy[1])
+    yaw = float(start_yaw)
+    pts = [np.array([[x, y]], dtype=np.float64)]
+
+    for e in elements:
+        t = e.get('t', 'line')
+        if t == 'line':
+            L = float(e.get('len', 0.0))
+            x += L * math.cos(yaw)
+            y += L * math.sin(yaw)
+            pts.append(np.array([[x, y]]))
+        elif t == 'arc':
+            r = float(e.get('r', 1.0))
+            deg = float(e.get('deg', 45.0))
+            n = max(2, int(abs(deg) / arc_step_deg) + 1)
+            # 左转(deg>0)：圆心在当前点左侧 r 处
+            sign = 1.0 if deg >= 0 else -1.0
+            # 圆心：左转在航向左法向，右转在右法向
+            cx = x - sign * r * math.sin(yaw)
+            cy = y + sign * r * math.cos(yaw)
+            # 起点相对圆心的角度
+            a0 = math.atan2(y - cy, x - cx)
+            a1 = a0 + math.radians(deg)
+            arc = _arc_points(cx, cy, r, a0, a1, n)
+            pts.append(arc[1:])
+            x, y = arc[-1]
+            yaw += math.radians(deg)
+        elif t == 'pts':
+            p = np.asarray(e.get('p', []), dtype=np.float64)
+            if len(p) >= 2:
+                pts.append(p[1:] if np.allclose(p[0], [x, y]) else p)
+                x, y = p[-1]
+                yaw = math.atan2(p[-1][1] - p[-2][1], p[-1][0] - p[-2][0])
+    return np.vstack(pts)
 
 
-def _polyline_segments(pts):
+def _segments(pts):
     p = np.asarray(pts, dtype=np.float64)
     return np.hstack([p[:-1], p[1:]])
 
 
 class Track(object):
-    def __init__(self):
-        self.line = build_centerline()
-        self.segs = _polyline_segments(self.line)
+    def __init__(self, design=None):
+        if design is None:
+            design = load_design()
+        self.design = design
+        self.half_w = float(design.get('half_w', 0.25))
+        self.start = design.get('start', [0.15, 0.0, 0.0])
+
+        el = design.get('path', [])
+        if el and isinstance(el[0], dict) and el[0].get('t') == 'pts':
+            self.line = path_from_elements(el)
+        else:
+            self.line = path_from_elements(el, start_xy=self.start[:2], start_yaw=self.start[2])
+        self.segs = _segments(self.line)
+
+        self.crosses = design.get('crosses', [])
+        self.rings = design.get('rings', [])
+
         xs = np.concatenate([self.segs[:, 0], self.segs[:, 2]])
         ys = np.concatenate([self.segs[:, 1], self.segs[:, 3]])
         self.x0, self.x1 = xs.min() - GRID_PAD, xs.max() + GRID_PAD
@@ -73,8 +125,8 @@ class Track(object):
     def _rasterize(self):
         X, Y = np.meshgrid(self.gx, self.gy)
         m = np.zeros(X.shape, dtype=bool)
+        hw = self.half_w
 
-        # 1) 所有直道/弧线段：点到线段距离 <= 半宽
         for (ax, ay, bx, by) in self.segs:
             vx, vy = bx - ax, by - ay
             L2 = vx * vx + vy * vy
@@ -83,26 +135,34 @@ class Track(object):
             t = np.clip(((X - ax) * vx + (Y - ay) * vy) / L2, 0.0, 1.0)
             dx = X - (ax + t * vx)
             dy = Y - (ay + t * vy)
-            m |= (dx * dx + dy * dy) <= TRACK_HALF_W ** 2
+            m |= (dx * dx + dy * dy) <= hw * hw
 
-        # 2) 十字支路（沿 y 方向穿过底部直道）
-        cx, cy = CROSS_CENTER
-        m |= (np.abs(X - cx) <= TRACK_HALF_W) & (np.abs(Y - cy) <= CROSS_HALF_L)
+        # 十字支路（沿线方向铺一段）
+        for c in self.crosses:
+            cx, cy = float(c['x']), float(c['y'])
+            yaw = float(c.get('yaw', math.pi / 2))
+            half = float(c.get('half', 1.3))
+            dx, dy = math.cos(yaw) * half, math.sin(yaw) * half
+            vx, vy = dx * 2, dy * 2
+            L2 = vx * vx + vy * vy
+            if L2 > 1e-12:
+                ax, ay = cx - dx, cy - dy
+                t = np.clip(((X - ax) * vx + (Y - ay) * vy) / L2, 0.0, 1.0)
+                ddx = X - (ax + t * vx)
+                ddy = Y - (ay + t * vy)
+                m |= (ddx * ddx + ddy * ddy) <= hw * hw
 
-        # 3) 圆环环带
-        rx, ry = RING_CENTER
-        r = np.hypot(X - rx, Y - ry)
-        m |= (r >= RING_INNER) & (r <= RING_OUTER)
-
-        # 4) 环心那一段的顶部直道要断开（否则车会直穿环心）
-        m &= ~((r < RING_INNER)
-               & (np.abs(X - rx) <= RING_OUTER)
-               & (np.abs(Y - ry) <= TRACK_HALF_W + 0.02))
+        # 圆环（环带；环心那段中线要挖掉，否则车会直穿环心）
+        for g in self.rings:
+            rx, ry = float(g['x']), float(g['y'])
+            ri, ro = float(g.get('r_in', 0.75)), float(g.get('r_out', 1.35))
+            r = np.hypot(X - rx, Y - ry)
+            m |= (r >= ri) & (r <= ro)
+            m &= ~((r < ri) & (np.abs(X - rx) <= ro) & (np.abs(Y - ry) <= hw + 0.02))
         return m
 
     # ---------- 查询 ----------
     def is_white(self, x, y):
-        """世界坐标 → 是否白色路面（越界 = 黑）"""
         ix = np.rint((np.asarray(x) - self.x0) / GRID_RES).astype(np.int32)
         iy = np.rint((np.asarray(y) - self.y0) / GRID_RES).astype(np.int32)
         ok = (ix >= 0) & (ix < self.nx) & (iy >= 0) & (iy < self.ny)
@@ -111,9 +171,30 @@ class Track(object):
         return out
 
     def start_pose(self):
-        return 0.15, 0.0, 0.0        # x, y, yaw(rad)：底部直道左端，朝东
+        s = self.start
+        return float(s[0]), float(s[1]), float(s[2])
+
+
+# ---------------- 设计文件 ----------------
+def load_design(path=None):
+    p = path or DESIGN_FILE
+    if os.path.exists(p):
+        try:
+            with open(p, 'r', encoding='utf-8') as f:
+                return json.load(f)
+        except Exception:
+            pass
+    return json.loads(json.dumps(DEFAULT_DESIGN))
+
+
+def save_design(design, path=None):
+    p = path or DESIGN_FILE
+    with open(p, 'w', encoding='utf-8') as f:
+        json.dump(design, f, ensure_ascii=False, indent=1)
+    return p
 
 
 if __name__ == '__main__':
     t = Track()
-    print('grid %dx%d  white %.2f%%' % (t.nx, t.ny, 100.0 * t.mask.mean()))
+    print('元素 %d 段，白面积 %.2f%%，十字 %d 个，圆环 %d 个'
+          % (len(t.segs), 100.0 * t.mask.mean(), len(t.crosses), len(t.rings)))
