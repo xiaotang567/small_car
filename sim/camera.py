@@ -7,12 +7,14 @@
 
 成像链（尽量贴近实拍）：
   反射率 albedo(白 0.85 / 黑 0.06) → 光照衰减 → 自动曝光(AEC，把亮的顶到 255) →
-  镜头暗角 → 模糊(1px) → 噪声 → uint8
+  镜头暗角 → 模糊 → 噪声 → uint8
 选自动曝光是因为实车那颗 MT9V034 的 AEC 只能开、不能关（我们踩过坑），
 所以画面亮度总是"白的地方刚好饱和"，固件里默认阈值 255 就是靠这个工作。
+
+★ 加速（FW 仿真专用）：射线方向在**相机坐标系**里只算一次，每帧只做一次 3×3 旋转；
+  模糊改成 numpy 的 3 抽头盒式滤波；`fast=True` 时不清噪（优化/批量跑用）。
 """
 import numpy as np
-from PIL import Image, ImageFilter
 
 from track import Track
 
@@ -25,101 +27,113 @@ CAM_HFOV  = np.deg2rad(60.0)   # 水平视场
 
 
 def _basis(yaw):
-    """相机朝向：世界 z 向上，yaw=0 朝 +x。
-       返回 前/右/上 三个基向量（前方向带低头角）"""
-    fwd = np.array([np.cos(yaw) * np.cos(CAM_PITCH),
-                    np.sin(yaw) * np.cos(CAM_PITCH),
-                    -np.sin(CAM_PITCH)])
-    right = np.array([-np.sin(yaw), np.cos(yaw), 0.0])
-    up = np.cross(fwd, right)          # 顺序很重要：right×fwd 得到的是朝下
+    """相机朝向：世界 z 向上，yaw=0 朝 +x。返回 前/右/上 三个基向量（前方向带低头角）"""
+    cp, sp = np.cos(CAM_PITCH), np.sin(CAM_PITCH)
+    cy, sy = np.cos(yaw), np.sin(yaw)
+    fwd = np.array([cy * cp, sy * cp, -sp])
+    right = np.array([-sy, cy, 0.0])
+    up = np.cross(fwd, right)
     return fwd, right, up
 
 
-def _rays(yaw):
-    """每个像素的方向向量 (H, W, 3)，已归一化"""
+def _rays_cam(w=W, h=H):
+    """相机坐标系下的单位射线 (h,w,3)：x 右 / y 上 / z 前"""
     tx = np.tan(CAM_HFOV * 0.5)
-    ty = tx * (float(H) / float(W))          # 方形像素
-    u = (np.arange(W) + 0.5) / W * 2.0 - 1.0
-    v = 1.0 - (np.arange(H) + 0.5) / H * 2.0
-    U, V = np.meshgrid(u, v)                 # (H, W)
-    fwd, right, up = _basis(yaw)
-    d = (fwd[None, None, :]
-         + (U * tx)[:, :, None] * right[None, None, :]
-         + (V * ty)[:, :, None] * up[None, None, :])
+    ty = tx * (float(h) / float(w))
+    u = (np.arange(w) + 0.5) / w * 2.0 - 1.0
+    v = 1.0 - (np.arange(h) + 0.5) / h * 2.0
+    U, V = np.meshgrid(u, v)
+    d = np.stack([U * tx, V * ty, np.ones_like(U)], axis=2).astype(np.float32)
     d /= np.linalg.norm(d, axis=2, keepdims=True)
     return d
 
 
 class Camera(object):
     def __init__(self, track: Track, size=(W, H), seed=12345, noise=0.6,
-                 vignette=0.35, blur=1, saturate=True):
+                 vignette=0.35, blur=1, saturate=True, fast=False):
         self.track = track
         self.size = size
         self.rng = np.random.default_rng(seed)
-        self.noise = noise
-        self.vignette = vignette
-        self.blur = blur
+        self.noise = 0.0 if fast else noise
+        self.blur = 0 if fast else blur
         self.saturate = saturate
+        self.fast = fast
+        self._d_cam = _rays_cam(size[0], size[1])
 
         # 暗角模板（一次算好）
         u = (np.arange(size[0]) + 0.5) / size[0] * 2.0 - 1.0
         v = (np.arange(size[1]) + 0.5) / size[1] * 2.0 - 1.0
         U, V = np.meshgrid(u, v)
-        self.vig = 1.0 - vignette * (U * U + V * V) * 0.5
+        self.vig = (1.0 - vignette * (U * U + V * V) * 0.5).astype(np.float32)
+
+    def _box3(self, a):
+        """3 抽头盒式模糊（横+竖各一次），比 PIL 高斯快一个数量级"""
+        a = (a + np.roll(a, 1, axis=1) + np.roll(a, -1, axis=1)) * (1.0 / 3.0)
+        a = (a + np.roll(a, 1, axis=0) + np.roll(a, -1, axis=0)) * (1.0 / 3.0)
+        return a
 
     def render(self, x, y, yaw):
         """返回 (H,W) uint8：白=255，黑≈20~60"""
-        d = _rays(yaw)                                   # (H,W,3)
+        fwd, right, up = _basis(yaw)
+        R = np.stack([right, up, fwd], axis=1).astype(np.float32)     # 列向量
+        d = self._d_cam @ R.T                                         # (H,W,3) 世界系
+
         ox = x + CAM_FWD * np.cos(yaw)
         oy = y + CAM_FWD * np.sin(yaw)
         oz = CAM_H
 
         dz = d[:, :, 2]
         with np.errstate(divide='ignore', invalid='ignore'):
-            t = np.where(dz < -1e-6, -oz / dz, np.inf)   # 打到地面 z=0
+            t = np.where(dz < -1e-6, -oz / dz, np.inf)
+        hit = np.isfinite(t)
         px = ox + d[:, :, 0] * t
         py = oy + d[:, :, 1] * t
-        hit = np.isfinite(t)
 
-        alb = np.full(d.shape[:2], 0.06)
-        alb[hit] = np.where(self.track.is_white(px[hit], py[hit]), 0.85, 0.06)
+        alb = np.full(d.shape[:2], 0.06, dtype=np.float32)
+        hx, hy = px[hit], py[hit]
+        alb[hit] = np.where(self.track.is_white(hx, hy), 0.85, 0.06)
 
-        # 远处稍微暗一点（真实镜头的衰减/地面漫反射）
         dist = np.where(hit, t, 50.0)
         att = 1.0 / (1.0 + 0.035 * dist ** 1.2)
         rad = alb * att * self.vig
 
-        # 自动曝光（AEC）：把最亮的（白路面）拉到接近饱和
         p = np.percentile(rad, 97.0)
         if p > 1e-6:
-            gain = 1.05 / p                    # 略微过曝 ⇒ 白路面饱和到 255（和实拍一致）
-            rad = rad * gain
-        img = np.clip(rad * 255.0, 0, 255)
-
+            rad = rad * (1.05 / p)
+        img = rad * 255.0
         if self.saturate:
-            img = np.clip(img + 25.0, 0, 255)      # 白路面顶到 255（和实拍一样过曝一点点）
+            img = img + 25.0
+        np.clip(img, 0, 255, out=img)
 
-        out = Image.fromarray(img.astype(np.uint8), mode='L')
         if self.blur:
-            out = out.filter(ImageFilter.GaussianBlur(self.blur))
-        a = np.asarray(out, dtype=np.float32)
-        a += self.rng.normal(0.0, self.noise, a.shape)
-        return np.clip(a, 0, 255).astype(np.uint8)
+            img = self._box3(img)
+        if self.noise > 0.0:
+            img += self.rng.normal(0.0, self.noise, img.shape)
+            np.clip(img, 0, 255, out=img)
+        return img.astype(np.uint8)
 
 
 if __name__ == '__main__':
     import os
+    import time
+    from PIL import Image
+
     tr = Track()
     cam = Camera(tr)
-    poses = [
-        ('start',    *tr.start_pose()),
-        ('cross',    2.2, 0.0, 0.0),
-        ('ring_in',  2.2, 6.0, 0.0),
-        ('ring_on',  3.2, 7.15, np.pi / 2),
-        ('turn',     6.2, 0.4, np.deg2rad(40)),
-    ]
+    camf = Camera(tr, fast=True)
+    poses = [('start', *tr.start_pose()), ('cross', 2.2, 0.0, 0.0),
+             ('ring', 2.2, 6.0, 0.0), ('turn', 6.2, 0.4, np.deg2rad(40))]
     os.makedirs('out', exist_ok=True)
     for name, x, y, yaw in poses:
         img = cam.render(x, y, yaw)
         Image.fromarray(img).resize((W * 3, H * 3), Image.NEAREST).save('out/cam_%s.png' % name)
         print('%-8s mean=%5.1f  sat=%4.1f%%' % (name, img.mean(), 100.0 * (img >= 250).mean()))
+
+    t0 = time.perf_counter()
+    for _ in range(200):
+        camf.render(1.0, 0.0, 0.0)
+    print('fast 相机 %.2f ms/帧' % ((time.perf_counter() - t0) / 200 * 1000))
+    t0 = time.perf_counter()
+    for _ in range(200):
+        cam.render(1.0, 0.0, 0.0)
+    print('标准 相机 %.2f ms/帧' % ((time.perf_counter() - t0) / 200 * 1000))

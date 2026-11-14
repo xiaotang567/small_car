@@ -58,8 +58,12 @@ class App(object):
         self.b_stop = self._btn(btns, '停止', self.do_stop, C_OFF, 0, 1)
         self.b_reset = self._btn(btns, '复位', self.do_reset, C_BTN, 1, 0)
         self.b_trail = self._btn(btns, '清轨迹', self.do_clear, C_BTN, 1, 1)
-        for b in (self.b_run, self.b_stop, self.b_reset, self.b_trail):
+        self.b_speed = self._btn(btns, '加速 ×1', self.do_speed, C_BTN, 2, 0)
+        self.b_smooth = self._btn(btns, '平滑：开', self.do_smooth, C_BTN, 2, 1)
+        for b in (self.b_run, self.b_stop, self.b_reset, self.b_trail,
+                  self.b_speed, self.b_smooth):
             b.configure(width=16)
+        self.speed_x = 1.0
 
         tk.Label(right, text='调参可走 TCP（端口 %d），用 tools/car_ui.py 连' % port,
                  fg='#7d8797', bg=BG).pack(pady=4)
@@ -167,6 +171,21 @@ class App(object):
     def do_clear(self):
         self.trail = []
 
+    def do_speed(self):
+        """★ 加速：×1 → ×2 → ×4 → ×8 → ×1（仿真时间跑得比实际快）"""
+        self.speed_x = {1.0: 2.0, 2.0: 4.0, 4.0: 8.0, 8.0: 1.0}[self.speed_x]
+        self.b_speed.configure(text='加速 ×%d' % int(self.speed_x),
+                               bg=C_ON if self.speed_x > 1 else C_BTN)
+
+    def do_smooth(self):
+        """★ 关掉图像的模糊/噪声（纯几何）—— 跑批/对比时更快、更纯净"""
+        cam = self.sim.cam
+        cam.fast = not cam.fast
+        cam.noise = 0.0 if cam.fast else 0.6
+        cam.blur = 0 if cam.fast else 1
+        self.b_smooth.configure(text='平滑：%s' % ('关' if cam.fast else '开'),
+                                bg=C_OFF if cam.fast else C_BTN)
+
     # ---------------- 主循环 ----------------
     def tick(self):
         sim = self.sim
@@ -175,9 +194,11 @@ class App(object):
         if not hasattr(self, 't_last'):
             self.t_last = now
             self.acc = 0.0
-        self.acc += min(now - self.t_last, 0.1)
+        self.acc += min(now - self.t_last, 0.1) * self.speed_x
         self.t_last = now
-        while self.acc >= 0.02:
+        _n = 0
+        while self.acc >= 0.02 and _n < 30:      # 一拍最多补 30 个控制周期（0.6s），别把界面卡死
+            _n += 1
             self.acc -= 0.02
             for _ in range(4):           # 4×5ms = 20ms 一拍（控制链内部对齐 20ms）
                 sim.step(0.005)
@@ -222,6 +243,10 @@ def main():
     args = [a for a in sys.argv[1:] if not a.startswith('--')]
     port = int(args[0]) if args else 8086
     auto = '--auto' in sys.argv          # 直接开跑（不用点按钮，方便看/截图）
+    sp = 1.0
+    for i, a in enumerate(sys.argv):
+        if a == '--speed' and i + 1 < len(sys.argv):
+            sp = float(sys.argv[i + 1])
     root = tk.Tk()
     app = App(root, port)
     try:
@@ -231,6 +256,9 @@ def main():
         print('[sim] TCP 客户端启动（上位机 car_ui.py 在 %d 上监听时自动连上）' % port)
     except Exception as e:
         print('[sim] TCP 未启动：%s' % e)
+    if sp != 1.0:
+        app.speed_x = sp
+        app.b_speed.configure(text='加速 ×%d' % int(sp), bg=C_ON)
     if auto:
         app.do_run()                     # 直接开跑
     root.mainloop()
