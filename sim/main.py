@@ -139,16 +139,20 @@ class App(object):
 
 
 def main():
-    port = int(sys.argv[1]) if len(sys.argv) > 1 else 8086
+    args = [a for a in sys.argv[1:] if not a.startswith('--')]
+    port = int(args[0]) if args else 8086
+    auto = '--auto' in sys.argv          # 直接开跑（不用点按钮，方便看/截图）
     root = tk.Tk()
     app = App(root, port)
     try:
         from tcp_link import TcpLink
         app.link = TcpLink(app.sim, port)
         app.link.start()
-        print('[sim] TCP 端口 %d 已监听（tools/car_ui.py 可连）' % port)
+        print('[sim] TCP 客户端启动（上位机 car_ui.py 在 %d 上监听时自动连上）' % port)
     except Exception as e:
         print('[sim] TCP 未启动：%s' % e)
+    if auto:
+        app.do_run()                     # 直接开跑
     root.mainloop()
 
 
