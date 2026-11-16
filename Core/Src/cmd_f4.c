@@ -150,7 +150,7 @@ static void cam_cmd_status (void)
        DRP = 发送看门狗**主动放弃**的帧数（一直飙 ⇒ 链路/模块发不动）✓
        DST = DMA 停摆看门狗重启采集的次数（>0 ⇒ 采集链卡过，但已经自己救回来了）✓
        SELF= 连续 2 秒没有完整帧 ⇒ 重启采集的次数（和 DST 一起看）✓ */
-    sprintf(b, "CFG f=%u g=%u x=%u y=%u (%ux%u) d=%u CST=%u RV=%06lX LINE=%u FW=2237 EDG=%lu EL=%u ER=%u DRP=%lu DST=%lu SELF=%lu TH=%u IPM=%u BVR=%d BVE=%.1f BVF=%.1f\r\n",
+    sprintf(b, "CFG f=%u g=%u x=%u y=%u (%ux%u) d=%u CST=%u RV=%06lX LINE=%u FW=2238 EDG=%lu EL=%u ER=%u DRP=%lu DST=%lu SELF=%lu TH=%u IPM=%u BVR=%d BVE=%.1f BVF=%.1f\r\n",
             (unsigned)cam_cmd_fps, (unsigned)cam_cmd_gap_ms,
             (unsigned)cam_cmd_dx, (unsigned)cam_cmd_dy,
             (unsigned)(CAM_TXW / cam_cmd_dx), (unsigned)(CAM_H / cam_cmd_dy),
@@ -189,6 +189,18 @@ static void cam_cmd_line (char *s)
     if (0 == *s) { return; }
 
     c = (uint8_t)(((*s >= 'A') && (*s <= 'Z')) ? (*s + 32) : *s);      // 转小写
+
+    /* ★★ 2238：**标定模式**（只给 tools/ipm_cal.py 用，正常别碰）
+         `cal 1` = 图传改成发**相机原图**（标定必须用斜视角的图，俯视图没法标）
+         `cal 0` = 恢复正常：图传发逆透视图
+       注意：只有**图传内容**会变；舵机误差始终用逆透视（g_ipm_enable 恒 1）。*/
+    if ((c == 'c') && (s[1] == 'a') && (s[2] == 'l'))
+    {
+        g_ipm_view = (0 != cam_cmd_snum(s + 3)) ? 0U : 1U;   /* cal 1 ⇒ 0 = 相机原图 */
+        sprintf(b, "ACK cal: image=%s\r\n", (0U != g_ipm_view) ? "BEV" : "camera(cal)");
+        cmd_txt(b);
+        return;
+    }
 
     switch (c)
     {
@@ -280,38 +292,14 @@ static void cam_cmd_line (char *s)
             break;
 
         case 'b':
-            /* ★★ 2230/2231：俯视图相关命令（都在这个 case 里）
-                 bv <0/1>  舵机误差用不用逆透视（0 = 退回透视那条链）
-                 bi <0/1>  图传发什么（0 = 相机原图，1 = **逆透视图**）
-               其它 b 命令保持原样（打开 UART5 配相机）。*/
-            if ((s[1] == 'v') || (s[1] == 'V'))
+            /* ★★ 2238：**运行时切换全部拆掉**（用户要求：固定用逆透视，不许动态切换）
+                 原来的 bv / bi / br / bm 都撤了，只回一句提示。
+                 图传内容固定 = 逆透视图；舵机误差固定 = 逆透视结果。
+                 要标定时用 `cal 1`（tools/ipm_cal.py 自己会发，正常别碰）。*/
+            if ((s[1] == 'v') || (s[1] == 'V') || (s[1] == 'i') || (s[1] == 'I') ||
+                (s[1] == 'r') || (s[1] == 'R') || (s[1] == 'm') || (s[1] == 'M'))
             {
-                g_ipm_enable = (0 != cam_cmd_snum(s + 2)) ? 1U : 0U;
-                sprintf(b, "ACK bv: IPM=%u ok=%u rows=%d e_near=%.1f e_far=%.1f e_m=%.3f\r\n",
-                        (unsigned)g_ipm_enable, (unsigned)cam_bev_ok,
-                        (int)cam_bev_rows, (double)cam_bev_en,
-                        (double)cam_bev_ef, (double)cam_bev_m);
-                cmd_txt(b);
-                return;
-            }
-            if ((s[1] == 'r') || (s[1] == 'R'))
-            {
-                /* ★ 2236：朝向补偿已删除（图像只在取图时翻一次）*/
-                cmd_txt("ACK br: removed (no rot comp, flip only on acquire)\r\n");
-                return;
-            }
-            if ((s[1] == 'm') || (s[1] == 'M'))
-            {
-                /* ★ 2236：发送侧翻转已删除（发出去的就是 disp_img 原样）*/
-                cmd_txt("ACK bm: removed (no tx flip)\r\n");
-                return;
-            }
-            if ((s[1] == 'i') || (s[1] == 'I'))
-            {
-                g_ipm_view = (0 != cam_cmd_snum(s + 2)) ? 1U : 0U;
-                sprintf(b, "ACK bi: view=%s\r\n",
-                        (0U != g_ipm_view) ? "BEV(inverse perspective)" : "camera");
-                cmd_txt(b);
+                cmd_txt("ACK b?: removed - fixed to BEV (no runtime switch)\r\n");
                 return;
             }
             v = cam_cmd_num(s + 1);

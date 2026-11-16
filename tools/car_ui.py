@@ -269,16 +269,11 @@ class App(object):
         self.lbl_mode = self._lbl(f, '当前：二值图 188×120', fg=C_DIM, font=('Microsoft YaHei', 9))
         self.lbl_mode.grid(row=4, column=0, columnspan=4, sticky='w', padx=6, pady=(0, 6))
 
-        # ★★ 2026-11-16：**图传内容切换 + 抓图存盘**（做逆透视标定就靠这两个）
-        #   `bi 0` = 发相机原图（标定要这张，正方形四条边是斜的）；
-        #   `bi 1` = 发逆透视图（默认，俯视看赛道）；
-        #   抓图 = 把**当前这一帧原样**存成 PNG（不缩放、不画红线），另存一张放大 8 倍带网格的。
-        self.btn_view_cam = self._btn(f, '相机视图', lambda: self.do_view(0), w=8, h=1)
-        self.btn_view_cam.grid(row=5, column=0, padx=6, pady=(0, 6), sticky='w')
-        self.btn_view_bev = self._btn(f, '俯视视图', lambda: self.do_view(1), w=8, h=1)
-        self.btn_view_bev.grid(row=5, column=1, padx=2, pady=(0, 6), sticky='w')
+        # ★★ 2238：**视图切换按钮删掉了**（固件固定发逆透视图，不再动态切换）。
+        #   只留"抓图存 PNG"：把当前这一帧原样存盘（不缩放、不画红线），另存一张放大 8 倍带网格的。
+        #   要标定逆透视请用 tools\ipm_cal.py（它自己会临时让板子发相机原图）。
         self.btn_grab = self._btn(f, '抓图存 PNG', self.do_grab, w=11, h=1, bg=C_ON)
-        self.btn_grab.grid(row=5, column=2, columnspan=2, padx=6, pady=(0, 6), sticky='e')
+        self.btn_grab.grid(row=5, column=0, columnspan=4, padx=6, pady=(0, 6), sticky='ew')
 
         # ---- 仪表 ----
         f = tk.LabelFrame(right, text=' 实时数据 ', bg=C_PANEL, fg=C_ACCENT,
@@ -610,13 +605,7 @@ class App(object):
                         self.btn_bin if binary else self.btn_gray)
         self.refresh_buttons()
 
-    # ---------------------------------------------------------------- 视图切换 / 抓图（逆透视标定用）
-    def do_view(self, bev):
-        """切图传内容：0 = 相机原图（标定用），1 = 逆透视图（俯视）"""
-        self.send_ack('bi %d' % bev, 'ACK bi',
-                      '图传 → %s' % ('逆透视图（俯视）' if bev else '相机原图（标定用）'),
-                      self.btn_view_bev if bev else self.btn_view_cam)
-
+    # ---------------------------------------------------------------- 抓图（看画面 / 做记录）
     def do_grab(self):
         """把**当前这一帧**原样存盘（不缩放、不画红线），放在 tools/cal/：
              grab_YYYYmmdd_HHMMSS.png      原始分辨率（二值 188×120 / 灰度 94×60）
