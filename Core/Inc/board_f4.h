@@ -172,6 +172,7 @@ extern volatile float    lf_dbg_a, lf_dbg_b, lf_dbg_c, lf_dbg_dev;     // 每行
 extern volatile uint8_t  cam_thresh;         // 本帧实际阈值
 /* ★ 2230：逆透视（俯视）扫描 */
 extern volatile uint8_t  g_ipm_enable;       // 1 = 舵机误差用俯视结果（命令 bv 0/1）
+extern volatile uint8_t  g_tx_flip_lr;       /* 1 = 发送时左右翻一次（上位机看到正的）*/
 extern volatile uint8_t  g_ipm_view;         // 1 = 图传发逆透视图（0 = 相机原图）
 extern volatile uint8_t  cam_bev_ok;         // 1 = 这一帧俯视可用
 extern volatile int32_t  cam_bev_rows;       // 俯视扫到多少行

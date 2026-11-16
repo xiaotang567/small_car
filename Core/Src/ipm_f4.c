@@ -24,7 +24,7 @@
    查表是按仿真相机的朝向算出来的 ⇒ 要把坐标变换一下再取像素。
       bit0 = 左右镜像   bit1 = 上下翻转   (3 = 180°，当前默认)
    开机默认 3；万一装法不同，用命令 `br 0..3` 现场试，不用重烧。*/
-volatile uint8_t g_ipm_rot = 3U;
+volatile uint8_t g_ipm_rot = 1U;   /* ★ 2233：镜像只是"左右反了"⇒ 默认只左右翻（1）*/
 
 static inline uint16_t ipm_xform (uint16_t idx)
 {
