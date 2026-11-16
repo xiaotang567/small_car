@@ -483,6 +483,15 @@
               <FileName>imu_f4.c</FileName>
               <FileType>1</FileType>
               <FilePath>../Core/Src/imu_f4.c</FilePath>
+            </File>            <File>
+              <FileName>ipm_f4.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>../Core/Src/ipm_f4.c</FilePath>
+            </File>
+            <File>
+              <FileName>ipm_lut.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>../Core/Src/ipm_lut.c</FilePath>
             </File>
           </Files>
         </Group>

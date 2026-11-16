@@ -9,6 +9,7 @@
 ********************************************************************************************************************/
 
 #include "board_f4.h"
+#include "ipm_f4.h"      /* ★ 2230：逆透视（俯视）扫描 */
 #include <stdio.h>
 #include <string.h>
 
@@ -2149,7 +2150,17 @@ void cam_sccb_apply_flip (void)
 volatile uint8_t  cam_bound[120];
 volatile uint8_t  cam_bound_r[120];
 volatile uint8_t  cam_center[120];     // 每行的亮/暗交界列（0xFF = 无）
-volatile uint8_t  cam_thresh = 0;     // 本帧实际用的二值化阈值（诊断用）
+volatile uint8_t cam_thresh = 0;     // 本帧实际用的二值化阈值（诊断用）
+
+/* ★★ 2230：**逆透视（俯视）扫描**的结果（每帧都会算，命令 `bv 0/1` 决定用不用）★
+   俯视图里赛道等宽 ⇒ 没有"近宽远窄/弯道行宽变宽/弦中点偏内"这些透视误差。
+   用不用它由 g_ipm_enable 决定；俯视这一帧没找到线时自动退回透视那条链。*/
+volatile uint8_t g_ipm_enable = 1U;      /* 1 = 舵机误差用俯视结果 */
+volatile uint8_t cam_bev_ok   = 0U;      /* 1 = 这一帧俯视可用 */
+volatile int32_t cam_bev_rows = 0;       /* 扫到多少行 */
+volatile float   cam_bev_en   = 0.0f;    /* 近处偏差（等效像素）*/
+volatile float   cam_bev_ef   = 0.0f;    /* 远处偏差 */
+volatile float   cam_bev_m    = 0.0f;    /* 近处偏差（米）*/
 /* ★ 2026-11-07：**手动阈值**（0 = 自动 Otsu；1..255 = 固定阈值）—— 命令 `th <n>` */
 volatile uint8_t  cam_thresh_manual = 255U;
 
@@ -3151,6 +3162,21 @@ void board_cam_analyze (void)
     }
 
     cam_track_eval();        /* ★ FW=2174：算直道/弯道 + 给舵机的偏差量 */
+
+    /* ★★ 2230：**再跑一次逆透视扫描**（俯视图坐标上找中线）
+       · 每帧都算（156 行 × 121 列查表，几毫秒），结果放 cam_bev_* 给舵机用
+       · 俯视没找到线（ok=0）就不动透视的结果 ⇒ 永远不会因为俯视失败没数据 */
+    {
+        ipm_scan_t bs;
+
+        ipm_bev_scan(&disp_img[0][0], 255U, &bs);
+        cam_bev_ok   = bs.ok;
+        cam_bev_rows = bs.rows;
+        cam_bev_en   = bs.e_near;
+        cam_bev_ef   = bs.e_far;
+        cam_bev_m    = bs.e_m;
+        if ((0U != bs.ok) && (0U != bs.curved)) { cam_curved = 1U; }
+    }
 
     /* ★ 左右边界留在 cam_bound[] / cam_bound_r[] 里，由 app.c 打包发给上位机画红线 */
 #else

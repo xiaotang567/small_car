@@ -754,6 +754,16 @@ void ctrl_steer_from_cam (void)
     {
         float e_near = (cam_line_k * (float)STEER_R_NEAR + cam_line_b) - (float)(CAM_TXW / 2);
         float e_far  = (cam_line_k * (float)STEER_R_AHEAD + cam_line_b) - (float)(CAM_TXW / 2);
+
+        /* ★★ 2230：**逆透视优先** —— 俯视图里赛道等宽，误差不受透视影响。
+           · 俯视这一帧扫到了线（cam_bev_ok）⇒ 用它算的近/远偏差
+           · 没扫到（贴边/被挡）⇒ 沿用上面透视那条链的结果，不会没数据
+           两者单位已经统一成"等效相机像素"，PID 增益不用改。*/
+        if ((0U != g_ipm_enable) && (0U != cam_bev_ok))
+        {
+            e_near = cam_bev_en;
+            e_far  = cam_bev_ef;
+        }
         float w      = g_drv_steer_w;        /* ★ 2214：远近权重由 state_f4.c 按状态给 */
 
         e = e_near * (1.0f - w) + e_far * w;

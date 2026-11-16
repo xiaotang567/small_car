@@ -170,6 +170,13 @@ extern volatile uint8_t  cam_ahead;
 extern volatile uint16_t cam_fps10;
 extern volatile float    lf_dbg_a, lf_dbg_b, lf_dbg_c, lf_dbg_dev;     // 每行交界列（0xFF=无）
 extern volatile uint8_t  cam_thresh;         // 本帧实际阈值
+/* ★ 2230：逆透视（俯视）扫描 */
+extern volatile uint8_t  g_ipm_enable;       // 1 = 舵机误差用俯视结果（命令 bv 0/1）
+extern volatile uint8_t  cam_bev_ok;         // 1 = 这一帧俯视可用
+extern volatile int32_t  cam_bev_rows;       // 俯视扫到多少行
+extern volatile float    cam_bev_en;         // 近处偏差（等效像素）
+extern volatile float    cam_bev_ef;         // 远处偏差
+extern volatile float    cam_bev_m;          // 近处偏差（米）
 uint32_t board_vsync_probe (void);
 void     cam_pin_probe (uint32_t *href_edges, uint32_t *vsync_edges);
 void     cam_dump_regs_line (uint8_t base);   // ★ 开机自动 dump 相机寄存器的一行   // ★ 直接数 PB7(VSYNC) 边沿（绕开 DCMI）
