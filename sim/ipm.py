@@ -23,21 +23,22 @@ import numpy as np
 class IPM(object):
     def __init__(self, img_wh=(188, 120), hfov=np.deg2rad(60.0),
                  cam_xy=(0.20, 0.0, 0.13), pitch=np.deg2rad(18.0),
-                 bev_x=(0.05, 1.60), bev_y=0.60, res=0.01, bilinear=True):
+                 bev_x=(0.05, 1.60), bev_y=0.60, res=0.01, bilinear=True, res_y=None):
         self.img_w, self.img_h = img_wh
         self.hfov = hfov
         self.cam = np.asarray(cam_xy, dtype=np.float64)     # (x 前, y 左, z 上)
         self.pitch = pitch
-        self.res = res
+        self.res = res                                  # 横向 m/像素
+        self.res_y = res if res_y is None else res_y    # 纵向 m/像素（可以不等）
         self.bilinear = bilinear
         self.bev_x0, self.bev_x1 = bev_x
         self.bev_y = bev_y
 
         # ---- 输出网格（车体系，米）----
-        self.nx = int(round((bev_x[1] - bev_x[0]) / res)) + 1     # 行（前向）
-        self.ny = int(round(2.0 * bev_y / res)) + 1               # 列（横向）
-        xs = bev_x[0] + np.arange(self.nx) * res                  # 每行对应的前向距离
-        ys = -bev_y + np.arange(self.ny) * res                    # 每列对应的横向位置
+        self.nx = int(round((bev_x[1] - bev_x[0]) / self.res_y)) + 1   # 行（前向）
+        self.ny = int(round(2.0 * bev_y / res)) + 1                    # 列（横向）
+        xs = bev_x[0] + np.arange(self.nx) * self.res_y                # 每行对应的前向距离
+        ys = -bev_y + np.arange(self.ny) * res                         # 每列对应的横向位置
         # 车体系：X 前, Y 左, Z 上；BEV 行 = X，列 = Y
         X, Y = np.meshgrid(xs, ys, indexing='ij')
 
@@ -104,7 +105,7 @@ class IPM(object):
         return -self.bev_y + col * self.res
 
     def row_of_x(self, x):
-        return (x - self.bev_x0) / self.res
+        return (x - self.bev_x0) / self.res_y
 
     def col_of_y(self, y):
         return (y + self.bev_y) / self.res

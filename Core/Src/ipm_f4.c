@@ -124,10 +124,34 @@ void ipm_bev_scan (const uint8_t *img, uint8_t thresh, ipm_scan_t *out)
     if (cen_far < 0) { cen_far = cen_near; }
 
     /* ★ 符号约定：目标在左 ⇒ e > 0（和固件原来的 cam_err_near 一致） */
-    out->e_near = ((float)cen_near - (float)IPM_COL_CENTER) * IPM_PX_PER_COL;
-    out->e_far  = ((float)cen_far  - (float)IPM_COL_CENTER) * IPM_PX_PER_COL;
+    out->e_near = ((float)cen_near - IPM_COL_CENTER_F) * IPM_PX_PER_COL;
+    out->e_far  = ((float)cen_far  - IPM_COL_CENTER_F) * IPM_PX_PER_COL;
     out->e_m    = out->e_near / 250.0f;
     out->curved = ((out->e_far - out->e_near) > IPM_CURVE_DEG ||
                    (out->e_far - out->e_near) < -IPM_CURVE_DEG) ? 1U : 0U;
     out->ok = 1U;
+}
+
+//-------------------------------------------------------------------------------------------------------------------
+// 把俯视图画成一张 188×120 的图（给图传用）
+//   行 = 前向距离（第 0 行 = 车前 5cm，第 119 行 = 前方 1.55m）
+//   列 = 横向（第 93/94 列 = 车正前方那条线）
+//   地形以上/视野外 = 0（黑）
+// 开销：120×188 = 22560 次查表，纯内存操作，不到 1ms
+//-------------------------------------------------------------------------------------------------------------------
+void ipm_bev_render (const uint8_t *img, uint8_t *dst)
+{
+    int32_t r, c;
+
+    for (r = 0; r < (int32_t)IPM_BEV_ROWS; r++)
+    {
+        const uint16_t *lut = ipm_lut[r];
+        uint8_t        *row = &dst[r * (int32_t)IPM_BEV_COLS];
+
+        for (c = 0; c < (int32_t)IPM_BEV_COLS; c++)
+        {
+            uint16_t idx = lut[c];
+            row[c] = ((idx != 0xFFFFU) && (img[idx] == 255U)) ? 255U : 0U;
+        }
+    }
 }

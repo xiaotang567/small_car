@@ -2156,6 +2156,8 @@ volatile uint8_t cam_thresh = 0;     // 本帧实际用的二值化阈值（诊�
    俯视图里赛道等宽 ⇒ 没有"近宽远窄/弯道行宽变宽/弦中点偏内"这些透视误差。
    用不用它由 g_ipm_enable 决定；俯视这一帧没找到线时自动退回透视那条链。*/
 volatile uint8_t g_ipm_enable = 1U;      /* 1 = 舵机误差用俯视结果 */
+volatile uint8_t g_ipm_view   = 1U;      /* 1 = **图传发逆透视图**（0 = 发相机原图）*/
+static   uint32_t s_bev_frame = 0xFFFFFFFFU;   /* 哪一帧的 disp_img 已经换成俯视图了 */
 volatile uint8_t cam_bev_ok   = 0U;      /* 1 = 这一帧俯视可用 */
 volatile int32_t cam_bev_rows = 0;       /* 扫到多少行 */
 volatile float   cam_bev_en   = 0.0f;    /* 近处偏差（等效像素）*/
@@ -3084,6 +3086,14 @@ void cam_track_eval (void)
 
 void board_cam_analyze (void)
 {
+    /* ★★ 2231：图传发俯视图时，**巡线必须看相机原图**
+       analyze 在一帧里可能被调用多次（发送相位），而上一次结尾把 disp_img
+       换成了俯视图 ⇒ 这次就会在俯视图上找线（EL=0 / BVR=0）。
+       ⇒ 开头先判断：这一帧已经换过就从环形缓冲**重新搬一次相机原图**。*/
+    if ((0U != g_ipm_view) && (s_bev_frame == cam_frame_cnt) && (0U != cam_frm_aligned))
+    {
+        cam_copy_whole_frame((uint16_t)cam_frm_start_row);
+    }
     static uint32_t hist[256];
     uint8_t *base = &disp_img[0][0];
     uint32_t total = (uint32_t)CAM_H * (uint32_t)CAM_TXW;
@@ -3176,6 +3186,19 @@ void board_cam_analyze (void)
         cam_bev_ef   = bs.e_far;
         cam_bev_m    = bs.e_m;
         if ((0U != bs.ok) && (0U != bs.curved)) { cam_curved = 1U; }
+    }
+
+    /* ★★ 2231：**图传改成发逆透视图**
+       上面所有跟踪都是用相机原图算完了，这里才把俯视图画进 disp_img。
+       顺序很重要：先算跟踪，再覆盖 ⇒ 图传发出去的是俯视图，但跟踪看的还是相机图。*/
+    if (0U != g_ipm_view)
+    {
+        __attribute__((section(".ccmram"))) static uint8_t s_bev[120][188];
+        /* 22.5KB —— **必须放 CCM**：主 SRAM 已经被 cam_image(90KB) 吃满了 */
+
+        ipm_bev_render(&disp_img[0][0], &s_bev[0][0]);
+        (void)memcpy(&disp_img[0][0], &s_bev[0][0], (size_t)(120 * 188));
+        s_bev_frame = cam_frame_cnt;
     }
 
     /* ★ 左右边界留在 cam_bound[] / cam_bound_r[] 里，由 app.c 打包发给上位机画红线 */

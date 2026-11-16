@@ -149,7 +149,7 @@ static void cam_cmd_status (void)
        DRP = 发送看门狗**主动放弃**的帧数（一直飙 ⇒ 链路/模块发不动）✓
        DST = DMA 停摆看门狗重启采集的次数（>0 ⇒ 采集链卡过，但已经自己救回来了）✓
        SELF= 连续 2 秒没有完整帧 ⇒ 重启采集的次数（和 DST 一起看）✓ */
-    sprintf(b, "CFG f=%u g=%u x=%u y=%u (%ux%u) d=%u CST=%u RV=%06lX LINE=%u FW=2230 EDG=%lu EL=%u ER=%u DRP=%lu DST=%lu SELF=%lu TH=%u IPM=%u BVR=%d BVE=%.1f BVF=%.1f\r\n",
+    sprintf(b, "CFG f=%u g=%u x=%u y=%u (%ux%u) d=%u CST=%u RV=%06lX LINE=%u FW=2231 EDG=%lu EL=%u ER=%u DRP=%lu DST=%lu SELF=%lu TH=%u IPM=%u BVR=%d BVE=%.1f BVF=%.1f\r\n",
             (unsigned)cam_cmd_fps, (unsigned)cam_cmd_gap_ms,
             (unsigned)cam_cmd_dx, (unsigned)cam_cmd_dy,
             (unsigned)(CAM_TXW / cam_cmd_dx), (unsigned)(CAM_H / cam_cmd_dy),
@@ -278,6 +278,28 @@ static void cam_cmd_line (char *s)
             break;
 
         case 'b':
+            /* ★★ 2230/2231：俯视图相关命令（都在这个 case 里）
+                 bv <0/1>  舵机误差用不用逆透视（0 = 退回透视那条链）
+                 bi <0/1>  图传发什么（0 = 相机原图，1 = **逆透视图**）
+               其它 b 命令保持原样（打开 UART5 配相机）。*/
+            if ((s[1] == 'v') || (s[1] == 'V'))
+            {
+                g_ipm_enable = (0 != cam_cmd_snum(s + 2)) ? 1U : 0U;
+                sprintf(b, "ACK bv: IPM=%u ok=%u rows=%d e_near=%.1f e_far=%.1f e_m=%.3f\r\n",
+                        (unsigned)g_ipm_enable, (unsigned)cam_bev_ok,
+                        (int)cam_bev_rows, (double)cam_bev_en,
+                        (double)cam_bev_ef, (double)cam_bev_m);
+                cmd_txt(b);
+                return;
+            }
+            if ((s[1] == 'i') || (s[1] == 'I'))
+            {
+                g_ipm_view = (0 != cam_cmd_snum(s + 2)) ? 1U : 0U;
+                sprintf(b, "ACK bi: view=%s\r\n",
+                        (0U != g_ipm_view) ? "BEV(inverse perspective)" : "camera");
+                cmd_txt(b);
+                return;
+            }
             v = cam_cmd_num(s + 1);
             cam_cfg_uart_open((uint8_t)((v > 4U) ? 0U : v));
             cam_cfg_state = 0U;
@@ -436,7 +458,7 @@ static void cam_cmd_line (char *s)
         //   行 bin4 后帧只有 120 行 ⇒ 行数必须 < 120（出厂 443 会卡死不成帧 ✓）
         case 'e':
             v = cam_cmd_num(s + 1);
-            /* ★★ FW=2230：**亮度就是曝光行数（R0x0B）** ★★
+            /* ★★ FW=2231：**亮度就是曝光行数（R0x0B）** ★★
                因为我们已经把 AEC/AGC 关掉了（见 cam_f4.c 里的说明：AEC 开着时 R0x0B/R0xA5 都不听话，
                亮度按钮按了没反应就是这么来的）。现在：
                  · R0x0B 曝光行数 10..110（必须 < 一帧 120 行）← 这个命令调它，越大越亮

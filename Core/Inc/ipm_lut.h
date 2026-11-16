@@ -3,8 +3,8 @@
 
 #include <stdint.h>
 
-#define IPM_BEV_ROWS   156
-#define IPM_BEV_COLS   121
+#define IPM_BEV_ROWS   120
+#define IPM_BEV_COLS   188
 #define IPM_SRC_W      188
 #define IPM_SRC_H      120
 

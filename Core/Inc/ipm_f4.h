@@ -21,10 +21,13 @@
 #include <stdint.h>
 
 /* 俯视 → 等效相机像素 的换算：1 列 = 10mm，250 px/m ⇒ 1 列 = 2.5 等效像素 */
-#define IPM_PX_PER_COL      2.5f
-#define IPM_COL_CENTER      60          /* 俯视图中心列（y = 0，也就是车的位置）*/
-#define IPM_NEAR_ROW        65          /* 前向 0.70m 的那一行 */
-#define IPM_FAR_ROW         125         /* 前向 1.30m 的那一行 */
+/* 俯视图 = 120 行 × 188 列（和相机图一样大）⇒ 可以直接顶替 disp_img 发出去
+   前向 0.050~1.550m（12.6mm/行）、横向 ±0.600m（6.42mm/列）、中心列 93.5 */
+#define IPM_PX_PER_COL      1.604f      /* 250 px/m × 6.42mm/列 */
+#define IPM_COL_CENTER      93          /* 中心列（整数，判"哪段包含中心"用）*/
+#define IPM_COL_CENTER_F    93.5f       /* 中心列（浮点，算误差用）*/
+#define IPM_NEAR_ROW        51          /* 前向 0.70m */
+#define IPM_FAR_ROW         99          /* 前向 1.30m */
 #define IPM_MIN_ROWS        8           /* 少于这么多行就不认这一帧 */
 #define IPM_CURVE_DEG       40.0f       /* 远近误差差超过这么多等价像素就判弯道 */
 
@@ -40,5 +43,9 @@ typedef struct
 
 /* 扫一帧俯视图（img 是 188×120 的二值化图，255 = 赛道）*/
 void ipm_bev_scan (const uint8_t *img, uint8_t thresh, ipm_scan_t *out);
+
+/* 把俯视图**画成一张 188×120 的图**（255 = 赛道，0 = 别处）
+   dst 必须是 188×120 的缓冲区；图传要发逆透视图时就调它 */
+void ipm_bev_render (const uint8_t *img, uint8_t *dst);
 
 #endif /* __IPM_F4_H */

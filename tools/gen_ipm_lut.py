@@ -24,7 +24,12 @@ OUT_H = os.path.join(HERE, '..', 'Core', 'Inc', 'ipm_lut.h')
 
 
 def main():
-    ipm = IPM(bilinear=False)
+    # ★ 俯视图做成**和相机图一样的 120 行 × 188 列**，这样固件里可以直接顶上 disp_img，
+    #   图传那边一个字节都不用改，上位机看到的就变成俯视图了。
+    RES_X = 1.20 / 187.0
+    RES_Y = 1.50 / 119.0
+    ipm = IPM(bilinear=False, bev_x=(0.05, 0.05 + 119 * RES_Y),
+              bev_y=187 * RES_X / 2.0, res=RES_X, res_y=RES_Y)
     nx, ny = ipm.nx, ipm.ny
     u = np.rint(ipm.map_u).astype(np.int32)
     v = np.rint(ipm.map_v).astype(np.int32)
