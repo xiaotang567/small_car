@@ -269,11 +269,14 @@ class App(object):
         self.lbl_mode = self._lbl(f, '当前：二值图 188×120', fg=C_DIM, font=('Microsoft YaHei', 9))
         self.lbl_mode.grid(row=4, column=0, columnspan=4, sticky='w', padx=6, pady=(0, 6))
 
-        # ★★ 2238：**视图切换按钮删掉了**（固件固定发逆透视图，不再动态切换）。
-        #   只留"抓图存 PNG"：把当前这一帧原样存盘（不缩放、不画红线），另存一张放大 8 倍带网格的。
-        #   要标定逆透视请用 tools\ipm_cal.py（它自己会临时让板子发相机原图）。
+        # ★★ 2238：没有"视图切换"了（固件固定发逆透视图）。
+        #   但要能**偶尔看一眼相机原图**（对焦/对方向/看现场），所以：
+        #     「相机原图快照」= 只在那 ~1 秒里让板子发几帧原图，抓下来**另开一个窗口**显示，
+        #                       然后自动切回逆透视图。主画面全程还是俯视图，不算模式切换。
+        self.btn_snap = self._btn(f, '相机原图快照', self.do_cam_snap, w=13, h=1)
+        self.btn_snap.grid(row=5, column=0, columnspan=2, padx=6, pady=(0, 6), sticky='ew')
         self.btn_grab = self._btn(f, '抓图存 PNG', self.do_grab, w=11, h=1, bg=C_ON)
-        self.btn_grab.grid(row=5, column=0, columnspan=4, padx=6, pady=(0, 6), sticky='ew')
+        self.btn_grab.grid(row=5, column=2, columnspan=2, padx=6, pady=(0, 6), sticky='ew')
 
         # ---- 仪表 ----
         f = tk.LabelFrame(right, text=' 实时数据 ', bg=C_PANEL, fg=C_ACCENT,
@@ -604,6 +607,65 @@ class App(object):
         self.send_ack('s %d' % binary, 'ACK s', '图像 → %s' % ('二值图' if binary else '原图灰度'),
                         self.btn_bin if binary else self.btn_gray)
         self.refresh_buttons()
+
+    # ---------------------------------------------------------------- 相机原图快照
+    SNAP_FRAMES = 4
+
+    def do_cam_snap(self):
+        """相机原图快照：让板子只在这 ~1 秒里发**相机原图**，抓一帧开窗口显示，然后自动回俯视图。
+           （固件只接受 `cal 1/0` 这一个临时命令；主画面平时始终是逆透视图，不是模式切换）"""
+        if self.conn is None:
+            self.log('（未连接，抓不了）')
+            return
+        if self.mode_gray:
+            self.log('先点「二值图」再抓快照（快照走的是整帧包）')
+            return
+        self.snap_left = self.SNAP_FRAMES
+        self.send('cal 1', '取相机原图快照…（%d 帧后自动切回俯视图）' % self.SNAP_FRAMES)
+
+    def _snap_tick(self):
+        """每收到一帧调用；数够 SNAP_FRAMES 就切回俯视图并弹窗"""
+        if not getattr(self, 'snap_left', 0):
+            return
+        self.snap_left -= 1
+        if self.snap_left > 0:
+            return
+        frame = self.shot                      # 先把这一帧记住
+        self.send('cal 0', '快照完成，已切回俯视图')
+        self.show_snap_window(frame)
+
+    def show_snap_window(self, shot):
+        if (shot is None) or (not HAVE_PIL):
+            return
+        w, h, data, gray = shot
+        im = Image.frombytes('L', (w, h), data)
+        path = ''
+        try:
+            d = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'cal')
+            os.makedirs(d, exist_ok=True)
+            path = os.path.join(d, time.strftime('cam_%Y%m%d_%H%M%S') + '.png')
+            im.save(path)
+        except Exception as e:
+            self.log('存图失败: %s' % e)
+        k = 4
+        big = im.resize((w * k, h * k), Image.NEAREST).convert('RGB')
+        dr = ImageDraw.Draw(big)
+        for x in range(0, w, 20):
+            dr.line([(x * k, 0), (x * k, h * k)], fill=(40, 90, 150))
+            dr.text((x * k + 2, 1), str(x), fill=(150, 200, 255))
+        for y in range(0, h, 20):
+            dr.line([(0, y * k), (w * k, y * k)], fill=(40, 90, 150))
+            dr.text((2, y * k + 1), str(y), fill=(150, 200, 255))
+        top = tk.Toplevel(self.root)
+        top.title('相机原图快照（%dx%d，看方向/对焦用；关掉此窗口即可）' % (w, h))
+        top.configure(bg=C_BG)
+        ph = ImageTk.PhotoImage(big)
+        lbl = tk.Label(top, image=ph, bg='black')
+        lbl.image = ph
+        lbl.pack(padx=6, pady=6)
+        tk.Label(top, text=('已存：%s' % path) if path else '', bg=C_BG, fg=C_DIM,
+                 font=('Consolas', 9)).pack(anchor='w', padx=6)
+        self.log('✔ 相机原图快照已存：%s' % path)
 
     # ---------------------------------------------------------------- 抓图（看画面 / 做记录）
     def do_grab(self):
@@ -1019,6 +1081,7 @@ class App(object):
         if not self.mode_gray:
             self.shot = (BIN_W, BIN_H, bytes(out), False)
             self.schedule_draw(force=True)
+            self._snap_tick()          # ★ 相机原图快照：数够帧数就切回俯视图并弹窗
 
     def on_gray_block(self, blk, rows, pay):
         r0 = blk * 8
