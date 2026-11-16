@@ -41,6 +41,9 @@ typedef struct
     float   e_m;         /* 近处偏差（米，正=车偏右）*/
 } ipm_scan_t;
 
+/* ★ 2232：原图朝向补偿（bit0=左右 bit1=上下，3=180°），命令 `br 0..3` */
+extern volatile uint8_t g_ipm_rot;
+
 /* 扫一帧俯视图（img 是 188×120 的二值化图，255 = 赛道）*/
 void ipm_bev_scan (const uint8_t *img, uint8_t thresh, ipm_scan_t *out);
 

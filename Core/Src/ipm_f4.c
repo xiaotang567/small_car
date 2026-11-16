@@ -19,6 +19,26 @@
 /* 一行里最多认几段（够了，赛道一行不会碎成很多段）*/
 #define IPM_MAX_RUNS    8U
 
+/* ★★ 2232：**传感器原图的朝向补偿**
+   用户指出：原图是"上下颠倒 + 左右相反"。
+   查表是按仿真相机的朝向算出来的 ⇒ 要把坐标变换一下再取像素。
+      bit0 = 左右镜像   bit1 = 上下翻转   (3 = 180°，当前默认)
+   开机默认 3；万一装法不同，用命令 `br 0..3` 现场试，不用重烧。*/
+volatile uint8_t g_ipm_rot = 3U;
+
+static inline uint16_t ipm_xform (uint16_t idx)
+{
+    uint16_t u, v;
+
+    if ((0U == g_ipm_rot) || (0xFFFFU == idx)) { return idx; }
+
+    u = (uint16_t)(idx % IPM_SRC_W);
+    v = (uint16_t)(idx / IPM_SRC_W);
+    if (0U != (g_ipm_rot & 1U)) { u = (uint16_t)(IPM_SRC_W - 1U - u); }
+    if (0U != (g_ipm_rot & 2U)) { v = (uint16_t)(IPM_SRC_H - 1U - v); }
+    return (uint16_t)(v * IPM_SRC_W + u);
+}
+
 static uint8_t s_rs[IPM_MAX_RUNS];
 static uint8_t s_re[IPM_MAX_RUNS];
 
@@ -35,8 +55,8 @@ static uint8_t ipm_row_runs (const uint8_t *img, uint8_t y)
 
         if (idx != 0xFFFFU)
         {
-            const uint8_t *base = img;
-            white = (base[idx] == 255U) ? 1U : 0U;
+            idx = ipm_xform(idx);          /* ★ 2232：按固件里的图像朝向取像素 */
+            white = (img[idx] == 255U) ? 1U : 0U;
         }
 
         if (0U != white)
@@ -151,6 +171,8 @@ void ipm_bev_render (const uint8_t *img, uint8_t *dst)
         for (c = 0; c < (int32_t)IPM_BEV_COLS; c++)
         {
             uint16_t idx = lut[c];
+
+            if (idx != 0xFFFFU) { idx = ipm_xform(idx); }
             row[c] = ((idx != 0xFFFFU) && (img[idx] == 255U)) ? 255U : 0U;
         }
     }
