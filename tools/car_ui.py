@@ -161,6 +161,7 @@ class App(object):
         self.root.configure(bg=C_BG)
         self.root.geometry('1220x880')
         self.build_ui()
+        self.root.bind('<F2>', lambda e: self.do_grab())      # ★ F2 = 抓图存 PNG
         self.refresh_buttons()
         self.update_speed_ui()
         self.root.update()
@@ -267,6 +268,17 @@ class App(object):
 
         self.lbl_mode = self._lbl(f, '当前：二值图 188×120', fg=C_DIM, font=('Microsoft YaHei', 9))
         self.lbl_mode.grid(row=4, column=0, columnspan=4, sticky='w', padx=6, pady=(0, 6))
+
+        # ★★ 2026-11-16：**图传内容切换 + 抓图存盘**（做逆透视标定就靠这两个）
+        #   `bi 0` = 发相机原图（标定要这张，正方形四条边是斜的）；
+        #   `bi 1` = 发逆透视图（默认，俯视看赛道）；
+        #   抓图 = 把**当前这一帧原样**存成 PNG（不缩放、不画红线），另存一张放大 8 倍带网格的。
+        self.btn_view_cam = self._btn(f, '相机视图', lambda: self.do_view(0), w=8, h=1)
+        self.btn_view_cam.grid(row=5, column=0, padx=6, pady=(0, 6), sticky='w')
+        self.btn_view_bev = self._btn(f, '俯视视图', lambda: self.do_view(1), w=8, h=1)
+        self.btn_view_bev.grid(row=5, column=1, padx=2, pady=(0, 6), sticky='w')
+        self.btn_grab = self._btn(f, '抓图存 PNG', self.do_grab, w=11, h=1, bg=C_ON)
+        self.btn_grab.grid(row=5, column=2, columnspan=2, padx=6, pady=(0, 6), sticky='e')
 
         # ---- 仪表 ----
         f = tk.LabelFrame(right, text=' 实时数据 ', bg=C_PANEL, fg=C_ACCENT,
@@ -597,6 +609,53 @@ class App(object):
         self.send_ack('s %d' % binary, 'ACK s', '图像 → %s' % ('二值图' if binary else '原图灰度'),
                         self.btn_bin if binary else self.btn_gray)
         self.refresh_buttons()
+
+    # ---------------------------------------------------------------- 视图切换 / 抓图（逆透视标定用）
+    def do_view(self, bev):
+        """切图传内容：0 = 相机原图（标定用），1 = 逆透视图（俯视）"""
+        self.send_ack('bi %d' % bev, 'ACK bi',
+                      '图传 → %s' % ('逆透视图（俯视）' if bev else '相机原图（标定用）'),
+                      self.btn_view_bev if bev else self.btn_view_cam)
+
+    def do_grab(self):
+        """把**当前这一帧**原样存盘（不缩放、不画红线），放在 tools/cal/：
+             grab_YYYYmmdd_HHMMSS.png      原始分辨率（二值 188×120 / 灰度 94×60）
+             grab_YYYYmmdd_HHMMSS_x8.png   放大 8 倍，每 10 像素一条蓝网格线、每 20 标数字
+             grab_YYYYmmdd_HHMMSS.txt      尺寸 / 来源
+           在 _x8 那张上标正方形：网格线就落在图像坐标为 10 的整数倍的位置，直接读数字。"""
+        if (self.shot is None) or (not HAVE_PIL):
+            self.log('✗ 还没有图像（等画面出来再点抓图）')
+            return
+        w, h, data, gray = self.shot
+        d = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'cal')
+        try:
+            os.makedirs(d, exist_ok=True)
+            tag = time.strftime('grab_%Y%m%d_%H%M%S')
+            base = os.path.join(d, tag)
+            im = Image.frombytes('L', (w, h), data)
+            im.save(base + '.png')
+
+            k = 8
+            big = im.resize((w * k, h * k), Image.NEAREST).convert('RGB')
+            dr = ImageDraw.Draw(big)
+            cg = (0, 120, 255)
+            for x in range(0, w, 10):
+                dr.line([(x * k, 0), (x * k, h * k - 1)], fill=cg, width=1)
+            for y in range(0, h, 10):
+                dr.line([(0, y * k), (w * k - 1, y * k)], fill=cg, width=1)
+            for x in range(0, w, 20):
+                dr.text((x * k + 2, 2), str(x), fill=(255, 220, 0))
+            for y in range(0, h, 20):
+                dr.text((2, y * k + 1), str(y), fill=(255, 220, 0))
+            big.save(base + '_x8.png')
+
+            with open(base + '.txt', 'w', encoding='utf-8') as fp:
+                fp.write('tag=%s  size=%dx%d  gray=%s\n' % (tag, w, h, gray))
+                fp.write('x8 图上：网格线每 10 图像像素一条，黄字是该线对应的图像坐标\n')
+            self.log('✔ 已存图：%s.png' % base)
+            self.log('          %s_x8.png（在这张上标正方形）' % base)
+        except Exception as e:
+            self.log('✗ 存图失败: %s' % e)
 
     # ---------------------------------------------------------------- 电机1
     def set_motor_mode(self, m):

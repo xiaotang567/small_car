@@ -15,7 +15,6 @@
 
 /* 寻线参数 */
 #define LF_SEED_ROW        112                 /* 种子行：车头附近，不被遮挡 */
-#define CAM_MIRROR          1       /* ★ FW=2172：摄像头倒装 ⇒ 左右镜像（0 = 不镜像）*/
 #define LF_USE_8NEIGHBOR    1
 
 
@@ -856,8 +855,13 @@ static void cam_frame_boundary (void)
 }
 
 //-------------------------------------------------------------------------------------------------------------------
-// 函数简介     把环形缓冲里从 start_row 开始的 **120 行整块**搬进 disp_img（上下翻转）
-// 备注信息     120 次 188B 的 memcpy ≈ 0.2ms（CCM 里），比一帧 20ms 短 100 倍 ⇒ 不可能被打断 ✓
+// 函数简介     ★★★ 全工程**唯一**的图像翻转点：把环形缓冲里 start_row 开始的 120 行搬进 disp_img ★★★
+// 备注信息     传感器是倒装/反向出图的（原图上下颠倒 + 左右相反），
+//              ⇒ 取图时**先上下翻转、再左右颠倒**，之后 disp_img 就是正经方向：
+//                 近处（车头前）在下 = 第 110~119 行，远处在上 = 第 0 行，左边是第 0 列。
+//              ⚠️ 除了这里，**代码里不再有任何左右/上下翻转**（发送侧、逆透视查表都不翻）。
+//              ⚠️ 巡线的定向就是按这张图标定的（lf_route_of(110,92) 当"车头近处"）⇒ 这里不能乱改。
+//             120 次 188B 的逐字节拷贝 ≈ 0.2ms（CCM 里），比一帧 20ms 短 100 倍 ⇒ 不会被打断 ✓
 //-------------------------------------------------------------------------------------------------------------------
 static void cam_copy_whole_frame (uint16_t start_row)
 {
@@ -868,19 +872,12 @@ static void cam_copy_whole_frame (uint16_t start_row)
     {
         uint32_t src = ((uint32_t)start_row + r) % (uint32_t)cam_ring_rows;
         const uint8_t *s = &flat[src * (uint32_t)cam_row_bytes];
-        uint8_t       *d = &disp_img[(uint32_t)(CAM_H - 1U) - r][0];
+        uint8_t       *d = &disp_img[(uint32_t)(CAM_H - 1U) - r][0];   /* ① 上下翻转 */
 
-        /* ★ FW=2172：摄像头是**倒装**的 ⇒ 行号要翻（下面 CAM_H-1-r），列也要翻
-           （不然左右就是反的）。整帧 120×188 = 22560 字节，逐字节反向拷贝约 0.2ms，
-           远小于一帧 20ms，可以忽略。不想镜像就把 CAM_MIRROR 改成 0。*/
-#if (CAM_MIRROR != 0)
         for (c = 0U; c < (uint32_t)CAM_TXW; c++)
         {
-            d[c] = s[(uint32_t)CAM_TXW - 1U - c];
+            d[c] = s[(uint32_t)CAM_TXW - 1U - c];                      /* ② 左右颠倒 */
         }
-#else
-        (void)memcpy(d, s, (size_t)CAM_TXW);
-#endif
     }
 }
 
@@ -2048,7 +2045,12 @@ uint8_t cam_sccb_set_bin4 (void)
         //    但必须配 **快门 R0x0B ≤ 120 行**（行 bin4 后一帧只有 120 行，
         //    出厂默认曝光 443 行 > 120 → 永远完不成帧 —— 那才是当时“行 bin4 不成帧”的真凶手 ✓）
         //    掩码 ~0x0F：[3:2]=2（列 bin4）且 [1:0]=2（行 bin4）⇒ 0x0A ✓
-        v = (uint16_t)((v & (uint16_t)~0x000FU) | 0x000AU);
+        // ★★ 2237（实测踩坑）：**bit[7:4] 必须一起清零**！
+        //    这颗模块偶尔开机会带着 bit5/bit4（Column/Row Flip）起来，甚至读-改-写时把
+        //    乱码写进去（实测回读到 **0x03FA** ⇒ 硬件上下+左右都翻 ⇒ 图变成一片横条纹、随后 DMA 停摆卡死）。
+        //    全工程的图像翻转只在 cam_copy_whole_frame() 里做一次 ⇒ 这里把 bit[7:4] 强制清 0，
+        //    只保留 bin 位，保证每次开机都是 0x030A ✓
+        v = (uint16_t)((v & (uint16_t)~0x00FFU) | 0x000AU);
         (void)cam_sccb_write_reg(0x0DU, v);
     }
     else { err = 1U; }
@@ -2119,25 +2121,8 @@ volatile uint8_t cam_shutter = 100U;  // ★★ 曝光 R0x0B（行数）—— *
                                       //      ⇒ PCLK 一直在跑（PF 有值）但 VSYNC/HREF 一个边沿都没有
                                       //      ⇒ DCMI 的 SR/RIS 全 0、DMA 的 NDTR 一动不动 ✓ 实测完全吻合
                                       //   100 ≈ 3.7ms 曝光（写入口还有 110 的硬上限兜底）
-volatile uint8_t cam_flip = 0U;       // 0=不翻 1=左右镜像(ColumnFlip) 2=上下(RowFlip) 3=两者(180°)
-
-//-------------------------------------------------------------------------------------------------------------------
-// 函数简介     ★ 按 `cam_flip` 重写 R0x0D 的翻转位（bit5=Column Flip 左右镜像 / bit4=Row Flip 上下）★
-//   🔑 用"读-改-写"只动 bit4/bit5，**binning 位（[3:2]/[1:0]）与保留位原样保留** ✓
-//   传感器在下一帧就生效（这两个位是 shadowed 的 ✓）⇒ 按一次 `n` 最多等一帧就看到方向变化 ✓
-//-------------------------------------------------------------------------------------------------------------------
-void cam_sccb_apply_flip (void)
-{
-    uint16_t v = 0U;
-    uint16_t f = (uint16_t)(((cam_flip & 1U) ? 0x0020U : 0U) |   // bit5 Column Flip（左右镜像）
-                            ((cam_flip & 2U) ? 0x0010U : 0U));   // bit4 Row Flip（上下）
-
-    if (0U == cam_sccb_read_reg(0x0DU, &v))
-    {
-        v = (uint16_t)((v & (uint16_t)~0x0030U) | f);
-        (void)cam_sccb_write_reg(0x0DU, v);
-    }
-}
+/* ★ 2026-11-16：**删除传感器硬件翻转（R0x0D bit5/bit4）** ——
+   图像翻转只在 cam_copy_whole_frame() 里做一次（先上下、再左右），这里不再有第二处。*/
 
 //-------------------------------------------------------------------------------------------------------------------
 // 函数简介     ★★★ 全部在单片机内完成：Otsu 自动阈值 → 二值化 → 每行找“亮/暗交界列” ★★★
@@ -2155,7 +2140,10 @@ volatile uint8_t cam_thresh = 0;     // 本帧实际用的二值化阈值（诊�
 /* ★★ 2230：**逆透视（俯视）扫描**的结果（每帧都会算，命令 `bv 0/1` 决定用不用）★
    俯视图里赛道等宽 ⇒ 没有"近宽远窄/弯道行宽变宽/弦中点偏内"这些透视误差。
    用不用它由 g_ipm_enable 决定；俯视这一帧没找到线时自动退回透视那条链。*/
-volatile uint8_t g_ipm_enable = 1U;      /* 1 = 舵机误差用俯视结果 */
+volatile uint8_t g_ipm_enable = 0U;      /* ★ 2237：默认 **0**（舵机仍然用透视那条链）
+                                            1 = 舵机误差改用俯视结果（命令 `bv 1`）
+                                            为什么先关：俯视标定刚做好，**误差符号还没在车上验证**；
+                                            没验证就自动接管舵机会直接反打方向。 */
 volatile uint8_t g_ipm_view   = 1U;      /* 1 = **图传发逆透视图**（0 = 发相机原图）*/
 static   uint32_t s_bev_frame = 0xFFFFFFFFU;   /* 哪一帧的 disp_img 已经换成俯视图了 */
 volatile uint8_t cam_bev_ok   = 0U;      /* 1 = 这一帧俯视可用 */
@@ -3185,7 +3173,10 @@ void board_cam_analyze (void)
         cam_bev_en   = bs.e_near;
         cam_bev_ef   = bs.e_far;
         cam_bev_m    = bs.e_m;
-        if ((0U != bs.ok) && (0U != bs.curved)) { cam_curved = 1U; }
+        /* ★ 2237：俯视的"弯道"只在**真的用俯视控制**时才往 cam_curved 里写。
+           原来无条件写 ⇒ 标定好的新查表每帧都报 curved=1（telemetry 里 cv 恒 1）
+           ⇒ 状态机一直以为在弯道（减速/积分策略全变），车会"跑着跑着不动了"。*/
+        if ((0U != g_ipm_enable) && (0U != bs.ok) && (0U != bs.curved)) { cam_curved = 1U; }
     }
 
     /* ★★ 2231：**图传改成发逆透视图**

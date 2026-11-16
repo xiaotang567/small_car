@@ -150,7 +150,7 @@ static void cam_cmd_status (void)
        DRP = 发送看门狗**主动放弃**的帧数（一直飙 ⇒ 链路/模块发不动）✓
        DST = DMA 停摆看门狗重启采集的次数（>0 ⇒ 采集链卡过，但已经自己救回来了）✓
        SELF= 连续 2 秒没有完整帧 ⇒ 重启采集的次数（和 DST 一起看）✓ */
-    sprintf(b, "CFG f=%u g=%u x=%u y=%u (%ux%u) d=%u CST=%u RV=%06lX LINE=%u FW=2235 EDG=%lu EL=%u ER=%u DRP=%lu DST=%lu SELF=%lu TH=%u IPM=%u ROT=%u TF=%u BVR=%d BVE=%.1f BVF=%.1f\r\n",
+    sprintf(b, "CFG f=%u g=%u x=%u y=%u (%ux%u) d=%u CST=%u RV=%06lX LINE=%u FW=2237 EDG=%lu EL=%u ER=%u DRP=%lu DST=%lu SELF=%lu TH=%u IPM=%u BVR=%d BVE=%.1f BVF=%.1f\r\n",
             (unsigned)cam_cmd_fps, (unsigned)cam_cmd_gap_ms,
             (unsigned)cam_cmd_dx, (unsigned)cam_cmd_dy,
             (unsigned)(CAM_TXW / cam_cmd_dx), (unsigned)(CAM_H / cam_cmd_dy),
@@ -163,9 +163,9 @@ static void cam_cmd_status (void)
             (unsigned long)cam_dma_stall,
             (unsigned long)cam_self_heal,
             (unsigned)((0U != cam_thresh_manual) ? (unsigned)cam_thresh_manual : (unsigned)cam_thresh),
-            (unsigned)g_ipm_enable, (unsigned)g_ipm_rot, (unsigned)g_tx_flip,
+            (unsigned)g_ipm_enable,
             (int)cam_bev_rows,
-            (double)cam_bev_en, (double)cam_bev_ef);   /* ★ 2230：逆透视状态 */
+            (double)cam_bev_en, (double)cam_bev_ef);   /* ★ 2236：ROT/TF 已删除（没有翻转补偿了）*/
     cmd_txt(b);
 }
 
@@ -296,17 +296,14 @@ static void cam_cmd_line (char *s)
             }
             if ((s[1] == 'r') || (s[1] == 'R'))
             {
-                g_ipm_rot = (uint8_t)(cam_cmd_clamp((uint32_t)cam_cmd_snum(s + 2), 0U, 3U));
-                sprintf(b, "ACK br: rot=%u (bit0=LR bit1=UD, 3=180deg)\r\n",
-                        (unsigned)g_ipm_rot);
-                cmd_txt(b);
+                /* ★ 2236：朝向补偿已删除（图像只在取图时翻一次）*/
+                cmd_txt("ACK br: removed (no rot comp, flip only on acquire)\r\n");
                 return;
             }
             if ((s[1] == 'm') || (s[1] == 'M'))
             {
-                g_tx_flip = (uint8_t)cam_cmd_clamp((uint32_t)cam_cmd_snum(s + 2), 0U, 3U);
-                sprintf(b, "ACK bm: tx_flip=%u (bit0=LR bit1=UD)\r\n", (unsigned)g_tx_flip);
-                cmd_txt(b);
+                /* ★ 2236：发送侧翻转已删除（发出去的就是 disp_img 原样）*/
+                cmd_txt("ACK bm: removed (no tx flip)\r\n");
                 return;
             }
             if ((s[1] == 'i') || (s[1] == 'I'))
@@ -487,13 +484,10 @@ static void cam_cmd_line (char *s)
                     (unsigned)cam_shutter, (unsigned)cam_gain);
             return;
 
-        // ★ 翻转/镜像：`n` 每按一次换一种（0 不翻 → 1 左右镜像 → 2 上下 → 3 180° → 0…）
-        //   传感器硬件翻转（R0x0D bit5/bit4），下一帧即生效 ✓ —— 装在车上方向不对就用它 ✓
+        // ★ 2236：**传感器硬件翻转已删除**（R0x0D bit5/bit4 不再动）——
+        //   图像翻转只在 cam_copy_whole_frame() 里做一次（先上下、再左右）。
         case 'n':
-            cam_flip = (uint8_t)((cam_flip + 1U) & 3U);
-            cam_sccb_apply_flip();
-            sprintf(b, "ACK n: flip=%u (0=none 1=mirror 2=flip-vert 3=180)\r\n", (unsigned)cam_flip);
-            cmd_txt(b);
+            cmd_txt("ACK n: hardware flip removed (flip only on acquire)\r\n");
             return;
 
         case 'o':

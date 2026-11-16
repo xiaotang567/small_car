@@ -172,7 +172,6 @@ extern volatile float    lf_dbg_a, lf_dbg_b, lf_dbg_c, lf_dbg_dev;     // 每行
 extern volatile uint8_t  cam_thresh;         // 本帧实际阈值
 /* ★ 2230：逆透视（俯视）扫描 */
 extern volatile uint8_t  g_ipm_enable;       // 1 = 舵机误差用俯视结果（命令 bv 0/1）
-extern volatile uint8_t  g_tx_flip;          /* 发送侧翻转：bit0 左右 / bit1 上下（3 = 180°）*/
 extern volatile uint8_t  g_ipm_view;         // 1 = 图传发逆透视图（0 = 相机原图）
 extern volatile uint8_t  cam_bev_ok;         // 1 = 这一帧俯视可用
 extern volatile int32_t  cam_bev_rows;       // 俯视扫到多少行
@@ -196,8 +195,6 @@ extern volatile uint16_t cam_dbg_a5;         // ★ 2205：R0xA5 回读（AEC �
 extern volatile uint16_t cam_dbg_sh;         // ★ 2205：R0x0B 回读（快门行数）
 extern volatile uint32_t cam_gray_mean;      // ★ 2204：本帧平均灰度（≈255 ⇒ 真过曝，二值图全白就是它）
 extern volatile uint32_t cam_sat_pcnt;       // ★ 2204：本帧饱和（>=250）像素百分比
-void     cam_sccb_apply_flip (void);         // ★ 按 cam_flip 重写 R0x0D 的翻转位（bit5=左右镜像 bit4=上下）
-extern volatile uint8_t  cam_flip;           // 0=不翻 1=镜像 2=上下 3=180°
 extern volatile uint8_t  cam_bin_ok;                // 1 = 配置成功且回读一致
 extern volatile uint16_t cam_r0d;                   // R0x0D 回读值
 extern volatile uint16_t cam_r0e;                   // R0x0E 回读值

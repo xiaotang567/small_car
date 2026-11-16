@@ -19,25 +19,10 @@
 /* 一行里最多认几段（够了，赛道一行不会碎成很多段）*/
 #define IPM_MAX_RUNS    8U
 
-/* ★★ 2232：**传感器原图的朝向补偿**
-   用户指出：原图是"上下颠倒 + 左右相反"。
-   查表是按仿真相机的朝向算出来的 ⇒ 要把坐标变换一下再取像素。
-      bit0 = 左右镜像   bit1 = 上下翻转   (3 = 180°，当前默认)
-   开机默认 3；万一装法不同，用命令 `br 0..3` 现场试，不用重烧。*/
-volatile uint8_t g_ipm_rot = 1U;   /* ★ 2233：镜像只是"左右反了"⇒ 默认只左右翻（1）*/
-
-static inline uint16_t ipm_xform (uint16_t idx)
-{
-    uint16_t u, v;
-
-    if ((0U == g_ipm_rot) || (0xFFFFU == idx)) { return idx; }
-
-    u = (uint16_t)(idx % IPM_SRC_W);
-    v = (uint16_t)(idx / IPM_SRC_W);
-    if (0U != (g_ipm_rot & 1U)) { u = (uint16_t)(IPM_SRC_W - 1U - u); }
-    if (0U != (g_ipm_rot & 2U)) { v = (uint16_t)(IPM_SRC_H - 1U - v); }
-    return (uint16_t)(v * IPM_SRC_W + u);
-}
+/* ★ 2026-11-16：**删除原图朝向补偿（原 g_ipm_rot / ipm_xform）**。
+   图像翻转只在 cam_copy_whole_frame() 里做一次（先上下、再左右），
+   之后 disp_img 就是"近处在下、左边是第 0 列"的正经方向 ⇒
+   查表里存的就是 disp_img 的像素下标，用的时候直接取，**不再做任何翻转**。*/
 
 static uint8_t s_rs[IPM_MAX_RUNS];
 static uint8_t s_re[IPM_MAX_RUNS];
@@ -55,8 +40,7 @@ static uint8_t ipm_row_runs (const uint8_t *img, uint8_t y)
 
         if (idx != 0xFFFFU)
         {
-            idx = ipm_xform(idx);          /* ★ 2232：按固件里的图像朝向取像素 */
-            white = (img[idx] == 255U) ? 1U : 0U;
+            white = (img[idx] == 255U) ? 1U : 0U;      /* 直接取（不再翻）*/
         }
 
         if (0U != white)
@@ -154,8 +138,11 @@ void ipm_bev_scan (const uint8_t *img, uint8_t thresh, ipm_scan_t *out)
 
 //-------------------------------------------------------------------------------------------------------------------
 // 把俯视图画成一张 188×120 的图（给图传用）
-//   行 = 前向距离（第 0 行 = 车前 5cm，第 119 行 = 前方 1.55m）
-//   列 = 横向（第 93/94 列 = 车正前方那条线）
+//   查表行 r：第 0 行 = 车前 5cm（近），第 119 行 = 前方 1.55m（远）
+//   ★ 画进 dst 时**行号倒过来**（dst 行 = 119 - r）：
+//     上=远、下=近，和相机图/人眼一致。原来直接写 dst[r] ⇒ 上位机看到的俯视图
+//     是**上下颠倒**的（近处在上）。
+//   列 = 横向（第 93/94 列 = 车正前方那条线），左=第 0 列，不翻。
 //   地形以上/视野外 = 0（黑）
 // 开销：120×188 = 22560 次查表，纯内存操作，不到 1ms
 //-------------------------------------------------------------------------------------------------------------------
@@ -166,13 +153,12 @@ void ipm_bev_render (const uint8_t *img, uint8_t *dst)
     for (r = 0; r < (int32_t)IPM_BEV_ROWS; r++)
     {
         const uint16_t *lut = ipm_lut[r];
-        uint8_t        *row = &dst[r * (int32_t)IPM_BEV_COLS];
+        uint8_t        *row = &dst[((int32_t)IPM_BEV_ROWS - 1 - r) * (int32_t)IPM_BEV_COLS];
 
         for (c = 0; c < (int32_t)IPM_BEV_COLS; c++)
         {
             uint16_t idx = lut[c];
 
-            if (idx != 0xFFFFU) { idx = ipm_xform(idx); }
             row[c] = ((idx != 0xFFFFU) && (img[idx] == 255U)) ? 255U : 0U;
         }
     }

@@ -35,16 +35,9 @@ static uint32_t t_last_frame = 0U;    // ★ 上次自检时的帧计数（判"�
 volatile uint8_t  cam_rx_dump[32]  = {0};
 volatile uint32_t cam_rx_dump_i    = 0U;
 static uint32_t cam_t_tx      = 0;
-/* ★★ 2233：**发送侧左右翻转**
-   disp_img 是"摄像头倒装"补偿过的镜像图（巡线的定向就按这个标定的），
-   直接发出去上位机看到的就是左右反的。
-   ⇒ 打包/发送时把列号倒过来（只影响发出去的图），disp_img 不动。
-   命令 `bm 0/1` 开/关。*/
-volatile uint8_t  g_tx_flip = 1U;         /* ★ 发送侧翻转（bit0 左右 / bit1 上下）
-                                             ⚠️ **只对"相机原图"(​bi 0)生效**：
-                                             disp_img 是倒装补偿过的镜像图，发出去要翻一次；
-                                             俯视图已经用 rot 补偿过，不能再翻。*/
-volatile uint8_t  g_tx_flip_lr = 1U;      /* 兼容旧代码（没用了）*/
+/* ★ 2026-11-16：**删除发送侧翻转**（原来的 g_tx_flip / g_tx_flip_lr）。
+   disp_img 在取图时已经翻正（cam_copy_whole_frame：先上下、再左右）⇒
+   发出去的图就是正经方向，发送时**一个像素都不翻**。*/
 static uint16_t cam_tx_row    = 0U;      // 当前正在发的行（发送块用它填 pkt[4] / 取像素）
 
 volatile uint32_t dbg_href_e  = 0U;   /* ★ PA4(HREF) 20ms 内边沿数 */
@@ -795,10 +788,8 @@ void app_loop (void)
 
             for (r2 = 0U; r2 < txh; r2++)
             {
-                /* ★ 2234：发送侧翻转（bit0 左右 / bit1 上下），只影响发出去的图 */
-                uint8_t  tf   = (0U != g_ipm_view) ? 0U : g_tx_flip;   /* ★俯视图不再翻 */
-                uint16_t srow = (0U != (tf & 2U)) ? (uint16_t)(txh - 1U - r2) : r2;
-                const uint8_t *src = &disp_img[srow * (uint16_t)cam_cmd_dy][0];
+                /* ★ 2026-11-16：不翻。disp_img 在取图时已经翻正（唯一翻转点）*/
+                const uint8_t *src = &disp_img[r2 * (uint16_t)cam_cmd_dy][0];
                 for (i2 = 0U; i2 < nbytes; i2++)
                 {
                     uint8_t byte = 0U;
@@ -807,9 +798,7 @@ void app_loop (void)
                         uint16_t col = (uint16_t)(i2 * 8U + k2);
                         if (col < txw)
                         {
-                            uint16_t scol = (0U != (tf & 1U))
-                                          ? (uint16_t)((txw - 1U - col) * (uint16_t)cam_cmd_dx)
-                                          : (uint16_t)(col * (uint16_t)cam_cmd_dx);
+                            uint16_t scol = (uint16_t)(col * (uint16_t)cam_cmd_dx);
                             if (src[scol] >= 128U) { byte |= (uint8_t)(1U << (7U - k2)); }
                         }
                     }
@@ -889,12 +878,8 @@ void app_loop (void)
               uint16_t col = (uint16_t)((uint16_t)i2 * 8U + k2);
               if (col < txw)
               {
-                uint16_t tw = (uint16_t)((uint16_t)CAM_TXW / (uint16_t)cam_cmd_dx);
-        uint8_t  tf   = (0U != g_ipm_view) ? 0U : g_tx_flip;
-        uint16_t srow = (0U != (tf & 2U)) ? (uint16_t)(tw - 1U - cam_tx_row) : cam_tx_row;
-        uint16_t scol = (0U != (tf & 1U)) ? (uint16_t)((tw - 1U - col) * (uint16_t)cam_cmd_dx)
-                                         : (uint16_t)(col * (uint16_t)cam_cmd_dx);
-        uint8_t v = disp_img[srow * (uint16_t)cam_cmd_dy][scol];
+                /* ★ 2026-11-16：不翻 —— disp_img 在取图时已经翻正 */
+                uint8_t v = disp_img[cam_tx_row * (uint16_t)cam_cmd_dy][col * (uint16_t)cam_cmd_dx];
                 if (v >= 128U) { byte |= (uint8_t)(1U << (7U - k2)); }
               }
             }
@@ -1078,7 +1063,7 @@ void app_loop (void)
         //     MD  = 当前采集模式（0 = 752 宽 / 1 = 188 宽）
         //     BIN = 188×120 配置是否成功（1 = 已写并回读一致）
         //     R0D/R0E = 两个 Read Mode 寄存器的**回读值**（列 bin 在 R0D[3:2]、行 bin 在 R0E[1:0]）
-        sprintf(buf, "S f=%lu V=%lu VS=%lu LG=%lu TO=%lu F=%u FL=%u P=%u RX=%lu CAM=%u ID=%04X N=%u MD=%u BIN=%u R0D=%04X W=%u E=%u K=%lu R=%04lX IE=%04lX MI=%04lX CR=%08lX ND=%lu DC=%08lX HE=%lu VE=%lu LW=%lu GP=%lu FW=2235 LM=%lu RST=%02lX PC=%08lX CF=%04lX BA=%08lX MG=%lu SAT=%lu A5=%04lX SH=%04lX\r\n",
+        sprintf(buf, "S f=%lu V=%lu VS=%lu LG=%lu TO=%lu F=%u FL=%u P=%u RX=%lu CAM=%u ID=%04X N=%u MD=%u BIN=%u R0D=%04X W=%u E=%u K=%lu R=%04lX IE=%04lX MI=%04lX CR=%08lX ND=%lu DC=%08lX HE=%lu VE=%lu LW=%lu GP=%lu FW=2237 LM=%lu RST=%02lX PC=%08lX CF=%04lX BA=%08lX MG=%lu SAT=%lu A5=%04lX SH=%04lX\r\n",
                 (unsigned long)cam_frame_cnt, (unsigned long)cam_vsync_isr_cnt,
                 (unsigned long)cam_vs_cap_cnt,
                 (unsigned long)disp_lag_max,
